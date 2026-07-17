@@ -22,6 +22,7 @@ describe('happy path: register client -> register dress -> allocate -> check out
     })
 
     const loginResponse = await request(app).post('/api/auth/login').send({ login: 'bia', password: 'senha123' })
+    expect(loginResponse.status).toBe(200)
     token = loginResponse.body.token
   })
 
@@ -59,6 +60,7 @@ describe('happy path: register client -> register dress -> allocate -> check out
     const availabilityBefore = await auth(
       request(app).get(`/api/allocations/products/${productId}/availability?asOf=2026-09-05`),
     )
+    expect(availabilityBefore.status).toBe(200)
     expect(availabilityBefore.body.status).toBe('available')
 
     const allocationResponse = await auth(request(app).post('/api/allocations')).send({
@@ -74,6 +76,7 @@ describe('happy path: register client -> register dress -> allocate -> check out
     const availabilityReserved = await auth(
       request(app).get(`/api/allocations/products/${productId}/availability?asOf=2026-09-03`),
     )
+    expect(availabilityReserved.status).toBe(200)
     expect(availabilityReserved.body.status).toBe('reserved')
 
     const secondAttempt = await auth(request(app).post('/api/allocations')).send({
@@ -95,6 +98,7 @@ describe('happy path: register client -> register dress -> allocate -> check out
     const availabilityRented = await auth(
       request(app).get(`/api/allocations/products/${productId}/availability?asOf=2026-09-03`),
     )
+    expect(availabilityRented.status).toBe(200)
     expect(availabilityRented.body.status).toBe('rented')
 
     const returnResponse = await auth(
@@ -106,6 +110,7 @@ describe('happy path: register client -> register dress -> allocate -> check out
     const availabilityAfter = await auth(
       request(app).get(`/api/allocations/products/${productId}/availability?asOf=2026-09-06`),
     )
+    expect(availabilityAfter.status).toBe(200)
     expect(availabilityAfter.body.status).toBe('available')
   })
 })
