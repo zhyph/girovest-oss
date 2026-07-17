@@ -63,6 +63,30 @@ describe('isOccupiedForRange', () => {
     ]
     expect(isOccupiedForRange(allocations, new Date('2026-08-01'), new Date('2026-08-05'))).toBe(false)
   })
+
+  it('blocks a new allocation that starts exactly on the reserved window due date (boundary touching)', () => {
+    const allocations: AllocationWindow[] = [
+      {
+        status: 'reserved',
+        checkoutDate: new Date('2026-08-01'),
+        dueDate: new Date('2026-08-05'),
+        actualReturnDate: null,
+      },
+    ]
+    expect(isOccupiedForRange(allocations, new Date('2026-08-05'), new Date('2026-08-10'))).toBe(true)
+  })
+
+  it('allows a new allocation entirely after an existing reserved window with a gap', () => {
+    const allocations: AllocationWindow[] = [
+      {
+        status: 'reserved',
+        checkoutDate: new Date('2026-08-01'),
+        dueDate: new Date('2026-08-05'),
+        actualReturnDate: null,
+      },
+    ]
+    expect(isOccupiedForRange(allocations, new Date('2026-08-10'), new Date('2026-08-15'))).toBe(false)
+  })
 })
 
 describe('derivedAvailability', () => {
