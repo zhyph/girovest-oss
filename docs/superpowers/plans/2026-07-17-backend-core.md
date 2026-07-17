@@ -274,7 +274,7 @@ Create `server/src/domain/sanity.test.ts`:
 
 ```typescript
 import { describe, it, expect } from 'vitest'
-import { addOne } from './sanity'
+import { addOne } from './sanity.js'
 
 describe('addOne', () => {
   it('adds one to a number', () => {
@@ -532,7 +532,7 @@ Create `server/src/db/client.test.ts`:
 
 ```typescript
 import { describe, it, expect, afterAll } from 'vitest'
-import { prisma } from './client'
+import { prisma } from './client.js'
 
 describe('prisma client smoke test', () => {
   afterAll(async () => {
@@ -620,7 +620,7 @@ export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes]
 Create `server/src/errors/AppError.ts`:
 
 ```typescript
-import type { ErrorCode } from './errorCodes'
+import type { ErrorCode } from './errorCodes.js'
 
 export class AppError extends Error {
   public readonly code: ErrorCode
@@ -641,8 +641,8 @@ Create `server/src/errors/errorMiddleware.ts`:
 
 ```typescript
 import type { NextFunction, Request, Response } from 'express'
-import { AppError } from './AppError'
-import { ErrorCodes } from './errorCodes'
+import { AppError } from './AppError.js'
+import { ErrorCodes } from './errorCodes.js'
 
 export function errorMiddleware(
   err: unknown,
@@ -665,7 +665,7 @@ Create `server/src/app.ts`:
 
 ```typescript
 import express from 'express'
-import { errorMiddleware } from './errors/errorMiddleware'
+import { errorMiddleware } from './errors/errorMiddleware.js'
 
 export const app = express()
 app.use(express.json())
@@ -688,7 +688,7 @@ Create `server/src/server.ts`:
 
 ```typescript
 import 'dotenv/config'
-import { app } from './app'
+import { app } from './app.js'
 
 const port = Number(process.env.PORT ?? 3000)
 
@@ -704,7 +704,7 @@ Create `server/tests/integration/health.test.ts`:
 ```typescript
 import { describe, it, expect } from 'vitest'
 import request from 'supertest'
-import { app } from '../../src/app'
+import { app } from '../../src/app.js'
 
 describe('GET /health', () => {
   it('returns ok', async () => {
@@ -752,7 +752,7 @@ Create `server/src/domain/occupancy.test.ts`:
 
 ```typescript
 import { describe, it, expect } from 'vitest'
-import { isOccupiedForRange, derivedAvailability, type AllocationWindow } from './occupancy'
+import { isOccupiedForRange, derivedAvailability, type AllocationWindow } from './occupancy.js'
 
 describe('isOccupiedForRange', () => {
   it('blocks a new allocation whose range overlaps a reserved allocation', () => {
@@ -1027,9 +1027,9 @@ Create `server/src/auth/authMiddleware.ts`:
 
 ```typescript
 import type { NextFunction, Request, Response } from 'express'
-import { AppError } from '../errors/AppError'
-import { ErrorCodes } from '../errors/errorCodes'
-import { verifyStaffToken } from './jwt'
+import { AppError } from '../errors/AppError.js'
+import { ErrorCodes } from '../errors/errorCodes.js'
+import { verifyStaffToken } from './jwt.js'
 
 export function requireAuth(req: Request, _res: Response, next: NextFunction): void {
   const header = req.header('authorization')
@@ -1054,11 +1054,11 @@ Create `server/src/auth/authRoutes.ts`:
 ```typescript
 import { Router } from 'express'
 import { z } from 'zod'
-import { prisma } from '../db/client'
-import { AppError } from '../errors/AppError'
-import { ErrorCodes } from '../errors/errorCodes'
-import { verifyPassword } from './passwords'
-import { signStaffToken } from './jwt'
+import { prisma } from '../db/client.js'
+import { AppError } from '../errors/AppError.js'
+import { ErrorCodes } from '../errors/errorCodes.js'
+import { verifyPassword } from './passwords.js'
+import { signStaffToken } from './jwt.js'
 
 export const authRouter = Router()
 
@@ -1094,7 +1094,7 @@ Edit `server/src/app.ts` — replace:
 
 ```typescript
 import express from 'express'
-import { errorMiddleware } from './errors/errorMiddleware'
+import { errorMiddleware } from './errors/errorMiddleware.js'
 
 export const app = express()
 app.use(express.json())
@@ -1115,8 +1115,8 @@ with:
 
 ```typescript
 import express from 'express'
-import { errorMiddleware } from './errors/errorMiddleware'
-import { authRouter } from './auth/authRoutes'
+import { errorMiddleware } from './errors/errorMiddleware.js'
+import { authRouter } from './auth/authRoutes.js'
 
 export const app = express()
 app.use(express.json())
@@ -1140,9 +1140,9 @@ Create `server/src/auth/authRoutes.test.ts`:
 ```typescript
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import request from 'supertest'
-import { app } from '../app'
-import { prisma } from '../db/client'
-import { hashPassword } from './passwords'
+import { app } from '../app.js'
+import { prisma } from '../db/client.js'
+import { hashPassword } from './passwords.js'
 
 describe('POST /api/auth/login', () => {
   let locationId: string
@@ -1237,15 +1237,15 @@ Create `server/src/services/clientService.test.ts`:
 
 ```typescript
 import { describe, it, expect, afterEach } from 'vitest'
-import { prisma } from '../db/client'
-import { AppError } from '../errors/AppError'
+import { prisma } from '../db/client.js'
+import { AppError } from '../errors/AppError.js'
 import {
   createClient,
   listClients,
   getClient,
   updateClient,
   deleteClient,
-} from './clientService'
+} from './clientService.js'
 
 afterEach(async () => {
   await prisma.allocation.deleteMany()
@@ -1335,9 +1335,9 @@ Expected: FAIL — `clientService.ts` does not exist.
 Create `server/src/services/clientService.ts`:
 
 ```typescript
-import { prisma } from '../db/client'
-import { AppError } from '../errors/AppError'
-import { ErrorCodes } from '../errors/errorCodes'
+import { prisma } from '../db/client.js'
+import { AppError } from '../errors/AppError.js'
+import { ErrorCodes } from '../errors/errorCodes.js'
 
 export interface CreateClientInput {
   name: string
@@ -1400,10 +1400,10 @@ Create `server/src/routes/clients.ts`:
 ```typescript
 import { Router } from 'express'
 import { z } from 'zod'
-import { requireAuth } from '../auth/authMiddleware'
-import { AppError } from '../errors/AppError'
-import { ErrorCodes } from '../errors/errorCodes'
-import { createClient, listClients, getClient, updateClient, deleteClient } from '../services/clientService'
+import { requireAuth } from '../auth/authMiddleware.js'
+import { AppError } from '../errors/AppError.js'
+import { ErrorCodes } from '../errors/errorCodes.js'
+import { createClient, listClients, getClient, updateClient, deleteClient } from '../services/clientService.js'
 
 export const clientsRouter = Router()
 clientsRouter.use(requireAuth)
@@ -1472,7 +1472,7 @@ app.use('/api/clients', clientsRouter)
 And add the import at the top alongside the other route imports:
 
 ```typescript
-import { clientsRouter } from './routes/clients'
+import { clientsRouter } from './routes/clients.js'
 ```
 
 - [ ] **Step 7: Run the full test suite to confirm nothing regressed**
@@ -1520,9 +1520,9 @@ Create `server/src/services/productService.test.ts`:
 
 ```typescript
 import { describe, it, expect, afterEach, beforeEach } from 'vitest'
-import { prisma } from '../db/client'
-import { AppError } from '../errors/AppError'
-import { createProduct, listProducts, getProduct, updateProduct, deleteProduct } from './productService'
+import { prisma } from '../db/client.js'
+import { AppError } from '../errors/AppError.js'
+import { createProduct, listProducts, getProduct, updateProduct, deleteProduct } from './productService.js'
 
 let locationId: string
 
@@ -1637,9 +1637,9 @@ Expected: FAIL — `productService.ts` does not exist.
 Create `server/src/services/productService.ts`:
 
 ```typescript
-import { prisma } from '../db/client'
-import { AppError } from '../errors/AppError'
-import { ErrorCodes } from '../errors/errorCodes'
+import { prisma } from '../db/client.js'
+import { AppError } from '../errors/AppError.js'
+import { ErrorCodes } from '../errors/errorCodes.js'
 
 export type ProductStatus = 'active' | 'maintenance' | 'retired'
 
@@ -1773,16 +1773,16 @@ Create `server/src/routes/products.ts`:
 ```typescript
 import { Router } from 'express'
 import { z } from 'zod'
-import { requireAuth } from '../auth/authMiddleware'
-import { AppError } from '../errors/AppError'
-import { ErrorCodes } from '../errors/errorCodes'
+import { requireAuth } from '../auth/authMiddleware.js'
+import { AppError } from '../errors/AppError.js'
+import { ErrorCodes } from '../errors/errorCodes.js'
 import {
   createProduct,
   listProducts,
   getProduct,
   updateProduct,
   deleteProduct,
-} from '../services/productService'
+} from '../services/productService.js'
 
 export const productsRouter = Router()
 productsRouter.use(requireAuth)
@@ -1864,7 +1864,7 @@ app.use('/api/products', productsRouter)
 // Always add new routers ABOVE this comment and BELOW it stays last:
 ```
 
-And add the import: `import { productsRouter } from './routes/products'`
+And add the import: `import { productsRouter } from './routes/products.js'`
 
 - [ ] **Step 7: Run the full test suite**
 
@@ -1914,15 +1914,15 @@ Create `server/src/services/allocationService.test.ts`:
 
 ```typescript
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { prisma } from '../db/client'
-import { AppError } from '../errors/AppError'
+import { prisma } from '../db/client.js'
+import { AppError } from '../errors/AppError.js'
 import {
   createAllocation,
   checkOutAllocation,
   returnAllocation,
   cancelAllocation,
   getProductAvailability,
-} from './allocationService'
+} from './allocationService.js'
 
 let locationId: string
 let staffId: string
@@ -2081,10 +2081,10 @@ Create `server/src/services/allocationService.ts`:
 
 ```typescript
 import { Prisma } from '../../generated/prisma/client.js'
-import { prisma } from '../db/client'
-import { AppError } from '../errors/AppError'
-import { ErrorCodes } from '../errors/errorCodes'
-import { isOccupiedForRange, derivedAvailability, type AllocationWindow, type AllocationStatus } from '../domain/occupancy'
+import { prisma } from '../db/client.js'
+import { AppError } from '../errors/AppError.js'
+import { ErrorCodes } from '../errors/errorCodes.js'
+import { isOccupiedForRange, derivedAvailability, type AllocationWindow, type AllocationStatus } from '../domain/occupancy.js'
 
 const MAX_WRITE_CONFLICT_RETRIES = 5
 const ACTIVE_STATUSES: AllocationStatus[] = ['reserved', 'checked_out']
@@ -2251,16 +2251,16 @@ Create `server/src/routes/allocations.ts`:
 ```typescript
 import { Router } from 'express'
 import { z } from 'zod'
-import { requireAuth } from '../auth/authMiddleware'
-import { AppError } from '../errors/AppError'
-import { ErrorCodes } from '../errors/errorCodes'
+import { requireAuth } from '../auth/authMiddleware.js'
+import { AppError } from '../errors/AppError.js'
+import { ErrorCodes } from '../errors/errorCodes.js'
 import {
   createAllocation,
   checkOutAllocation,
   returnAllocation,
   cancelAllocation,
   getProductAvailability,
-} from '../services/allocationService'
+} from '../services/allocationService.js'
 
 export const allocationsRouter = Router()
 allocationsRouter.use(requireAuth)
@@ -2344,7 +2344,7 @@ app.use('/api/allocations', allocationsRouter)
 // Always add new routers ABOVE this comment and BELOW it stays last:
 ```
 
-And add the import: `import { allocationsRouter } from './routes/allocations'`
+And add the import: `import { allocationsRouter } from './routes/allocations.js'`
 
 - [ ] **Step 7: Run the full test suite**
 
@@ -2383,8 +2383,8 @@ Create `server/src/services/calendarService.test.ts`:
 
 ```typescript
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { prisma } from '../db/client'
-import { listGoingOut, listDueBack, listOverdue } from './calendarService'
+import { prisma } from '../db/client.js'
+import { listGoingOut, listDueBack, listOverdue } from './calendarService.js'
 
 let locationId: string
 let staffId: string
@@ -2480,7 +2480,7 @@ Expected: FAIL — `calendarService.ts` does not exist.
 Create `server/src/services/calendarService.ts`:
 
 ```typescript
-import { prisma } from '../db/client'
+import { prisma } from '../db/client.js'
 
 export function listGoingOut(from: Date, to: Date) {
   return prisma.allocation.findMany({
@@ -2525,10 +2525,10 @@ Create `server/src/routes/calendar.ts`:
 ```typescript
 import { Router } from 'express'
 import { z } from 'zod'
-import { requireAuth } from '../auth/authMiddleware'
-import { AppError } from '../errors/AppError'
-import { ErrorCodes } from '../errors/errorCodes'
-import { listGoingOut, listDueBack, listOverdue } from '../services/calendarService'
+import { requireAuth } from '../auth/authMiddleware.js'
+import { AppError } from '../errors/AppError.js'
+import { ErrorCodes } from '../errors/errorCodes.js'
+import { listGoingOut, listDueBack, listOverdue } from '../services/calendarService.js'
 
 export const calendarRouter = Router()
 calendarRouter.use(requireAuth)
@@ -2580,7 +2580,7 @@ app.use('/api/calendar', calendarRouter)
 // Always add new routers ABOVE this comment and BELOW it stays last:
 ```
 
-And add the import: `import { calendarRouter } from './routes/calendar'`
+And add the import: `import { calendarRouter } from './routes/calendar.js'`
 
 - [ ] **Step 7: Run the full test suite**
 
@@ -2619,9 +2619,9 @@ Create `server/tests/integration/happyPath.test.ts`:
 ```typescript
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import request from 'supertest'
-import { app } from '../../src/app'
-import { prisma } from '../../src/db/client'
-import { hashPassword } from '../../src/auth/passwords'
+import { app } from '../../src/app.js'
+import { prisma } from '../../src/db/client.js'
+import { hashPassword } from '../../src/auth/passwords.js'
 
 describe('happy path: register client -> register dress -> allocate -> check out -> return', () => {
   let locationId: string
