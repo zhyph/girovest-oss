@@ -19,6 +19,9 @@ web app.
 - Ship as both a local desktop app (offline, single location) and a hosted
   web app (accessible remotely), from one codebase.
 - Data model ready for multiple locations later, without a v1 migration.
+- Ship with Brazilian Portuguese (`pt-BR`) as the default and only v1
+  language, built on an i18n layer so more languages can be added later
+  without touching business logic or component code.
 
 ## Non-goals (v1)
 
@@ -28,6 +31,8 @@ web app.
   `location` field exists in the schema but v1 only ever has one row.
 - SMS reminders — only in-app overdue flags and optional email alerts.
 - Public-facing customer portal — staff-only tool.
+- Translating into languages other than `pt-BR` for v1 — the i18n layer
+  is built to support it, but no other locale ships at launch.
 
 ## Architecture
 
@@ -44,9 +49,28 @@ The only difference between targets is the database connection string and
 how the server process is started. All business logic, validation, and UI
 are identical, so the two builds cannot drift apart in behavior.
 
+**i18n.** The frontend uses `react-i18next`, with UI strings in JSON
+resource files per locale/namespace (e.g. `locales/pt-BR/clients.json`,
+`locales/pt-BR/allocations.json`). Components reference translation keys,
+never hardcoded strings, from day one — so adding a language later means
+adding a new locale folder and registering it, not touching component
+code. Dates and currency are formatted with the built-in `Intl` API
+(`Intl.DateTimeFormat`, `Intl.NumberFormat`) keyed off the active locale
+(`pt-BR` → `DD/MM/YYYY`, `R$`), rather than hand-rolled formatting, so
+they flip correctly if another locale is added. The backend stays
+locale-agnostic: validation/error responses use machine-readable codes
+(e.g. `ERR_DUE_DATE_BEFORE_CHECKOUT`), and the frontend maps codes to
+translated text. The one exception is overdue-alert emails: those are
+backend-generated prose, rendered server-side (also via `i18next`, which
+supports server-side use) using the sending `Location`'s `locale` — every
+other user-facing message goes through the frontend's translation layer.
+
 ## Data model
 
-- **Location** — `id`, `name`, `address`. Seeded with a single row in v1.
+- **Location** — `id`, `name`, `address`, `locale` (default `pt-BR`).
+  Seeded with a single row in v1. `locale` drives which language overdue
+  emails are sent in once more locations (and languages) exist; for v1 it
+  is always `pt-BR`.
 - **Staff** — `id`, `name`, `login`, `password_hash`, `role`
   (`owner` | `staff`), `location_id`. Used for login and to record who
   checked a dress in/out.
