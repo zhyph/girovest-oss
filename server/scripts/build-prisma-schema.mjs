@@ -12,7 +12,7 @@ const header = `// GENERATED FILE — do not edit directly. Edit prisma/models.p
 
 generator client {
   provider = "prisma-client"
-  output   = "../../generated/prisma"
+  output   = "../../src/generated/prisma"
 }
 
 datasource db {
