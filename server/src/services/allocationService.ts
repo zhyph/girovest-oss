@@ -101,14 +101,22 @@ export async function checkOutAllocation(id: string, data: CheckOutInput) {
       `Cannot check out an allocation with status ${allocation.status}`,
     )
   }
-  return prisma.allocation.update({
-    where: { id },
+  const result = await prisma.allocation.updateMany({
+    where: { id, status: 'reserved' },
     data: {
       status: 'checked_out',
       conditionNotesOut: data.conditionNotesOut,
       depositCollected: data.depositCollected,
     },
   })
+  if (result.count === 0) {
+    throw new AppError(
+      ErrorCodes.INVALID_ALLOCATION_TRANSITION,
+      409,
+      'Allocation status changed concurrently; refresh and try again',
+    )
+  }
+  return prisma.allocation.findUniqueOrThrow({ where: { id } })
 }
 
 export interface ReturnInput {
@@ -126,8 +134,8 @@ export async function returnAllocation(id: string, data: ReturnInput) {
       `Cannot return an allocation with status ${allocation.status}`,
     )
   }
-  return prisma.allocation.update({
-    where: { id },
+  const result = await prisma.allocation.updateMany({
+    where: { id, status: 'checked_out' },
     data: {
       status: 'returned',
       actualReturnDate: data.actualReturnDate ?? new Date(),
@@ -135,6 +143,14 @@ export async function returnAllocation(id: string, data: ReturnInput) {
       depositReturned: data.depositReturned,
     },
   })
+  if (result.count === 0) {
+    throw new AppError(
+      ErrorCodes.INVALID_ALLOCATION_TRANSITION,
+      409,
+      'Allocation status changed concurrently; refresh and try again',
+    )
+  }
+  return prisma.allocation.findUniqueOrThrow({ where: { id } })
 }
 
 export async function cancelAllocation(id: string) {
@@ -146,7 +162,18 @@ export async function cancelAllocation(id: string) {
       `Cannot cancel an allocation with status ${allocation.status}`,
     )
   }
-  return prisma.allocation.update({ where: { id }, data: { status: 'cancelled' } })
+  const result = await prisma.allocation.updateMany({
+    where: { id, status: 'reserved' },
+    data: { status: 'cancelled' },
+  })
+  if (result.count === 0) {
+    throw new AppError(
+      ErrorCodes.INVALID_ALLOCATION_TRANSITION,
+      409,
+      'Allocation status changed concurrently; refresh and try again',
+    )
+  }
+  return prisma.allocation.findUniqueOrThrow({ where: { id } })
 }
 
 export async function getProductAvailability(productId: string, asOf: Date = new Date()) {
