@@ -30,6 +30,18 @@ export async function createAllocation(input: CreateAllocationInput) {
     throw new AppError(ErrorCodes.DUE_DATE_BEFORE_CHECKOUT, 400, 'Due date must be on or after checkout date')
   }
 
+  const product = await prisma.product.findUnique({ where: { id: input.productId } })
+  if (!product) {
+    throw new AppError(ErrorCodes.NOT_FOUND, 404, `Product ${input.productId} not found`)
+  }
+  if (product.status !== 'active') {
+    throw new AppError(
+      ErrorCodes.PRODUCT_NOT_IN_CIRCULATION,
+      409,
+      `Product is ${product.status} and cannot be allocated`,
+    )
+  }
+
   const useSerializable = process.env.DB_PROVIDER === 'postgresql'
 
   for (let attempt = 0; attempt < MAX_WRITE_CONFLICT_RETRIES; attempt++) {

@@ -152,4 +152,36 @@ describe('allocationService', () => {
   it('is available when there is no allocation at all', async () => {
     expect(await getProductAvailability(productId, new Date('2026-09-01'))).toBe('available')
   })
+
+  it('rejects allocating a product that is not active', async () => {
+    const maintenanceProduct = await prisma.product.create({
+      data: { locationId, name: 'Vestido em manutenção', category: 'festa', size: 'M', color: 'azul', rentalPrice: 100, depositAmount: 50, status: 'maintenance' },
+    })
+
+    await expect(
+      createAllocation({
+        productId: maintenanceProduct.id, clientId, staffId,
+        checkoutDate: new Date('2026-09-01'),
+        dueDate: new Date('2026-09-05'),
+        priceCharged: 100,
+      }),
+    ).rejects.toMatchObject({ code: 'PRODUCT_NOT_IN_CIRCULATION' })
+  })
+
+  it('CRITICAL: only one of two concurrent overlapping allocation attempts succeeds', async () => {
+    const attempt = () =>
+      createAllocation({
+        productId, clientId, staffId,
+        checkoutDate: new Date('2026-10-01'),
+        dueDate: new Date('2026-10-05'),
+        priceCharged: 100,
+      })
+
+    const results = await Promise.allSettled([attempt(), attempt()])
+    const fulfilled = results.filter((r) => r.status === 'fulfilled')
+    const rejected = results.filter((r) => r.status === 'rejected')
+
+    expect(fulfilled).toHaveLength(1)
+    expect(rejected).toHaveLength(1)
+  })
 })

@@ -8,6 +8,7 @@ export const ErrorCodes = {
   CANNOT_DELETE_WITH_HISTORY: 'CANNOT_DELETE_WITH_HISTORY',
   UNAUTHORIZED: 'UNAUTHORIZED',
   INTERNAL_ERROR: 'INTERNAL_ERROR',
+  PRODUCT_NOT_IN_CIRCULATION: 'PRODUCT_NOT_IN_CIRCULATION',
 } as const
 
 export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes]

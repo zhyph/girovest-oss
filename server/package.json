@@ -6,6 +6,7 @@
   "scripts": {
     "db:schema": "node scripts/build-prisma-schema.mjs",
     "db:generate": "npm run db:schema && prisma generate",
+    "prepare": "npm run db:generate",
     "db:migrate": "npm run db:schema && prisma migrate dev",
     "db:migrate:postgresql": "cross-env DB_PROVIDER=postgresql npm run db:migrate",
     "dev": "tsx watch src/server.ts",
@@ -17,7 +18,7 @@
     "test:watch": "dotenv -e .env.test -- vitest",
     "test:postgres:up": "docker compose -f tests/postgres/docker-compose.yml up -d --wait",
     "test:postgres:down": "docker compose -f tests/postgres/docker-compose.yml down -v",
-    "test:postgres": "npm run test:postgres:up && dotenv -e .env.test.postgresql -- npm run db:generate && dotenv -e .env.test.postgresql -- prisma db push && dotenv -e .env.test.postgresql -- vitest run; npm run test:postgres:down && npm run db:generate"
+    "test:postgres": "npm run test:postgres:up && dotenv -e .env.test.postgresql -- npm run db:generate && dotenv -e .env.test.postgresql -- prisma db push && dotenv -e .env.test.postgresql -- vitest run; npm run test:postgres:down; npm run db:generate"
   },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.8.0",
