@@ -446,7 +446,7 @@ const header = `// GENERATED FILE — do not edit directly. Edit prisma/models.p
 
 generator client {
   provider = "prisma-client"
-  output   = "../../generated/prisma"
+  output   = "../../src/generated/prisma"
 }
 
 datasource db {
@@ -488,7 +488,7 @@ cd /home/zhyp/Code/dress-store-app/server
 npm run db:generate
 npm run db:migrate -- --name init
 ```
-Expected: `prisma/sqlite/schema.prisma` is created, `generated/prisma/`
+Expected: `prisma/sqlite/schema.prisma` is created, `src/generated/prisma/`
 appears with the client, `prisma/sqlite/migrations/` gets an `init`
 migration, and `dev.db` is created.
 
@@ -497,7 +497,7 @@ migration, and `dev.db` is created.
 Create `server/src/db/client.ts`:
 
 ```typescript
-import { PrismaClient } from '../../generated/prisma/client.js'
+import { PrismaClient } from '../generated/prisma/client.js'
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
 import { PrismaPg } from '@prisma/adapter-pg'
 
@@ -2080,7 +2080,7 @@ Expected: FAIL — `allocationService.ts` does not exist.
 Create `server/src/services/allocationService.ts`:
 
 ```typescript
-import { Prisma } from '../../generated/prisma/client.js'
+import { Prisma } from '../generated/prisma/client.js'
 import { prisma } from '../db/client.js'
 import { AppError } from '../errors/AppError.js'
 import { ErrorCodes } from '../errors/errorCodes.js'
