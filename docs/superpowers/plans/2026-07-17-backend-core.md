@@ -241,9 +241,19 @@ export default defineConfig({
     environment: 'node',
     include: ['src/**/*.test.ts', 'tests/**/*.test.ts'],
     testTimeout: 15000,
+    fileParallelism: false,
   },
 })
 ```
+
+`fileParallelism: false` matters once integration tests exist (Tasks 2+):
+every integration test shares one SQLite file (`.env.test`'s
+`DATABASE_URL`), and each file's `afterEach`/`beforeEach` deletes/creates
+rows across the same tables. Running test files in parallel workers (the
+Vitest default) races those cleanups against each other; this setting
+forces files to run sequentially instead, matching how the "throwaway
+SQLite database" in the design doc's Testing section is meant to be used
+— one shared, disposable DB, accessed by one test file at a time.
 
 - [ ] **Step 5: Create `.gitignore`**
 
