@@ -1,0 +1,85 @@
+// GENERATED FILE — do not edit directly. Edit prisma/models.prisma
+// and run `npm run db:schema` instead.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Location {
+  id        String   @id @default(uuid())
+  name      String
+  address   String
+  locale    String   @default("pt-BR")
+  createdAt DateTime @default(now())
+
+  staff    Staff[]
+  products Product[]
+}
+
+model Staff {
+  id           String   @id @default(uuid())
+  name         String
+  login        String   @unique
+  passwordHash String
+  role         String
+  locationId   String
+  createdAt    DateTime @default(now())
+
+  location    Location     @relation(fields: [locationId], references: [id])
+  allocations Allocation[]
+}
+
+model Client {
+  id        String   @id @default(uuid())
+  name      String
+  phone     String
+  email     String
+  notes     String?
+  createdAt DateTime @default(now())
+
+  allocations Allocation[]
+}
+
+model Product {
+  id            String   @id @default(uuid())
+  locationId    String
+  name          String
+  description   String?
+  category      String
+  size          String
+  color         String
+  rentalPrice   Float
+  depositAmount Float
+  photos        String   @default("[]")
+  status        String   @default("active")
+  createdAt     DateTime @default(now())
+
+  location    Location     @relation(fields: [locationId], references: [id])
+  allocations Allocation[]
+}
+
+model Allocation {
+  id                String    @id @default(uuid())
+  productId         String
+  clientId          String
+  staffId           String
+  checkoutDate      DateTime
+  dueDate           DateTime
+  actualReturnDate  DateTime?
+  status            String
+  priceCharged      Float
+  depositCollected  Float?
+  depositReturned   Float?
+  conditionNotesOut String?
+  conditionNotesIn  String?
+  createdAt         DateTime  @default(now())
+
+  product Product @relation(fields: [productId], references: [id])
+  client  Client  @relation(fields: [clientId], references: [id])
+  staff   Staff   @relation(fields: [staffId], references: [id])
+}
