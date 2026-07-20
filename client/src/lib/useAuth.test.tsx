@@ -31,6 +31,21 @@ describe('useAuth', () => {
     await waitFor(() => expect(result.current.staff?.name).toBe('Ana'))
   })
 
+  it('clears the token when the follow-up /api/auth/me call fails after login', async () => {
+    vi.spyOn(api, 'apiFetch').mockImplementation(async (path) => {
+      if (path === '/api/auth/login') return { token: 'new-token' } as never
+      if (path === '/api/auth/me') throw new api.ApiError('SERVER_ERROR', 500, 'boom')
+      throw new Error('unexpected path')
+    })
+
+    const { result } = renderHook(() => useAuth(), { wrapper })
+
+    await expect(act(() => result.current.login('ana', 'senha123'))).rejects.toThrow('boom')
+
+    expect(getToken()).toBeNull()
+    expect(result.current.isLoggedIn).toBe(false)
+  })
+
   it('logs out and clears the token on the auth:logout event', async () => {
     vi.spyOn(api, 'apiFetch').mockResolvedValue({ id: '1', name: 'Ana', role: 'owner', locationId: 'l1' } as never)
     const { setToken } = await import('./auth.ts')

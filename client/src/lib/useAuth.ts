@@ -21,12 +21,8 @@ export function useAuth() {
   })
 
   useEffect(() => {
-    function handleLogout() {
-      clearToken()
-      queryClient.setQueryData(['auth', 'me'], undefined)
-    }
-    window.addEventListener('auth:logout', handleLogout)
-    return () => window.removeEventListener('auth:logout', handleLogout)
+    window.addEventListener('auth:logout', logout)
+    return () => window.removeEventListener('auth:logout', logout)
   }, [queryClient])
 
   async function login(login: string, password: string) {
@@ -39,8 +35,17 @@ export function useAuth() {
     // `enabled: Boolean(getToken())`, which was false while unauthenticated, so
     // it isn't an "active" query yet and `invalidateQueries` (refetchType:
     // 'active' by default) would not refetch it.
-    const staff = await apiFetch<StaffMe>('/api/auth/me')
-    queryClient.setQueryData(['auth', 'me'], staff)
+    try {
+      const staff = await apiFetch<StaffMe>('/api/auth/me')
+      queryClient.setQueryData(['auth', 'me'], staff)
+    } catch (error) {
+      // Don't leave a persisted token if we couldn't confirm the session:
+      // otherwise isLoggedIn flips to true while `staff` stays undefined,
+      // and ProtectedRoute (which only checks isLoggedIn) would let a
+      // "failed" login through with no profile data.
+      clearToken()
+      throw error
+    }
   }
 
   function logout() {
