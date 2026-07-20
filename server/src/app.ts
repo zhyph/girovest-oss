@@ -7,6 +7,7 @@ import { allocationsRouter } from './routes/allocations.js'
 import { calendarRouter } from './routes/calendar.js'
 
 export const app = express()
+app.disable('x-powered-by')
 app.use(express.json())
 
 app.get('/health', (_req, res) => {

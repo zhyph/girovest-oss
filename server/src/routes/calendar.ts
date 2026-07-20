@@ -30,6 +30,7 @@ calendarRouter.get('/due-back', async (req, res) => {
 })
 
 calendarRouter.get('/overdue', async (req, res) => {
-  const asOf = req.query.asOf ? new Date(String(req.query.asOf)) : new Date()
+  const asOfQuery = req.query.asOf
+  const asOf = typeof asOfQuery === 'string' ? new Date(asOfQuery) : new Date()
   res.json(await listOverdue(asOf))
 })

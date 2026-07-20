@@ -63,6 +63,7 @@ allocationsRouter.post('/:id/cancel', async (req, res) => {
 })
 
 allocationsRouter.get('/products/:productId/availability', async (req, res) => {
-  const asOf = req.query.asOf ? new Date(String(req.query.asOf)) : new Date()
+  const asOfQuery = req.query.asOf
+  const asOf = typeof asOfQuery === 'string' ? new Date(asOfQuery) : new Date()
   res.json({ status: await getProductAvailability(req.params.productId, asOf) })
 })
