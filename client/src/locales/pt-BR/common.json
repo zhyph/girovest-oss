@@ -1,0 +1,20 @@
+{
+  "appName": "Ateliê",
+  "nav": {
+    "dashboard": "Painel",
+    "clients": "Clientes",
+    "products": "Produtos",
+    "allocations": "Alocações",
+    "calendar": "Calendário"
+  },
+  "actions": {
+    "save": "Salvar",
+    "cancel": "Cancelar",
+    "edit": "Editar",
+    "delete": "Excluir",
+    "create": "Novo"
+  },
+  "errors": {
+    "UNKNOWN": "Algo deu errado. Tente novamente."
+  }
+}
