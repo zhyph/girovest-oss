@@ -1,0 +1,19 @@
+{
+  "title": "Clientes",
+  "searchPlaceholder": "Buscar por nome, telefone ou e-mail...",
+  "fields": {
+    "name": "Nome",
+    "phone": "Telefone",
+    "email": "E-mail",
+    "notes": "Observações"
+  },
+  "validation": {
+    "nameRequired": "Nome é obrigatório",
+    "phoneRequired": "Telefone é obrigatório",
+    "emailInvalid": "E-mail inválido"
+  },
+  "errors": {
+    "CANNOT_DELETE_WITH_HISTORY": "Não é possível excluir um cliente com histórico de alocações."
+  },
+  "empty": "Nenhum cliente cadastrado ainda."
+}
