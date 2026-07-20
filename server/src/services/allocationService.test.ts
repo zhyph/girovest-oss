@@ -8,6 +8,7 @@ import {
   cancelAllocation,
   getProductAvailability,
   isProductAvailableForRange,
+  listAllocations,
 } from './allocationService.js'
 
 let locationId: string
@@ -196,5 +197,24 @@ describe('allocationService', () => {
 
     expect(fulfilled).toHaveLength(1)
     expect(rejected).toHaveLength(1)
+  })
+
+  it('lists all allocations, newest first', async () => {
+    const first = await createAllocation({
+      productId, clientId, staffId,
+      checkoutDate: new Date('2026-09-01'),
+      dueDate: new Date('2026-09-05'),
+      priceCharged: 100,
+    })
+    await cancelAllocation(first.id)
+    const second = await createAllocation({
+      productId, clientId, staffId,
+      checkoutDate: new Date('2026-10-01'),
+      dueDate: new Date('2026-10-05'),
+      priceCharged: 100,
+    })
+
+    const all = await listAllocations()
+    expect(all.map((a) => a.id)).toEqual([second.id, first.id])
   })
 })

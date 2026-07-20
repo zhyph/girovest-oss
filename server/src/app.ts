@@ -1,4 +1,5 @@
 import express from 'express'
+import cors from 'cors'
 import { errorMiddleware } from './errors/errorMiddleware.js'
 import { authRouter } from './auth/authRoutes.js'
 import { clientsRouter } from './routes/clients.js'
@@ -8,6 +9,7 @@ import { calendarRouter } from './routes/calendar.js'
 
 export const app = express()
 app.disable('x-powered-by')
+app.use(cors())
 app.use(express.json())
 
 app.get('/health', (_req, res) => {

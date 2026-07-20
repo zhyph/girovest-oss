@@ -201,3 +201,7 @@ export async function isProductAvailableForRange(productId: string, checkoutDate
   })
   return !isOccupiedForRange(allocations.map(toWindow), checkoutDate, dueDate)
 }
+
+export async function listAllocations() {
+  return prisma.allocation.findMany({ orderBy: { createdAt: 'desc' } })
+}

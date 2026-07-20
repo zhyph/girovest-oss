@@ -10,10 +10,15 @@ import {
   cancelAllocation,
   getProductAvailability,
   isProductAvailableForRange,
+  listAllocations,
 } from '../services/allocationService.js'
 
 export const allocationsRouter = Router()
 allocationsRouter.use(requireAuth)
+
+allocationsRouter.get('/', async (_req, res) => {
+  res.json(await listAllocations())
+})
 
 const createSchema = z.object({
   productId: z.string().min(1),

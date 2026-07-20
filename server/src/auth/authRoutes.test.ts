@@ -100,3 +100,10 @@ describe('GET /api/auth/me', () => {
     expect(response.status).toBe(401)
   })
 })
+
+describe('CORS', () => {
+  it('allows cross-origin requests', async () => {
+    const response = await request(app).get('/health')
+    expect(response.headers['access-control-allow-origin']).toBe('*')
+  })
+})
