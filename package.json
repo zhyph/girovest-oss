@@ -1,0 +1,8 @@
+{
+  "name": "dress-store-app",
+  "private": true,
+  "workspaces": [
+    "server",
+    "client"
+  ]
+}
