@@ -5,6 +5,7 @@ import { AppLayout } from './AppLayout.tsx'
 import { DashboardPage } from '../features/dashboard/DashboardPage.tsx'
 import { ClientsPage } from '../features/clients/ClientsPage.tsx'
 import { ProductsPage } from '../features/products/ProductsPage.tsx'
+import { AllocationsPage } from '../features/allocations/AllocationsPage.tsx'
 
 export function AppRouter() {
   return (
@@ -15,7 +16,7 @@ export function AppRouter() {
           <Route index element={<DashboardPage />} />
           <Route path="/clientes" element={<ClientsPage />} />
           <Route path="/produtos" element={<ProductsPage />} />
-          <Route path="/alocacoes" element={<div>Alocações</div>} />
+          <Route path="/alocacoes" element={<AllocationsPage />} />
           <Route path="/calendario" element={<div>Calendário</div>} />
         </Route>
       </Route>

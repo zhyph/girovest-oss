@@ -1,0 +1,30 @@
+{
+  "title": "Alocações",
+  "newAllocation": "Nova alocação",
+  "fields": {
+    "client": "Cliente",
+    "product": "Produto",
+    "checkoutDate": "Data de saída",
+    "dueDate": "Data de devolução",
+    "priceCharged": "Valor cobrado"
+  },
+  "status": {
+    "reserved": "Reservado",
+    "checked_out": "Alugado",
+    "returned": "Devolvido",
+    "cancelled": "Cancelado"
+  },
+  "actions": {
+    "checkOut": "Check-out",
+    "return": "Devolver",
+    "cancel": "Cancelar"
+  },
+  "unavailableProduct": "Não disponível no período escolhido",
+  "errors": {
+    "PRODUCT_UNAVAILABLE": "Produto não disponível para as datas escolhidas.",
+    "PRODUCT_NOT_IN_CIRCULATION": "Este produto não está disponível para aluguel.",
+    "DUE_DATE_BEFORE_CHECKOUT": "A data de devolução deve ser após a data de saída.",
+    "INVALID_ALLOCATION_TRANSITION": "Esta ação não é permitida no status atual."
+  },
+  "empty": "Nenhuma alocação registrada ainda."
+}
