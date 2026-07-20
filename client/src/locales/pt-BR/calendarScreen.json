@@ -1,0 +1,11 @@
+{
+  "title": "Calendário",
+  "tabs": {
+    "goingOut": "Saindo",
+    "dueBack": "Voltando",
+    "overdue": "Atrasados"
+  },
+  "viewMonth": "Ver mês",
+  "viewAgenda": "Ver agenda",
+  "empty": "Nada para mostrar neste período."
+}
