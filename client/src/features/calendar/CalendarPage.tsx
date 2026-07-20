@@ -58,6 +58,8 @@ export function CalendarPage() {
           allocations={allocations ?? []}
           dateField={tabDateField[tab]}
           productNames={productNames}
+          date={anchor}
+          onNavigate={setAnchor}
           onSelectDay={(date) => {
             setAnchor(date)
             setView('agenda')

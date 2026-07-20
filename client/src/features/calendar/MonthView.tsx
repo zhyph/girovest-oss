@@ -17,11 +17,15 @@ export function MonthView({
   dateField,
   onSelectDay,
   productNames,
+  date,
+  onNavigate,
 }: {
   allocations: Allocation[]
   dateField: 'checkoutDate' | 'dueDate'
   onSelectDay: (date: Date) => void
   productNames: Map<string, string>
+  date: Date
+  onNavigate: (date: Date) => void
 }) {
   const events = allocations.map((allocation) => ({
     title: productNames.get(allocation.productId) ?? allocation.productId,
@@ -39,6 +43,8 @@ export function MonthView({
         startAccessor="start"
         endAccessor="end"
         views={['month']}
+        date={date}
+        onNavigate={onNavigate}
         onSelectEvent={(event) => onSelectDay(event.start)}
         onSelectSlot={(slot) => onSelectDay(slot.start)}
         selectable
