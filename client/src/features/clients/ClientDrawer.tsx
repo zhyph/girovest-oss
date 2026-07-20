@@ -13,6 +13,8 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
   const updateClient = useUpdateClient()
   const deleteClient = useDeleteClient()
   const [deleteErrorCode, setDeleteErrorCode] = useState<string | null>(null)
+  const [submitErrorCode, setSubmitErrorCode] = useState<string | null>(null)
+  const errorCode = deleteErrorCode ?? submitErrorCode
   const {
     register,
     handleSubmit,
@@ -23,12 +25,17 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
   })
 
   async function onSubmit(values: ClientFormValues) {
-    if (client) {
-      await updateClient.mutateAsync({ id: client.id, values })
-    } else {
-      await createClient.mutateAsync(values)
+    setSubmitErrorCode(null)
+    try {
+      if (client) {
+        await updateClient.mutateAsync({ id: client.id, values })
+      } else {
+        await createClient.mutateAsync(values)
+      }
+      onClose()
+    } catch (error) {
+      setSubmitErrorCode((error as { code?: string }).code ?? 'UNKNOWN')
     }
-    onClose()
   }
 
   async function handleDelete() {
@@ -64,9 +71,9 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
           {t('fields.notes')}
           <Input {...register('notes')} />
         </label>
-        {deleteErrorCode && (
+        {errorCode && (
           <p className="text-xs text-red-600">
-            {t(`errors.${deleteErrorCode}`, { defaultValue: t('common:errors.UNKNOWN', { ns: 'common' }) })}
+            {t(`errors.${errorCode}`, { defaultValue: t('common:errors.UNKNOWN', { ns: 'common' }) })}
           </p>
         )}
         <div className="mt-2 flex justify-between gap-2">
@@ -77,9 +84,9 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
           )}
           <div className="flex flex-1 justify-end gap-2">
             <Button type="button" variant="secondary" onClick={onClose}>
-              Cancelar
+              {t('common:actions.cancel', { ns: 'common' })}
             </Button>
-            <Button type="submit">Salvar</Button>
+            <Button type="submit">{t('common:actions.save', { ns: 'common' })}</Button>
           </div>
         </div>
       </form>
