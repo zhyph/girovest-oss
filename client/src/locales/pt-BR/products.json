@@ -1,0 +1,28 @@
+{
+  "title": "Produtos",
+  "fields": {
+    "name": "Nome",
+    "category": "Categoria",
+    "size": "Tamanho",
+    "color": "Cor",
+    "rentalPrice": "Preço do aluguel",
+    "depositAmount": "Caução",
+    "description": "Descrição",
+    "status": "Status"
+  },
+  "status": {
+    "active": "Disponível",
+    "maintenance": "Manutenção",
+    "retired": "Aposentado"
+  },
+  "validation": {
+    "nameRequired": "Nome é obrigatório",
+    "categoryRequired": "Categoria é obrigatória",
+    "sizeRequired": "Tamanho é obrigatório",
+    "colorRequired": "Cor é obrigatória"
+  },
+  "empty": "Nenhum produto cadastrado ainda.",
+  "errors": {
+    "CANNOT_DELETE_WITH_HISTORY": "Não é possível excluir um produto com histórico de alocações."
+  }
+}
