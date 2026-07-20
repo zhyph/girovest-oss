@@ -1,3 +1,29 @@
+@import "tailwindcss";
+
+/*
+ * Warm-boutique theme: a dressmaker's-workroom palette (linen + rose/bordeaux)
+ * rather than the generic "cream + terracotta + serif" AI-default combo.
+ * See task-3-report.md for the design rationale.
+ */
+@theme {
+  --color-brand-50: #fbeef1;
+  --color-brand-100: #f3d9de;
+  --color-brand-300: #da9aa8;
+  --color-brand-500: #b85c6e;
+  --color-brand-600: #9c4356;
+  --color-brand-700: #7a2f40;
+
+  --color-cream: #faf6f0;
+  --color-ink: #362a28;
+  --color-muted: #8c7a72;
+  --color-border-soft: #e9dcd3;
+
+  --radius-md: 0.5rem;
+  --radius-lg: 1rem;
+
+  --shadow-soft: 0 1px 2px 0 rgb(54 42 40 / 0.05), 0 10px 25px -10px rgb(122 47 64 / 0.18);
+}
+
 :root {
   color-scheme: light;
 }
@@ -5,4 +31,6 @@
 body {
   margin: 0;
   font-family: system-ui, -apple-system, sans-serif;
+  background-color: var(--color-cream);
+  color: var(--color-ink);
 }
