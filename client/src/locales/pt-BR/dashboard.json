@@ -2,5 +2,7 @@
   "title": "Painel — hoje",
   "goingOutToday": "Saindo hoje",
   "dueBackToday": "Voltando hoje",
-  "overdue": "Atrasados"
+  "overdue": "Atrasados",
+  "loading": "Carregando...",
+  "error": "Erro ao carregar dados do painel. Tente novamente."
 }

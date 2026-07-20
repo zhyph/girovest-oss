@@ -15,16 +15,32 @@ function StatTile({ label, value, danger }: { label: string; value: number; dang
 
 export function DashboardPage() {
   const { t } = useTranslation('dashboard')
-  const { goingOutToday, dueBackToday, overdue } = useDashboard()
+  const { goingOutToday, dueBackToday, overdue, isLoading, isError } = useDashboard()
 
   return (
     <div>
       <h1 className="mb-4 text-xl font-semibold">{t('title')}</h1>
-      <div className="grid grid-cols-3 gap-4">
-        <StatTile label={t('goingOutToday')} value={goingOutToday.length} />
-        <StatTile label={t('dueBackToday')} value={dueBackToday.length} />
-        <StatTile label={t('overdue')} value={overdue.length} danger />
-      </div>
+      {isLoading && (
+        <Card>
+          <CardBody>
+            <div className="text-center text-sm text-muted">{t('loading')}</div>
+          </CardBody>
+        </Card>
+      )}
+      {isError && (
+        <Card className="border-red-300 bg-red-50">
+          <CardBody>
+            <div className="text-sm text-red-700">{t('error')}</div>
+          </CardBody>
+        </Card>
+      )}
+      {!isLoading && !isError && (
+        <div className="grid grid-cols-3 gap-4">
+          <StatTile label={t('goingOutToday')} value={goingOutToday.length} />
+          <StatTile label={t('dueBackToday')} value={dueBackToday.length} />
+          <StatTile label={t('overdue')} value={overdue.length} danger />
+        </div>
+      )}
     </div>
   )
 }

@@ -44,5 +44,6 @@ export function useDashboard() {
     dueBackToday: dueBack.data ?? [],
     overdue: overdue.data ?? [],
     isLoading: goingOut.isLoading || dueBack.isLoading || overdue.isLoading,
+    isError: goingOut.isError || dueBack.isError || overdue.isError,
   }
 }
