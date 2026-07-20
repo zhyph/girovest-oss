@@ -5,6 +5,7 @@ import { AppError } from '../errors/AppError.js'
 import { ErrorCodes } from '../errors/errorCodes.js'
 import { verifyPassword } from './passwords.js'
 import { signStaffToken } from './jwt.js'
+import { requireAuth } from './authMiddleware.js'
 
 export const authRouter = Router()
 
@@ -31,4 +32,12 @@ authRouter.post('/login', async (req, res) => {
 
   const token = signStaffToken({ staffId: staff.id, role: staff.role as 'owner' | 'staff' })
   res.json({ token })
+})
+
+authRouter.get('/me', requireAuth, async (req, res) => {
+  const staff = await prisma.staff.findUnique({ where: { id: req.staff!.staffId } })
+  if (!staff) {
+    throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Staff account no longer exists')
+  }
+  res.json({ id: staff.id, name: staff.name, role: staff.role, locationId: staff.locationId })
 })

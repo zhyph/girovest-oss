@@ -7,6 +7,7 @@ import {
   returnAllocation,
   cancelAllocation,
   getProductAvailability,
+  isProductAvailableForRange,
 } from './allocationService.js'
 
 let locationId: string
@@ -58,6 +59,18 @@ describe('allocationService', () => {
         priceCharged: 100,
       }),
     ).rejects.toMatchObject({ code: 'DUE_DATE_BEFORE_CHECKOUT' })
+  })
+
+  it('reports a range as unavailable only when it overlaps an existing allocation', async () => {
+    await createAllocation({
+      productId, clientId, staffId,
+      checkoutDate: new Date('2026-09-01'),
+      dueDate: new Date('2026-09-10'),
+      priceCharged: 100,
+    })
+
+    expect(await isProductAvailableForRange(productId, new Date('2026-09-05'), new Date('2026-09-15'))).toBe(false)
+    expect(await isProductAvailableForRange(productId, new Date('2026-09-11'), new Date('2026-09-20'))).toBe(true)
   })
 
   it('rejects an overlapping allocation on the same product', async () => {

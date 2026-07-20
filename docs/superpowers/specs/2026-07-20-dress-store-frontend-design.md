@@ -113,7 +113,10 @@ request and redirects to the login screen on a `401`.
 
 Sidebar nav (Painel/Clientes/Produtos/Alocações/Calendário), collapsing to
 icon-only at tablet width — labels reappear on hover/tap. Current
-logged-in staff name shown at the bottom of the sidebar.
+logged-in staff name shown at the bottom of the sidebar, fetched once on
+app load from a new `GET /api/auth/me` endpoint (the JWT payload itself
+only carries `staffId`/`role`, not `name`, so this can't be read out of
+the token — `/me` looks the staff record up server-side instead).
 
 ### Dashboard (landing screen)
 
@@ -141,9 +144,11 @@ A table of allocations (product → client, date range, status badge) with
 status-aware row actions: `reserved` rows get Check-out/Cancelar buttons,
 `checked_out` rows get a Devolver button, `returned`/`cancelled` rows are
 read-only. "+ Nova alocação" opens a form: pick client → pick product
-(the product picker calls `/api/allocations/products/:id/availability`
-live as dates are chosen, hiding/disabling products that aren't available
-for the selected range) → dates → confirm. Check-out and Devolver open
+(the product picker calls `/api/allocations/products/:id/availability` with
+`checkoutDate`/`dueDate` query params — a range-aware mode added to the
+existing endpoint alongside its original single-instant `asOf` mode — live
+as dates are chosen, hiding/disabling products that aren't available for
+the selected range) → dates → confirm. Check-out and Devolver open
 small forms for condition notes and deposit collected/returned, matching
 the backend's existing payload shape.
 

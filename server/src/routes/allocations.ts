@@ -9,6 +9,7 @@ import {
   returnAllocation,
   cancelAllocation,
   getProductAvailability,
+  isProductAvailableForRange,
 } from '../services/allocationService.js'
 
 export const allocationsRouter = Router()
@@ -62,7 +63,23 @@ allocationsRouter.post('/:id/cancel', async (req, res) => {
   res.json(await cancelAllocation(req.params.id))
 })
 
+const availabilityRangeSchema = z.object({
+  checkoutDate: z.coerce.date(),
+  dueDate: z.coerce.date(),
+})
+
 allocationsRouter.get('/products/:productId/availability', async (req, res) => {
+  const rangeParsed = availabilityRangeSchema.safeParse(req.query)
+  if (rangeParsed.success) {
+    const available = await isProductAvailableForRange(
+      req.params.productId,
+      rangeParsed.data.checkoutDate,
+      rangeParsed.data.dueDate,
+    )
+    res.json({ available })
+    return
+  }
+
   const asOfQuery = req.query.asOf
   const asOf = typeof asOfQuery === 'string' ? new Date(asOfQuery) : new Date()
   res.json({ status: await getProductAvailability(req.params.productId, asOf) })

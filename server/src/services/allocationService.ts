@@ -194,3 +194,10 @@ export async function getProductAvailability(productId: string, asOf: Date = new
   })
   return derivedAvailability(allocations.map(toWindow), asOf)
 }
+
+export async function isProductAvailableForRange(productId: string, checkoutDate: Date, dueDate: Date) {
+  const allocations = await prisma.allocation.findMany({
+    where: { productId, status: { in: ACTIVE_STATUSES } },
+  })
+  return !isOccupiedForRange(allocations.map(toWindow), checkoutDate, dueDate)
+}

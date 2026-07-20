@@ -56,3 +56,47 @@ describe('POST /api/auth/login', () => {
     expect(response.body.code).toBe('INVALID_CREDENTIALS')
   })
 })
+
+describe('GET /api/auth/me', () => {
+  let locationId: string
+
+  beforeAll(async () => {
+    const location = await prisma.location.create({
+      data: { name: 'Loja Teste Me', address: 'Rua Teste, 2' },
+    })
+    locationId = location.id
+
+    await prisma.staff.create({
+      data: {
+        name: 'Bruno Staff',
+        login: 'bruno',
+        passwordHash: await hashPassword('correct-horse'),
+        role: 'staff',
+        locationId,
+      },
+    })
+  })
+
+  afterAll(async () => {
+    await prisma.staff.deleteMany({ where: { locationId } })
+    await prisma.location.delete({ where: { id: locationId } })
+  })
+
+  it('returns the logged-in staff name, role, and location', async () => {
+    const login = await request(app)
+      .post('/api/auth/login')
+      .send({ login: 'bruno', password: 'correct-horse' })
+
+    const response = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${login.body.token}`)
+
+    expect(response.status).toBe(200)
+    expect(response.body).toMatchObject({ name: 'Bruno Staff', role: 'staff', locationId })
+  })
+
+  it('rejects a request with no token', async () => {
+    const response = await request(app).get('/api/auth/me')
+    expect(response.status).toBe(401)
+  })
+})
