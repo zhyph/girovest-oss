@@ -61,7 +61,15 @@ a system install:
 ```ts
 spawn(process.execPath, ['dist/server.js'], {
   cwd: serverCwd,
-  env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', DB_PROVIDER: 'sqlite', DATABASE_URL, PORT: '3000' },
+  env: {
+    ...process.env,
+    ELECTRON_RUN_AS_NODE: '1',
+    DB_PROVIDER: 'sqlite',
+    DATABASE_URL,
+    JWT_SECRET,
+    HOST: '127.0.0.1',
+    PORT: '3000',
+  },
 })
 ```
 
@@ -94,6 +102,34 @@ const serverCwd = app.isPackaged
 
 `resolveServerCwd` itself is unchanged and keeps its existing unit test;
 the packaged-path branch gets a new one.
+
+### Secret generation
+
+`server/src/auth/jwt.ts` throws if `JWT_SECRET` is unset — true today in
+dev (via `.env`) but nothing supplies it for a packaged app. On startup,
+`main.ts` checks for `<userData>/jwt-secret`; if absent, generates one
+(`crypto.randomBytes(32).toString('hex')`) and writes it there, then reads
+whatever is on disk (fresh or pre-existing) and passes it as `JWT_SECRET`
+to the spawned server. Generating a new one on every launch instead of
+persisting would invalidate every staff member's session on every restart
+— it must be written once and reused.
+
+### Network binding
+
+`server/src/server.ts` currently calls `app.listen(port)` with no host,
+which binds `0.0.0.0` — reachable from any other machine on the same LAN,
+and the reason Windows Defender Firewall prompts ("allow this app to
+communicate on public/private networks?") on first launch. For a
+single-shop offline app this is both an unnecessary exposure (the
+bootstrap-only `/api/setup` window and all authenticated endpoints
+shouldn't be network-reachable) and a confusing first-run prompt for a
+non-technical client.
+
+Fix: `server.ts` reads an optional `HOST` env var (`app.listen(port, host
+?? '0.0.0.0', ...)`), defaulting to today's behavior so nothing else that
+depends on this server (e.g. a future hosted-web deployment, out of scope
+here) breaks. `main.ts` explicitly sets `HOST: '127.0.0.1'` when spawning
+the offline app's server process — no firewall prompt, no LAN exposure.
 
 ### Data location & first-run migrations
 
@@ -152,12 +188,20 @@ Sketch of the relevant `electron-builder` config (exact placement —
   "extraResources": [
     { "from": "../server/dist", "to": "server/dist" },
     { "from": "../server/node_modules", "to": "server/node_modules" },
-    { "from": "../server/prisma", "to": "server/prisma" }
+    { "from": "../server/prisma", "to": "server/prisma" },
+    { "from": "../server/prisma.config.ts", "to": "server/prisma.config.ts" }
   ],
   "win": { "target": "nsis" },
   "linux": { "target": "AppImage" }
 }
 ```
+
+`prisma.config.ts` (server root, not under `prisma/`) must ship alongside
+the schema/migrations — it's what picks the SQLite schema and migrations
+path at runtime based on `DB_PROVIDER`; there is no `prisma/schema.prisma`
+at Prisma's conventional default location, so without this file `prisma
+migrate deploy` falls back to Prisma's default lookup and finds nothing.
+Missing this breaks first launch before the setup screen ever loads.
 
 Windows gets an NSIS installer (Start Menu entry, uninstaller — the
 familiar double-click-to-install experience). Linux gets an AppImage — a
@@ -216,3 +260,8 @@ manual distribution.
   first real CI run is the actual test.
 - AppImage's own recommended practice (bundling most system libraries) can
   make it fairly large; acceptable for v1, not optimized.
+- Port 3000 already in use (a stale server process from an unclean
+  previous shutdown, or an unrelated local app) isn't handled — v1 answer
+  is to fail loudly (the spawned process's `error`/exit event surfaces as
+  a visible Electron error dialog rather than a silent hang) rather than
+  retry on another port or detect/kill a stale process.
