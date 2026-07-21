@@ -1,6 +1,7 @@
 node_modules/
 dist/
 out/
+release/
 tsconfig.tsbuildinfo
 test-results/
 playwright-report/
