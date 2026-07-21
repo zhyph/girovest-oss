@@ -1,0 +1,20 @@
+appId: com.dressstore.app
+productName: Dress Store
+directories:
+  output: release
+files:
+  - out/**/*
+  - package.json
+extraResources:
+  - from: ../server/dist
+    to: server/dist
+  - from: ../server/node_modules
+    to: server/node_modules
+  - from: ../server/prisma
+    to: server/prisma
+  - from: ../server/prisma.config.ts
+    to: server/prisma.config.ts
+win:
+  target: nsis
+linux:
+  target: AppImage

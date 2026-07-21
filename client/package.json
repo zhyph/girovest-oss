@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "electron:dev": "electron-vite dev",
-    "electron:build": "electron-vite build"
+    "electron:build": "electron-vite build",
+    "package": "electron-builder"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
@@ -43,7 +44,8 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
     "@vitest/ui": "^4.1.10",
-    "electron": "^43.1.1",
+    "electron": "43.1.1",
+    "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
     "jsdom": "^29.1.1",
     "typescript": "^7.0.2",
