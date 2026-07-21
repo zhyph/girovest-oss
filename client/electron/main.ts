@@ -30,7 +30,29 @@ export function resolveDatabaseUrl(userDataPath: string): string {
   return `file:${path.join(userDataPath, 'dev.db')}`
 }
 
+export async function waitForServerReady(
+  url: string,
+  timeoutMs = 10_000,
+  intervalMs = 150,
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch(url)
+      if (response.ok) return true
+    } catch {
+      // Server isn't accepting connections yet; keep polling until the timeout.
+    }
+    await new Promise((resolve) => setTimeout(resolve, intervalMs))
+  }
+  return false
+}
+
 let serverProcess: ChildProcess | null = null
+// Tracks whether the server process is being torn down intentionally (normal
+// app shutdown, or a startup failure we're already reporting) so the 'exit'
+// handler below doesn't show a duplicate/incorrect crash dialog in those cases.
+let isShuttingDown = false
 
 function runMigrations(serverCwd: string, env: NodeJS.ProcessEnv): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -49,7 +71,6 @@ function runMigrations(serverCwd: string, env: NodeJS.ProcessEnv): Promise<void>
 }
 
 async function startServer(): Promise<boolean> {
-  app.setName('dress-store-app')
   const userDataPath = app.getPath('userData')
   const serverCwd = resolveServerRuntimeCwd(
     app.isPackaged,
@@ -81,6 +102,16 @@ async function startServer(): Promise<boolean> {
   serverProcess.on('error', (error) => {
     console.error('Backend process failed to start:', error)
   })
+  serverProcess.on('exit', (code) => {
+    if (isShuttingDown) return
+    isShuttingDown = true
+    console.error(`Backend process exited unexpectedly with code ${code}`)
+    dialog.showErrorBox(
+      'Server Stopped Unexpectedly',
+      `The application server stopped unexpectedly (exit code ${code}). The app will now close.`,
+    )
+    app.quit()
+  })
 
   return true
 }
@@ -108,6 +139,13 @@ function createWindow() {
 // try to call methods on that string. Under a real Electron process `app`
 // is always a populated object, so production behavior is unaffected.
 if (app) {
+  // Must run before app.whenReady() resolves: Electron resolves the default
+  // userData path from package.json's name as soon as it's ready, so setting
+  // the name any later (e.g. inside startServer(), which used to run this
+  // after whenReady()) is a no-op and userData silently lands in the wrong
+  // directory (dress-store-client instead of dress-store-app).
+  app.setName('dress-store-app')
+
   app.whenReady().then(async () => {
     const started = await startServer()
     if (!started) {
@@ -118,10 +156,24 @@ if (app) {
       app.quit()
       return
     }
+
+    const ready = await waitForServerReady('http://127.0.0.1:3000/health')
+    if (!ready) {
+      isShuttingDown = true
+      serverProcess?.kill()
+      dialog.showErrorBox(
+        'Startup Failed',
+        'The application server did not become ready in time. The app will now close.',
+      )
+      app.quit()
+      return
+    }
+
     createWindow()
   })
 
   app.on('window-all-closed', () => {
+    isShuttingDown = true
     serverProcess?.kill()
     app.quit()
   })
