@@ -32,28 +32,38 @@ tearing down, the shared generated client may be left in `postgresql`
 mode — run `npm run db:generate` (with no `DB_PROVIDER` set, or explicitly
 `DB_PROVIDER=sqlite`) to restore it before running `npm test` again.
 
-## Seeding test data
+## Database tools
 
-The dev database (`server/dev.db`, from `npm run db:migrate`) starts empty —
-there's no automatic seed. For real usage (including the packaged Electron
-app), the client's own first-run "Configurar loja" screen creates the first
-`Location` + owner `Staff` row through the UI — no script needed. The two
-scripts below exist for manual/automated testing only:
+```bash
+npm run db:tools
+```
+
+An interactive menu (arrow keys + Enter) for common local tasks: seed an
+E2E test account, create a staff login, seed a batch of sample
+clients/products/allocations for manual testing, list what currently
+exists, or wipe everything (asks for a typed confirmation first). This is
+the easiest way to get test data without writing SQL by hand.
+
+For real usage (including the packaged Electron app), the client's own
+first-run "Configurar loja" screen creates the first `Location` + owner
+`Staff` row through the UI — none of this is needed for that.
+
+### Scripting / automation
+
+The two scripts below back some of the menu's own actions and are also
+callable directly, non-interactively:
 
 ```bash
 npx tsx seed-e2e.ts
 ```
 
 Creates a `Location` and a `Staff` row (login `e2e-staff`, password
-`e2e-password12`) via the same Prisma client the server uses, matching
-`client/e2e/happy-path.spec.ts`'s precondition. Safe to re-run against a
-fresh `dev.db`, but fails with a unique-constraint error if the login
-already exists.
+`e2e-password12`) matching `client/e2e/happy-path.spec.ts`'s precondition.
+Safe to re-run against a fresh `dev.db`, but fails with a unique-constraint
+error if the login already exists.
 
 ```bash
 npx tsx seed-staff.ts <login> <password> <name> <role: owner|staff> <locationId>
 ```
 
-Adds an additional `Staff` row to an *existing* `Location` (there's no UI
-for this yet — the in-app setup screen only bootstraps the first shop and
-its first owner login).
+Adds an additional `Staff` row to an *existing* `Location`.
