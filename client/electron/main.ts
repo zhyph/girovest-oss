@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, dialog } from 'electron'
 import { spawn, type ChildProcess } from 'child_process'
 import crypto from 'crypto'
 import fs from 'fs'
@@ -48,7 +48,7 @@ function runMigrations(serverCwd: string, env: NodeJS.ProcessEnv): Promise<void>
   })
 }
 
-async function startServer() {
+async function startServer(): Promise<boolean> {
   app.setName('dress-store-app')
   const userDataPath = app.getPath('userData')
   const serverCwd = resolveServerRuntimeCwd(
@@ -70,7 +70,7 @@ async function startServer() {
     await runMigrations(serverCwd, env)
   } catch (error) {
     console.error('Database migration failed:', error)
-    return
+    return false
   }
 
   serverProcess = spawn(process.execPath, ['dist/server.js'], {
@@ -81,6 +81,8 @@ async function startServer() {
   serverProcess.on('error', (error) => {
     console.error('Backend process failed to start:', error)
   })
+
+  return true
 }
 
 function createWindow() {
@@ -107,7 +109,15 @@ function createWindow() {
 // is always a populated object, so production behavior is unaffected.
 if (app) {
   app.whenReady().then(async () => {
-    await startServer()
+    const started = await startServer()
+    if (!started) {
+      dialog.showErrorBox(
+        'Startup Failed',
+        'The application database could not be prepared (migration failed). The app will now close. Check the logs for details.',
+      )
+      app.quit()
+      return
+    }
     createWindow()
   })
 
