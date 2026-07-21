@@ -1,9 +1,6 @@
 import { app, BrowserWindow } from 'electron'
 import { spawn, type ChildProcess } from 'child_process'
 import path from 'path'
-import { fileURLToPath } from 'url'
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 export function resolveServerCwd(appRoot: string): string {
   return path.resolve(appRoot, '..', 'server')
@@ -28,14 +25,14 @@ function createWindow() {
     width: 1200,
     height: 800,
     webPreferences: {
-      preload: path.join(__dirname, '../preload/index.js'),
+      preload: path.join(import.meta.dirname, '../preload/index.js'),
     },
   })
 
   if (process.env.ELECTRON_RENDERER_URL) {
     win.loadURL(process.env.ELECTRON_RENDERER_URL)
   } else {
-    win.loadFile(path.join(__dirname, '../renderer/index.html'))
+    win.loadFile(path.join(import.meta.dirname, '../renderer/index.html'))
   }
 }
 
