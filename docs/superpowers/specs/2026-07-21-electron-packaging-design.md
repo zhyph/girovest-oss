@@ -75,7 +75,9 @@ spawn(process.execPath, ['dist/server.js'], {
 
 `process.execPath` inside the Electron main process is the Electron binary
 itself; `ELECTRON_RUN_AS_NODE=1` tells it to behave as a plain Node process
-for that invocation. No extra runtime needs to be bundled.
+for that invocation. No extra runtime needs to be bundled. (`DATABASE_URL`
+and `JWT_SECRET` are computed as described in Secret Generation and Data
+Location below — shown here as already-resolved values for brevity.)
 
 The one real consequence: `bcrypt` and `better-sqlite3` (native modules)
 must be compiled against Electron's Node ABI, not the system Node ABI they
@@ -255,10 +257,12 @@ manual distribution.
 ## Testing
 
 - `client/electron/main.test.ts` gains cases for the new packaged-path
-  branch (`app.isPackaged` true → resources path) and the `DATABASE_URL`
-  computation from `app.getPath('userData')` — both pure-function-testable
-  without a real Electron runtime, following the existing pattern for
-  `resolveServerCwd`.
+  branch (`app.isPackaged` true → resources path), the `DATABASE_URL`
+  computation from `app.getPath('userData')`, and the JWT-secret
+  read-or-generate logic (absent file → generates and writes; existing
+  file → reads it back unchanged, so a restart doesn't invalidate
+  sessions) — all pure-function-testable without a real Electron runtime,
+  following the existing pattern for `resolveServerCwd`.
 - New backend tests for `GET /api/setup/status` and `POST /api/setup`
   (empty-DB and already-has-a-location cases), alongside the existing
   `authRoutes.test.ts` suite.
