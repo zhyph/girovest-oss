@@ -35,16 +35,25 @@ mode — run `npm run db:generate` (with no `DB_PROVIDER` set, or explicitly
 ## Seeding test data
 
 The dev database (`server/dev.db`, from `npm run db:migrate`) starts empty —
-there's no automatic seed. Manual testing (curl, or the client's E2E test)
-needs at least one `Location` and one `Staff` row to log in against. Seed
-them with:
+there's no automatic seed. For real usage (including the packaged Electron
+app), the client's own first-run "Configurar loja" screen creates the first
+`Location` + owner `Staff` row through the UI — no script needed. The two
+scripts below exist for manual/automated testing only:
 
 ```bash
 npx tsx seed-e2e.ts
 ```
 
-This creates a `Location` and a `Staff` row (login `e2e-staff`, password
+Creates a `Location` and a `Staff` row (login `e2e-staff`, password
 `e2e-password12`) via the same Prisma client the server uses, matching
-`client/e2e/happy-path.spec.ts`'s precondition. It's a one-off script, not
-part of the app — safe to re-run against a fresh `dev.db`, but will fail
-with a unique-constraint error if the login already exists.
+`client/e2e/happy-path.spec.ts`'s precondition. Safe to re-run against a
+fresh `dev.db`, but fails with a unique-constraint error if the login
+already exists.
+
+```bash
+npx tsx seed-staff.ts <login> <password> <name> <role: owner|staff> <locationId>
+```
+
+Adds an additional `Staff` row to an *existing* `Location` (there's no UI
+for this yet — the in-app setup screen only bootstraps the first shop and
+its first owner login).

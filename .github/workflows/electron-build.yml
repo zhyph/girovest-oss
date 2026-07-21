@@ -42,18 +42,17 @@ jobs:
       - name: Build client renderer/main/preload
         run: npm run electron:build --workspace=client
 
-      - name: Rebuild server native modules for Electron's ABI
-        # server/node_modules is copied verbatim into the packaged app via
-        # extraResources (a raw file copy, no rebuild step). The bcrypt/
-        # better-sqlite3 binaries selected by the "Prune server to production
-        # dependencies" step above were built for standalone Node, not for
-        # Electron's bundled Node/V8 that client/electron/main.ts spawns the
-        # server under (ELECTRON_RUN_AS_NODE=1) -- different NODE_MODULE_VERSION,
-        # guaranteed dlopen crash otherwise. Must run after the prune (so we
-        # rebuild what's actually shipped) and before packaging.
-        run: npm run rebuild-server-natives --workspace=client
-
       - name: Package with electron-builder
+        # `npm run package`'s own `prepackage` hook (client/package.json)
+        # runs `bundle-server` (esbuild-bundles server/dist/server.js into a
+        # single file) and `rebuild-server-natives` automatically before
+        # electron-builder runs -- the latter re-targets the bcrypt/
+        # better-sqlite3 binaries selected by the "Prune server to production
+        # dependencies" step above (built for standalone Node) to Electron's
+        # bundled Node/V8 ABI, which client/electron/main.ts spawns the server
+        # under (ELECTRON_RUN_AS_NODE=1). Different NODE_MODULE_VERSION
+        # otherwise -- guaranteed dlopen crash. A separate explicit step for
+        # this used to exist here too, running the same rebuild twice.
         run: npm run package --workspace=client -- --publish=never
 
       - uses: actions/upload-artifact@v4
