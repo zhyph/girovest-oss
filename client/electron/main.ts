@@ -16,6 +16,15 @@ export function resolveServerRuntimeCwd(
   return isPackaged ? path.join(resourcesPath, 'server') : resolveServerCwd(appRoot)
 }
 
+// Packaged builds ship a single esbuild-bundled file (server-bundle.mjs) that
+// inlines everything except the two native modules (bcrypt, better-sqlite3),
+// so the app isn't exposed to npm workspace hoisting silently dropping a
+// transitive dependency. Dev mode keeps running the plain tsc output
+// (dist/server.js) directly — no bundling step needed for fast iteration.
+export function resolveServerEntry(isPackaged: boolean): string {
+  return isPackaged ? 'server-bundle.mjs' : 'dist/server.js'
+}
+
 export function resolveJwtSecret(userDataPath: string): string {
   const secretPath = path.join(userDataPath, 'jwt-secret')
   if (fs.existsSync(secretPath)) {
@@ -94,7 +103,7 @@ async function startServer(): Promise<boolean> {
     return false
   }
 
-  serverProcess = spawn(process.execPath, ['dist/server.js'], {
+  serverProcess = spawn(process.execPath, [resolveServerEntry(app.isPackaged)], {
     cwd: serverCwd,
     env: { ...env, ELECTRON_RUN_AS_NODE: '1' },
     stdio: 'pipe',

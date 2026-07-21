@@ -13,7 +13,8 @@
     "electron:dev": "electron-vite dev",
     "electron:build": "electron-vite build",
     "rebuild-server-natives": "electron-rebuild --module-dir ../server --which-module better-sqlite3,bcrypt",
-    "prepackage": "npm run rebuild-server-natives",
+    "bundle-server": "cd ../server && npm run build:electron-bundle",
+    "prepackage": "npm run bundle-server && npm run rebuild-server-natives",
     "package": "electron-builder"
   },
   "dependencies": {

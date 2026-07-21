@@ -5,6 +5,7 @@ import path from 'path'
 import {
   resolveServerCwd,
   resolveServerRuntimeCwd,
+  resolveServerEntry,
   resolveJwtSecret,
   resolveDatabaseUrl,
 } from './main.ts'
@@ -25,6 +26,16 @@ describe('resolveServerRuntimeCwd', () => {
   it('falls back to resolveServerCwd when not packaged', () => {
     const result = resolveServerRuntimeCwd(false, '/home/user/dress-store-app/client', '/unused')
     expect(result).toBe(resolveServerCwd('/home/user/dress-store-app/client'))
+  })
+})
+
+describe('resolveServerEntry', () => {
+  it('uses the bundled server file when packaged', () => {
+    expect(resolveServerEntry(true)).toBe('server-bundle.mjs')
+  })
+
+  it('uses the plain tsc output in dev', () => {
+    expect(resolveServerEntry(false)).toBe('dist/server.js')
   })
 })
 

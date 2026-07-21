@@ -6,8 +6,8 @@ files:
   - out/**/*
   - package.json
 extraResources:
-  - from: ../server/dist
-    to: server/dist
+  - from: ../server/dist-bundle/server-bundle.mjs
+    to: server/server-bundle.mjs
   - from: ../server/node_modules
     to: server/node_modules
   - from: ../node_modules
