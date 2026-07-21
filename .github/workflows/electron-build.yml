@@ -1,0 +1,54 @@
+name: Build Electron App
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install workspace dependencies
+        run: npm ci
+
+      - name: Build server
+        run: npm run build --workspace=server
+
+      - name: Prune server to production dependencies
+        run: npm ci --omit=dev --workspace=server
+
+      - name: Restore client build tooling
+        # npm workspaces share one root node_modules tree, so the prune above
+        # (`npm ci --omit=dev --workspace=server`) strips devDependencies for
+        # the whole tree, not just server/ -- it removes client's electron,
+        # electron-vite, and electron-builder along with server's tsx/vitest.
+        # Verified locally: without this step, the next two steps fail with
+        # "command not found" because electron-vite/electron-builder are gone.
+        # This reinstalls only client's devDependencies and leaves the
+        # already-pruned server/node_modules production-only tree untouched.
+        run: npm install --workspace=client
+
+      - name: Build client renderer/main/preload
+        run: npm run electron:build --workspace=client
+
+      - name: Package with electron-builder
+        run: npm run package --workspace=client -- --publish=never
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dress-store-app-${{ matrix.os }}
+          path: |
+            client/release/*.exe
+            client/release/*.AppImage
+          if-no-files-found: error
