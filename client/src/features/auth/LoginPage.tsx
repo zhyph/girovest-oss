@@ -5,10 +5,12 @@ import { Button } from '../../components/ui/button.tsx'
 import { Input } from '../../components/ui/input.tsx'
 import { Card, CardBody, CardHeader } from '../../components/ui/card.tsx'
 import { useAuth } from '../../lib/useAuth.ts'
+import { useSetupStatus } from '../../lib/useSetup.ts'
 
 export function LoginPage() {
   const { t } = useTranslation(['auth', 'common'])
   const { login, isLoggedIn } = useAuth()
+  const setupStatus = useSetupStatus()
   const [loginValue, setLoginValue] = useState('')
   const [password, setPassword] = useState('')
   const [errorCode, setErrorCode] = useState<string | null>(null)
@@ -30,6 +32,10 @@ export function LoginPage() {
   // against unauthenticated access to the other routes, not the reverse.
   if (isLoggedIn) {
     return <Navigate to="/" replace />
+  }
+
+  if (setupStatus.data?.needsSetup) {
+    return <Navigate to="/configurar-loja" replace />
   }
 
   return (

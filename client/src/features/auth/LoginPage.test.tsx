@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event'
 import '../../i18n.ts'
 import { LoginPage } from './LoginPage.tsx'
 import * as useAuthModule from '../../lib/useAuth.ts'
+import * as useSetupModule from '../../lib/useSetup.ts'
 
 function renderLoginPage() {
   return render(
@@ -23,6 +24,9 @@ describe('LoginPage', () => {
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
       staff: undefined, isLoadingStaff: false, login, logout: vi.fn(), isLoggedIn: false,
     })
+    vi.spyOn(useSetupModule, 'useSetupStatus').mockReturnValue({
+      data: { needsSetup: false },
+    } as ReturnType<typeof useSetupModule.useSetupStatus>)
 
     renderLoginPage()
     await userEvent.type(screen.getByLabelText('Usuário'), 'ana')
@@ -37,6 +41,9 @@ describe('LoginPage', () => {
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
       staff: undefined, isLoadingStaff: false, login, logout: vi.fn(), isLoggedIn: false,
     })
+    vi.spyOn(useSetupModule, 'useSetupStatus').mockReturnValue({
+      data: { needsSetup: false },
+    } as ReturnType<typeof useSetupModule.useSetupStatus>)
 
     renderLoginPage()
     await userEvent.type(screen.getByLabelText('Usuário'), 'ana')
@@ -54,6 +61,9 @@ describe('LoginPage', () => {
       logout: vi.fn(),
       isLoggedIn: true,
     })
+    vi.spyOn(useSetupModule, 'useSetupStatus').mockReturnValue({
+      data: { needsSetup: false },
+    } as ReturnType<typeof useSetupModule.useSetupStatus>)
 
     renderLoginPage()
 

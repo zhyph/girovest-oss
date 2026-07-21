@@ -1,0 +1,12 @@
+{
+  "title": "Configurar loja",
+  "shopNameField": "Nome da loja",
+  "shopAddressField": "Endereço",
+  "ownerNameField": "Seu nome",
+  "ownerLoginField": "Usuário",
+  "ownerPasswordField": "Senha",
+  "submit": "Criar loja",
+  "errors": {
+    "SETUP_ALREADY_COMPLETE": "Esta loja já foi configurada."
+  }
+}

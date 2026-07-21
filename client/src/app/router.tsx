@@ -1,5 +1,6 @@
 import { Routes, Route } from 'react-router'
 import { LoginPage } from '../features/auth/LoginPage.tsx'
+import { SetupPage } from '../features/setup/SetupPage.tsx'
 import { ProtectedRoute } from './ProtectedRoute.tsx'
 import { AppLayout } from './AppLayout.tsx'
 import { DashboardPage } from '../features/dashboard/DashboardPage.tsx'
@@ -11,6 +12,7 @@ import { CalendarPage } from '../features/calendar/CalendarPage.tsx'
 export function AppRouter() {
   return (
     <Routes>
+      <Route path="/configurar-loja" element={<SetupPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
