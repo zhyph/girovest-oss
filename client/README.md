@@ -66,6 +66,24 @@ Windows machine — only Linux, locally. The GitHub Actions workflow
 native runner each, but hasn't actually been triggered (no git remote
 configured in this repo yet).
 
+### Releases
+
+Pushing a tag matching `v*` (e.g. `v1.0.0`) triggers CI to build both
+platforms and attach the installers to a **draft** GitHub Release (not
+published automatically — review it and hit "Publish" on GitHub yourself). A
+manual run of the workflow (`workflow_dispatch`) just builds and uploads to
+that Actions run directly, without touching the Releases page.
+
+No extra secrets are needed for this — `GITHUB_TOKEN` is provided
+automatically by GitHub Actions. The one thing that **is** required:
+`client/package.json`'s `repository` field must point at the real repo.
+electron-builder can't auto-detect it from `.git/config` here (this is an
+npm workspaces monorepo — `client/` is a subdirectory, not the repo root,
+and electron-builder's detection doesn't walk up to find `.git/` the way git
+itself does — confirmed by testing it directly, not assumed). It's currently
+a placeholder (`placeholder-owner/placeholder-repo`) — update it once the
+real repo exists.
+
 ## i18n
 
 All user-facing strings go through `react-i18next` (`t('namespace:key')`),
