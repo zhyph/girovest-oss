@@ -133,10 +133,20 @@ the offline app's server process — no firewall prompt, no LAN exposure.
 
 ### Data location & first-run migrations
 
-`DATABASE_URL` is computed from Electron's per-user data directory instead
-of the current hardcoded relative path:
+`app.getPath('userData')` keys off `app.name`, which — unless set
+explicitly — Electron resolves from the `name` field of the nearest
+`package.json` to the app root. That's `client/package.json`, whose `name`
+is `dress-store-client`, not `dress-store-app`; nothing in this design so
+far pins it. `main.ts` calls `app.setName('dress-store-app')` before any
+`app.getPath(...)` call, so the data directory name is a deliberate
+product identity, not an accident of which `package.json` Electron happens
+to read.
+
+`DATABASE_URL` is computed from that per-user data directory instead of
+the current hardcoded relative path:
 
 ```ts
+app.setName('dress-store-app')
 const dbPath = path.join(app.getPath('userData'), 'dev.db')
 const DATABASE_URL = `file:${dbPath}`
 ```
@@ -144,6 +154,15 @@ const DATABASE_URL = `file:${dbPath}`
 This resolves to `%APPDATA%\dress-store-app\dev.db` on Windows and
 `~/.config/dress-store-app/dev.db` on Linux — writable, persists across
 app updates, and isn't inside the (often read-only) install directory.
+
+Uninstalling is a separate question from updating: electron-builder's NSIS
+target does not delete `userData` on uninstall unless
+`deleteAppDataOnUninstall: true` is set explicitly, so by default a
+client's shop data (clients, allocations, the DB file above) survives an
+uninstall/reinstall too. That default is intentional here — this is real
+business data, not disposable cache — so the NSIS config leaves
+`deleteAppDataOnUninstall` unset (i.e. `false`) on purpose, not by
+oversight.
 
 Before starting the server, `main.ts` runs `prisma migrate deploy` against
 this path (the non-interactive, production migration command) using the
@@ -265,3 +284,10 @@ manual distribution.
   is to fail loudly (the spawned process's `error`/exit event surfaces as
   a visible Electron error dialog rather than a silent hang) rather than
   retry on another port or detect/kill a stale process.
+- The port number itself is duplicated in two independent, build-time
+  locations, not plumbed through one source of truth: `main.ts`'s spawn
+  env (`PORT: '3000'`) and `client/src/lib/api.ts`'s `VITE_API_BASE_URL`
+  fallback (`http://localhost:3000`, baked into the renderer bundle at
+  build time). Changing the port later — e.g. to work around a collision
+  — means updating both by hand; v1 accepts this rather than introducing
+  a shared config mechanism for a value that isn't expected to change.
