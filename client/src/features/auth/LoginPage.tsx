@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Navigate } from 'react-router'
 import { Button } from '../../components/ui/button.tsx'
 import { Input } from '../../components/ui/input.tsx'
 import { Card, CardBody, CardHeader } from '../../components/ui/card.tsx'
@@ -7,7 +8,7 @@ import { useAuth } from '../../lib/useAuth.ts'
 
 export function LoginPage() {
   const { t } = useTranslation(['auth', 'common'])
-  const { login } = useAuth()
+  const { login, isLoggedIn } = useAuth()
   const [loginValue, setLoginValue] = useState('')
   const [password, setPassword] = useState('')
   const [errorCode, setErrorCode] = useState<string | null>(null)
@@ -20,6 +21,15 @@ export function LoginPage() {
     } catch (error) {
       setErrorCode((error as { code?: string }).code ?? 'UNKNOWN')
     }
+  }
+
+  // Once login() resolves, isLoggedIn flips true (react-query's cache update
+  // for the ['auth', 'me'] key re-renders this component). Nothing else
+  // navigates away from /login on success, so this page has to redirect
+  // itself — /login isn't nested under ProtectedRoute, which only guards
+  // against unauthenticated access to the other routes, not the reverse.
+  if (isLoggedIn) {
+    return <Navigate to="/" replace />
   }
 
   return (

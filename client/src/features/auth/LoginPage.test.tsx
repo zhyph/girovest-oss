@@ -1,9 +1,21 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { MemoryRouter, Routes, Route } from 'react-router'
 import userEvent from '@testing-library/user-event'
 import '../../i18n.ts'
 import { LoginPage } from './LoginPage.tsx'
 import * as useAuthModule from '../../lib/useAuth.ts'
+
+function renderLoginPage() {
+  return render(
+    <MemoryRouter initialEntries={['/login']}>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/" element={<div>Dashboard stub</div>} />
+      </Routes>
+    </MemoryRouter>,
+  )
+}
 
 describe('LoginPage', () => {
   it('submits the entered credentials to login()', async () => {
@@ -12,7 +24,7 @@ describe('LoginPage', () => {
       staff: undefined, isLoadingStaff: false, login, logout: vi.fn(), isLoggedIn: false,
     })
 
-    render(<LoginPage />)
+    renderLoginPage()
     await userEvent.type(screen.getByLabelText('Usuário'), 'ana')
     await userEvent.type(screen.getByLabelText('Senha'), 'senha123')
     await userEvent.click(screen.getByRole('button', { name: 'Entrar' }))
@@ -26,11 +38,25 @@ describe('LoginPage', () => {
       staff: undefined, isLoadingStaff: false, login, logout: vi.fn(), isLoggedIn: false,
     })
 
-    render(<LoginPage />)
+    renderLoginPage()
     await userEvent.type(screen.getByLabelText('Usuário'), 'ana')
     await userEvent.type(screen.getByLabelText('Senha'), 'wrong')
     await userEvent.click(screen.getByRole('button', { name: 'Entrar' }))
 
     expect(await screen.findByText('Usuário ou senha inválidos.')).toBeInTheDocument()
+  })
+
+  it('redirects to / once already logged in', () => {
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1' },
+      isLoadingStaff: false,
+      login: vi.fn(),
+      logout: vi.fn(),
+      isLoggedIn: true,
+    })
+
+    renderLoginPage()
+
+    expect(screen.getByText('Dashboard stub')).toBeInTheDocument()
   })
 })

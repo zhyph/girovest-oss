@@ -31,3 +31,20 @@ If `npm run test:postgres` is interrupted (e.g. Ctrl-C) before it finishes
 tearing down, the shared generated client may be left in `postgresql`
 mode — run `npm run db:generate` (with no `DB_PROVIDER` set, or explicitly
 `DB_PROVIDER=sqlite`) to restore it before running `npm test` again.
+
+## Seeding test data
+
+The dev database (`server/dev.db`, from `npm run db:migrate`) starts empty —
+there's no automatic seed. Manual testing (curl, or the client's E2E test)
+needs at least one `Location` and one `Staff` row to log in against. Seed
+them with:
+
+```bash
+npx tsx seed-e2e.ts
+```
+
+This creates a `Location` and a `Staff` row (login `e2e-staff`, password
+`e2e-password12`) via the same Prisma client the server uses, matching
+`client/e2e/happy-path.spec.ts`'s precondition. It's a one-off script, not
+part of the app — safe to re-run against a fresh `dev.db`, but will fail
+with a unique-constraint error if the login already exists.
