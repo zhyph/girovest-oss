@@ -12,6 +12,10 @@ extraResources:
     to: server/node_modules
   - from: ../server/prisma
     to: server/prisma
+    filter:
+      - '**/*'
+      - '!**/*.db'
+      - '!**/*.db-journal'
   - from: ../server/prisma.config.ts
     to: server/prisma.config.ts
 win:
