@@ -78,7 +78,7 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
         )}
         <div className="mt-2 flex justify-between gap-2">
           {client && (
-            <Button type="button" variant="ghost" onClick={handleDelete}>
+            <Button type="button" variant="ghost" onClick={handleDelete} disabled={deleteClient.isPending}>
               {t('common:actions.delete', { ns: 'common' })}
             </Button>
           )}
@@ -86,7 +86,9 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
             <Button type="button" variant="secondary" onClick={onClose}>
               {t('common:actions.cancel', { ns: 'common' })}
             </Button>
-            <Button type="submit">{t('common:actions.save', { ns: 'common' })}</Button>
+            <Button type="submit" disabled={createClient.isPending || updateClient.isPending}>
+              {t('common:actions.save', { ns: 'common' })}
+            </Button>
           </div>
         </div>
       </form>

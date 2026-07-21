@@ -97,7 +97,7 @@ export function ProductDrawer({ product, onClose }: { product: Product | null; o
         )}
         <div className="mt-2 flex justify-between gap-2">
           {product && (
-            <Button type="button" variant="ghost" onClick={handleDelete}>
+            <Button type="button" variant="ghost" onClick={handleDelete} disabled={deleteProduct.isPending}>
               {t('common:actions.delete', { ns: 'common' })}
             </Button>
           )}
@@ -105,7 +105,9 @@ export function ProductDrawer({ product, onClose }: { product: Product | null; o
             <Button type="button" variant="secondary" onClick={onClose}>
               {t('common:actions.cancel', { ns: 'common' })}
             </Button>
-            <Button type="submit">{t('common:actions.save', { ns: 'common' })}</Button>
+            <Button type="submit" disabled={createProduct.isPending || updateProduct.isPending}>
+              {t('common:actions.save', { ns: 'common' })}
+            </Button>
           </div>
         </div>
       </form>

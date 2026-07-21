@@ -4,6 +4,8 @@ import userEvent from '@testing-library/user-event'
 import '../../i18n.ts'
 import { AllocationsPage } from './AllocationsPage.tsx'
 import * as useAllocationsModule from './useAllocations.ts'
+import * as useProductsModule from '../products/useProducts.ts'
+import * as useClientsModule from '../clients/useClients.ts'
 import type { Allocation } from './allocationSchemas.ts'
 
 const reserved: Allocation = {
@@ -25,12 +27,21 @@ function mockAllocationHooks(
   vi.spyOn(useAllocationsModule, 'useAllocationsList').mockReturnValue({ data: list, isLoading: false } as never)
   vi.spyOn(useAllocationsModule, 'useCheckOutAllocation').mockReturnValue({
     mutateAsync: overrides.checkOut ?? vi.fn(),
+    isPending: false,
   } as never)
   vi.spyOn(useAllocationsModule, 'useReturnAllocation').mockReturnValue({
     mutateAsync: overrides.returnAllocation ?? vi.fn(),
+    isPending: false,
   } as never)
   vi.spyOn(useAllocationsModule, 'useCancelAllocation').mockReturnValue({
     mutateAsync: overrides.cancel ?? vi.fn(),
+    isPending: false,
+  } as never)
+  vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({
+    data: [{ id: 'p1', name: 'Vestido Azul' }],
+  } as never)
+  vi.spyOn(useClientsModule, 'useClients').mockReturnValue({
+    data: [{ id: 'c1', name: 'Maria Silva' }],
   } as never)
 }
 

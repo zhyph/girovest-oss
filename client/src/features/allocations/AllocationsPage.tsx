@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../../components/ui/button.tsx'
+import { useClients } from '../clients/useClients.ts'
+import { useProducts } from '../products/useProducts.ts'
 import {
   useAllocationsList,
   useCheckOutAllocation,
@@ -9,6 +11,8 @@ import {
 } from './useAllocations.ts'
 import { NewAllocationForm } from './NewAllocationForm.tsx'
 import type { Allocation } from './allocationSchemas.ts'
+
+const dateFormatter = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
 
 function resolveErrorCode(error: unknown): string {
   return (error as { code?: string })?.code ?? 'UNKNOWN'
@@ -56,10 +60,10 @@ function RowActions({ allocation }: { allocation: Allocation }) {
     return (
       <div className="flex flex-col items-end gap-1">
         <div className="flex gap-2">
-          <Button size="sm" onClick={handleCheckOut}>
+          <Button size="sm" onClick={handleCheckOut} disabled={checkOut.isPending}>
             {t('actions.checkOut')}
           </Button>
-          <Button size="sm" variant="secondary" onClick={handleCancel}>
+          <Button size="sm" variant="secondary" onClick={handleCancel} disabled={cancel.isPending}>
             {t('actions.cancel')}
           </Button>
         </div>
@@ -70,7 +74,7 @@ function RowActions({ allocation }: { allocation: Allocation }) {
   if (allocation.status === 'checked_out') {
     return (
       <div className="flex flex-col items-end gap-1">
-        <Button size="sm" onClick={handleReturn}>
+        <Button size="sm" onClick={handleReturn} disabled={returnAllocation.isPending}>
           {t('actions.return')}
         </Button>
         {errorMessage && <span className="text-xs text-red-600">{errorMessage}</span>}
@@ -83,7 +87,18 @@ function RowActions({ allocation }: { allocation: Allocation }) {
 export function AllocationsPage() {
   const { t } = useTranslation('allocations')
   const { data: allocations, isLoading } = useAllocationsList()
+  const { data: products } = useProducts()
+  const { data: clients } = useClients()
   const [showForm, setShowForm] = useState(false)
+
+  const productNames = useMemo(
+    () => new Map((products ?? []).map((product) => [product.id, product.name])),
+    [products],
+  )
+  const clientNames = useMemo(
+    () => new Map((clients ?? []).map((client) => [client.id, client.name])),
+    [clients],
+  )
 
   if (isLoading) return <div>{t('title')}</div>
 
@@ -96,8 +111,19 @@ export function AllocationsPage() {
       {allocations && allocations.length === 0 && <p className="text-muted">{t('empty')}</p>}
       <div className="flex flex-col gap-1">
         {allocations?.map((allocation) => (
-          <div key={allocation.id} className="flex items-center justify-between rounded-md p-2 text-sm">
-            <span>{t(`status.${allocation.status}`)}</span>
+          <div
+            key={allocation.id}
+            className="flex items-center justify-between rounded-md border border-border-soft p-2 text-sm"
+          >
+            <div className="flex flex-col gap-0.5">
+              <span className="font-medium">{productNames.get(allocation.productId) ?? allocation.productId}</span>
+              <span className="text-muted">{clientNames.get(allocation.clientId) ?? allocation.clientId}</span>
+              <span className="text-xs text-muted">
+                {dateFormatter.format(new Date(allocation.checkoutDate))} –{' '}
+                {dateFormatter.format(new Date(allocation.dueDate))}
+              </span>
+              <span>{t(`status.${allocation.status}`)}</span>
+            </div>
             <RowActions allocation={allocation} />
           </div>
         ))}

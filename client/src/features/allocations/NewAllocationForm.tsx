@@ -83,7 +83,10 @@ export function NewAllocationForm({ onClose }: { onClose: () => void }) {
           <Button type="button" variant="secondary" onClick={onClose}>
             {t('common:actions.cancel', { ns: 'common' })}
           </Button>
-          <Button type="submit" disabled={availability.data?.available === false}>
+          <Button
+            type="submit"
+            disabled={availability.data?.available === false || createAllocation.isPending}
+          >
             {t('common:actions.save', { ns: 'common' })}
           </Button>
         </div>

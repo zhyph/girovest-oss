@@ -12,7 +12,8 @@
     "cancel": "Cancelar",
     "edit": "Editar",
     "delete": "Excluir",
-    "create": "Novo"
+    "create": "Novo",
+    "logout": "Sair"
   },
   "errors": {
     "UNKNOWN": "Algo deu errado. Tente novamente."
