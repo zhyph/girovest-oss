@@ -108,16 +108,27 @@ async function startServer(): Promise<boolean> {
     env: { ...env, ELECTRON_RUN_AS_NODE: '1' },
     stdio: 'pipe',
   })
+
+  // stdio: 'pipe' means the server's own console output goes nowhere unless
+  // something reads it — capture the tail of it so a crash dialog can show
+  // *why* it failed (e.g. "port already in use") instead of a bare exit code.
+  let recentOutput = ''
+  const captureOutput = (chunk: Buffer) => {
+    recentOutput = (recentOutput + chunk.toString()).slice(-2000)
+  }
+  serverProcess.stdout?.on('data', captureOutput)
+  serverProcess.stderr?.on('data', captureOutput)
+
   serverProcess.on('error', (error) => {
     console.error('Backend process failed to start:', error)
   })
   serverProcess.on('exit', (code) => {
     if (isShuttingDown) return
     isShuttingDown = true
-    console.error(`Backend process exited unexpectedly with code ${code}`)
+    console.error(`Backend process exited unexpectedly with code ${code}\n${recentOutput}`)
     dialog.showErrorBox(
       'Server Stopped Unexpectedly',
-      `The application server stopped unexpectedly (exit code ${code}). The app will now close.`,
+      `The application server stopped unexpectedly (exit code ${code}). The app will now close.\n\n${recentOutput.trim()}`,
     )
     app.quit()
   })
