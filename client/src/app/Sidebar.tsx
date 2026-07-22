@@ -39,7 +39,7 @@ export function Sidebar() {
         </NavLink>
       ))}
       {staff && (
-        <div className="mt-auto flex flex-col gap-1 px-2">
+        <div className="mt-auto flex flex-col gap-2 border-t border-border-soft px-2 pt-3">
           <div className="text-xs text-muted">{staff.name}</div>
           <Button variant="ghost" size="sm" className="justify-start px-0" onClick={logout}>
             {t('actions.logout')}
