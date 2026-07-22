@@ -41,6 +41,14 @@ linux:
   target: AppImage
 publish:
   provider: github
+  # Source repo is private; electron-updater can't read private release assets
+  # without shipping a token inside the app. Binaries + update feed
+  # (latest*.yml) go to this public, releases-only repo instead. This block is
+  # also baked into the package as app-update.yml — it's what installed
+  # clients poll.
+  owner: zhyph
+  repo: girovest-releases
   # Draft, not published: artifacts land attached to a draft release for a
   # human to review and hit "Publish" on — not auto-live the moment CI runs.
+  # electron-updater only ever sees published releases.
   releaseType: draft
