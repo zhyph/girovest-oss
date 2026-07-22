@@ -4,6 +4,7 @@ import crypto from 'crypto'
 import fs from 'fs'
 import path from 'path'
 import { backupDatabaseIfNeeded, writeBackupMarker } from './backup.ts'
+import { setupAutoUpdater } from './updater.ts'
 
 export function resolveServerCwd(appRoot: string): string {
   return path.resolve(appRoot, '..', 'server')
@@ -240,6 +241,7 @@ if (app) {
     }
 
     createWindow()
+    void setupAutoUpdater()
   })
 
   app.on('window-all-closed', () => {

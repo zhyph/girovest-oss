@@ -5,7 +5,10 @@ import { resolve } from 'path'
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()],
+    // electron-updater/electron-log are excluded from externalization (i.e.
+    // bundled into out/main) because the packaged app ships only out/**/* +
+    // package.json — no client node_modules to resolve them from at runtime.
+    plugins: [externalizeDepsPlugin({ exclude: ['electron-updater', 'electron-log'] })],
     ssr: { external: ['electron'] },
     build: {
       rollupOptions: {
