@@ -3,6 +3,7 @@ import { spawn, type ChildProcess } from 'child_process'
 import crypto from 'crypto'
 import fs from 'fs'
 import path from 'path'
+import { backupDatabaseIfNeeded, writeBackupMarker } from './backup.ts'
 
 export function resolveServerCwd(appRoot: string): string {
   return path.resolve(appRoot, '..', 'server')
@@ -136,9 +137,19 @@ async function startServer(): Promise<boolean> {
   }
 
   try {
+    // Backup before migrating; if the backup itself throws (e.g. disk full),
+    // deliberately abort startup rather than migrate without a safety copy.
+    backupDatabaseIfNeeded(
+      userDataPath,
+      app.getVersion(),
+      new Date().toISOString().slice(0, 10),
+    )
     await runMigrations(serverCwd, env)
+    // Only after success: a failed upgrade must re-back-up on the next
+    // launch attempt, so the marker can't move until migrations land.
+    writeBackupMarker(userDataPath, app.getVersion())
   } catch (error) {
-    console.error('Database migration failed:', error)
+    console.error('Database preparation failed:', error)
     return false
   }
 
