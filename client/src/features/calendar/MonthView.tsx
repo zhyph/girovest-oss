@@ -55,6 +55,7 @@ export function MonthView({
         onNavigate={onNavigate}
         onSelectEvent={(event) => onSelectDay(event.start)}
         onSelectSlot={(slot) => onSelectDay(slot.start)}
+        onDrillDown={(drillDate) => onSelectDay(drillDate)}
         selectable
         culture="pt-BR"
         messages={messages}
