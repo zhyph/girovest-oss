@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next'
+import { parseDateOnly } from '../../lib/date.ts'
 import type { Allocation } from '../allocations/allocationSchemas.ts'
 
 export function AgendaView({
@@ -18,7 +19,7 @@ export function AgendaView({
   }
 
   const sorted = [...allocations].sort(
-    (a, b) => new Date(a[dateField]).getTime() - new Date(b[dateField]).getTime(),
+    (a, b) => parseDateOnly(a[dateField]).getTime() - parseDateOnly(b[dateField]).getTime(),
   )
 
   return (
@@ -26,7 +27,7 @@ export function AgendaView({
       {sorted.map((allocation) => (
         <div key={allocation.id} className="flex justify-between rounded-md border border-border-soft p-2 text-sm">
           <span>{productNames.get(allocation.productId) ?? allocation.productId}</span>
-          <span className="text-muted">{formatter.format(new Date(allocation[dateField]))}</span>
+          <span className="text-muted">{formatter.format(parseDateOnly(allocation[dateField]))}</span>
         </div>
       ))}
     </div>

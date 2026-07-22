@@ -1,13 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { renderHook, waitFor, act } from '@testing-library/react'
+import { renderHook, waitFor, act, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter, useLocation } from 'react-router'
 import { useAuth } from './useAuth.ts'
 import * as api from './api.ts'
 import { getToken } from './auth.ts'
 
 function wrapper({ children }: { children: React.ReactNode }) {
   const queryClient = new QueryClient()
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  return (
+    <MemoryRouter>
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    </MemoryRouter>
+  )
 }
 
 describe('useAuth', () => {
@@ -54,6 +60,37 @@ describe('useAuth', () => {
     renderHook(() => useAuth(), { wrapper })
     act(() => window.dispatchEvent(new Event('auth:logout')))
 
+    expect(getToken()).toBeNull()
+  })
+
+  it('navigates to /login when logout() is called, not just clearing the token', async () => {
+    vi.spyOn(api, 'apiFetch').mockResolvedValue({ id: '1', name: 'Ana', role: 'owner', locationId: 'l1' } as never)
+    const { setToken } = await import('./auth.ts')
+    setToken('existing-token')
+
+    function Probe() {
+      const { logout } = useAuth()
+      const location = useLocation()
+      return (
+        <div>
+          <span data-testid="path">{location.pathname}</span>
+          <button onClick={logout}>sair</button>
+        </div>
+      )
+    }
+
+    const queryClient = new QueryClient()
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <QueryClientProvider client={queryClient}>
+          <Probe />
+        </QueryClientProvider>
+      </MemoryRouter>,
+    )
+
+    await userEvent.click(screen.getByText('sair'))
+
+    expect(screen.getByTestId('path')).toHaveTextContent('/login')
     expect(getToken()).toBeNull()
   })
 })

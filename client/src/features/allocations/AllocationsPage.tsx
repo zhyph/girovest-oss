@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../../components/ui/button.tsx'
+import { parseDateOnly } from '../../lib/date.ts'
 import { useClients } from '../clients/useClients.ts'
 import { useProducts } from '../products/useProducts.ts'
 import {
@@ -119,8 +120,8 @@ export function AllocationsPage() {
               <span className="font-medium">{productNames.get(allocation.productId) ?? allocation.productId}</span>
               <span className="text-muted">{clientNames.get(allocation.clientId) ?? allocation.clientId}</span>
               <span className="text-xs text-muted">
-                {dateFormatter.format(new Date(allocation.checkoutDate))} –{' '}
-                {dateFormatter.format(new Date(allocation.dueDate))}
+                {dateFormatter.format(parseDateOnly(allocation.checkoutDate))} –{' '}
+                {dateFormatter.format(parseDateOnly(allocation.dueDate))}
               </span>
               <span>{t(`status.${allocation.status}`)}</span>
             </div>

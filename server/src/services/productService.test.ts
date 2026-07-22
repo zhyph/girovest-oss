@@ -103,4 +103,38 @@ describe.sequential('productService', () => {
 
     await expect(deleteProduct(product.id)).rejects.toMatchObject({ code: 'CANNOT_DELETE_WITH_HISTORY' })
   })
+
+  it('reports availability derived from allocations, not the circulation status field', async () => {
+    const staff = await prisma.staff.create({
+      data: { name: 'S', login: 'staff-avail', passwordHash: 'x', role: 'staff', locationId },
+    })
+    const client = await prisma.client.create({ data: { name: 'C', phone: '1', email: 'c@example.com' } })
+    const product = await createProduct({
+      locationId, name: 'A', category: 'festa', size: 'M', color: 'azul', rentalPrice: 1, depositAmount: 1,
+    })
+
+    expect(product.availability).toBe('available')
+
+    await prisma.allocation.create({
+      data: {
+        productId: product.id,
+        clientId: client.id,
+        staffId: staff.id,
+        checkoutDate: new Date('2026-01-01'),
+        dueDate: new Date('2026-01-05'),
+        status: 'checked_out',
+        priceCharged: 1,
+      },
+    })
+
+    // The product's own circulation status never changes on checkout — this
+    // is exactly the field the Products list used to badge, which is why it
+    // always read "Disponível" no matter what.
+    const fetched = await getProduct(product.id)
+    expect(fetched.status).toBe('active')
+    expect(fetched.availability).toBe('rented')
+
+    const [listed] = await listProducts()
+    expect(listed.availability).toBe('rented')
+  })
 })

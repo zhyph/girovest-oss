@@ -9,7 +9,8 @@ import * as useAuthModule from '../../lib/useAuth.ts'
 
 const product = {
   id: 'p1', locationId: 'l1', name: 'Vestido Azul', category: 'casual', size: 'P', color: 'azul',
-  rentalPrice: 150, depositAmount: 50, status: 'active' as const, createdAt: '2026-01-01',
+  rentalPrice: 150, depositAmount: 50, status: 'active' as const, availability: 'available' as const,
+  createdAt: '2026-01-01',
 }
 
 function renderWithQueryClient(ui: React.ReactElement) {
@@ -35,5 +36,29 @@ describe('ProductsPage', () => {
     renderWithQueryClient(<ProductsPage />)
     await userEvent.click(screen.getByText('Vestido Azul'))
     expect(screen.getByLabelText('Nome')).toHaveValue('Vestido Azul')
+  })
+
+  it('badges a rented product as Alugado instead of the always-Disponível status field', () => {
+    const rented = { ...product, id: 'p2', name: 'Vestido Rosa', availability: 'rented' as const }
+    vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [rented], isLoading: false } as never)
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste' }, isLoadingStaff: false, login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
+
+    renderWithQueryClient(<ProductsPage />)
+
+    expect(screen.getByText('Alugado')).toBeInTheDocument()
+    expect(screen.queryByText('Disponível')).not.toBeInTheDocument()
+  })
+
+  it('remounts the drawer with fresh values when switching rows without closing it', async () => {
+    const other = { ...product, id: 'p2', name: 'Vestido Rosa' }
+    vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [product, other], isLoading: false } as never)
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste' }, isLoadingStaff: false, login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
+
+    renderWithQueryClient(<ProductsPage />)
+    await userEvent.click(screen.getByText('Vestido Azul'))
+    expect(screen.getByLabelText('Nome')).toHaveValue('Vestido Azul')
+
+    await userEvent.click(screen.getByText('Vestido Rosa'))
+    expect(screen.getByLabelText('Nome')).toHaveValue('Vestido Rosa')
   })
 })

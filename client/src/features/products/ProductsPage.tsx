@@ -29,12 +29,18 @@ export function ProductsPage() {
             <span>{product.name}</span>
             <span className="flex gap-4 text-muted">
               <span>{product.size}</span>
-              <span>{t(`status.${product.status}`)}</span>
+              <span>
+                {product.status === 'active'
+                  ? t(`availability.${product.availability}`)
+                  : t(`status.${product.status}`)}
+              </span>
             </span>
           </button>
         ))}
       </div>
-      {editing !== undefined && <ProductDrawer product={editing} onClose={() => setEditing(undefined)} />}
+      {editing !== undefined && (
+        <ProductDrawer key={editing?.id ?? 'new'} product={editing} onClose={() => setEditing(undefined)} />
+      )}
     </div>
   )
 }

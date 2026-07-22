@@ -11,7 +11,7 @@ clientsRouter.use(requireAuth)
 const createSchema = z.object({
   name: z.string().min(1),
   phone: z.string().min(1),
-  email: z.email(),
+  email: z.email().or(z.literal('')),
   notes: z.string().optional(),
 })
 

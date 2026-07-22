@@ -31,7 +31,9 @@ export function ClientsPage() {
           </button>
         ))}
       </div>
-      {editing !== undefined && <ClientDrawer client={editing} onClose={() => setEditing(undefined)} />}
+      {editing !== undefined && (
+        <ClientDrawer key={editing?.id ?? 'new'} client={editing} onClose={() => setEditing(undefined)} />
+      )}
     </div>
   )
 }

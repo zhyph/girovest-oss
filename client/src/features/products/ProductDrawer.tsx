@@ -81,10 +81,12 @@ export function ProductDrawer({ product, onClose }: { product: Product | null; o
         <label className="flex flex-col gap-1 text-sm">
           {t('fields.rentalPrice')}
           <Input type="number" step="0.01" {...register('rentalPrice', { valueAsNumber: true })} />
+          {errors.rentalPrice && <span className="text-xs text-red-600">{t('validation.rentalPriceInvalid')}</span>}
         </label>
         <label className="flex flex-col gap-1 text-sm">
           {t('fields.depositAmount')}
           <Input type="number" step="0.01" {...register('depositAmount', { valueAsNumber: true })} />
+          {errors.depositAmount && <span className="text-xs text-red-600">{t('validation.depositAmountInvalid')}</span>}
         </label>
         <label className="flex flex-col gap-1 text-sm">
           {t('fields.description')}

@@ -2,6 +2,7 @@ import { Calendar, dateFnsLocalizer } from 'react-big-calendar'
 import { format, parse, startOfWeek, getDay } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
+import { parseDateOnly } from '../../lib/date.ts'
 import type { Allocation } from '../allocations/allocationSchemas.ts'
 
 const localizer = dateFnsLocalizer({
@@ -29,8 +30,8 @@ export function MonthView({
 }) {
   const events = allocations.map((allocation) => ({
     title: productNames.get(allocation.productId) ?? allocation.productId,
-    start: new Date(allocation[dateField]),
-    end: new Date(allocation[dateField]),
+    start: parseDateOnly(allocation[dateField]),
+    end: parseDateOnly(allocation[dateField]),
     allDay: true,
     resource: allocation,
   }))

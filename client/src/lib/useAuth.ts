@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router'
 import { apiFetch } from './api.ts'
 import { getToken, setToken, clearToken } from './auth.ts'
 
@@ -13,6 +14,7 @@ export interface StaffMe {
 
 export function useAuth() {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
 
   const staffQuery = useQuery({
     queryKey: ['auth', 'me'],
@@ -51,7 +53,14 @@ export function useAuth() {
 
   function logout() {
     clearToken()
-    queryClient.setQueryData(['auth', 'me'], undefined)
+    // setQueryData(key, undefined) is a no-op in TanStack Query (it treats an
+    // undefined value as "no update"), so removeQueries is what actually
+    // clears the cache and notifies subscribers. Navigating explicitly here
+    // is what actually leaves the protected route tree — isLoggedIn is a
+    // plain synchronous localStorage read, not React state, so nothing
+    // forces a re-render/redirect without it.
+    queryClient.removeQueries({ queryKey: ['auth', 'me'] })
+    navigate('/login', { replace: true })
   }
 
   return {

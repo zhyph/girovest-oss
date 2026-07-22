@@ -15,11 +15,18 @@
     "maintenance": "Manutenção",
     "retired": "Aposentado"
   },
+  "availability": {
+    "available": "Disponível",
+    "reserved": "Reservado",
+    "rented": "Alugado"
+  },
   "validation": {
     "nameRequired": "Nome é obrigatório",
     "categoryRequired": "Categoria é obrigatória",
     "sizeRequired": "Tamanho é obrigatório",
-    "colorRequired": "Cor é obrigatória"
+    "colorRequired": "Cor é obrigatória",
+    "rentalPriceInvalid": "Preço do aluguel deve ser zero ou maior",
+    "depositAmountInvalid": "Caução deve ser zero ou maior"
   },
   "empty": "Nenhum produto cadastrado ainda.",
   "errors": {

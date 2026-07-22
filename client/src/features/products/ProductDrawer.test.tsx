@@ -8,7 +8,8 @@ import * as useAuthModule from '../../lib/useAuth.ts'
 
 const product = {
   id: 'p1', locationId: 'l1', name: 'Vestido Azul', category: 'casual', size: 'P', color: 'azul',
-  rentalPrice: 150, depositAmount: 50, status: 'active' as const, createdAt: '2026-01-01',
+  rentalPrice: 150, depositAmount: 50, status: 'active' as const, availability: 'available' as const,
+  createdAt: '2026-01-01',
 }
 
 function mockProductHooks(

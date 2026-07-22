@@ -44,6 +44,7 @@ function makeProduct(overrides: Partial<Product> = {}): Product {
     rentalPrice: 100,
     depositAmount: 50,
     status: 'active',
+    availability: 'available',
     createdAt: '2026-07-01T00:00:00.000Z',
     ...overrides,
   }
