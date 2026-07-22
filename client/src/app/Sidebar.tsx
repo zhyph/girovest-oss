@@ -18,7 +18,7 @@ export function Sidebar() {
   const { staff, logout } = useAuth()
 
   return (
-    <nav className="flex h-full w-48 flex-col gap-1 border-r border-border-soft bg-white p-3">
+    <nav className="flex w-48 flex-col gap-1 border-r border-border-soft bg-white p-3">
       <div className="mb-3 px-2 text-lg font-semibold text-brand-600">
         {staff?.locationName ?? t('appName')}
       </div>
