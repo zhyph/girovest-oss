@@ -54,6 +54,15 @@ describe('ClientDrawer', () => {
     expect(deleteImpl).not.toHaveBeenCalled()
   })
 
+  it('masks a typed phone number as (DDD) NNNNN-NNNN', async () => {
+    mockClientHooks(vi.fn())
+    render(<ClientDrawer client={null} onClose={vi.fn()} />)
+
+    await userEvent.type(screen.getByLabelText('Telefone'), '11987654321')
+
+    expect(screen.getByLabelText('Telefone')).toHaveValue('(11) 98765-4321')
+  })
+
   it('closes the drawer when delete succeeds', async () => {
     const onClose = vi.fn()
     mockClientHooks(vi.fn().mockResolvedValue(undefined))

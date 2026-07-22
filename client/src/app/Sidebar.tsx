@@ -18,8 +18,13 @@ export function Sidebar() {
   const { staff, logout } = useAuth()
 
   return (
-    <nav className="flex w-48 flex-col gap-1 border-r border-border-soft bg-white p-3">
-      <div className="mb-3 px-2 text-lg font-semibold text-brand-600">
+    <nav
+      className={cn(
+        'group flex w-16 shrink-0 flex-col gap-1 overflow-hidden border-r border-border-soft bg-white p-3',
+        'transition-[width] duration-150 hover:w-48 focus-within:w-48 lg:w-48',
+      )}
+    >
+      <div className="mb-3 truncate px-2 text-lg font-semibold whitespace-nowrap text-brand-600">
         {staff?.locationName ?? t('appName')}
       </div>
       {links.map(({ to, labelKey, icon: Icon }) => (
@@ -29,19 +34,19 @@ export function Sidebar() {
           end={to === '/'}
           className={({ isActive }) =>
             cn(
-              'flex items-center gap-2 rounded-md px-2 py-2 text-sm',
+              'flex items-center gap-2 rounded-md px-2 py-2 text-sm whitespace-nowrap',
               isActive ? 'bg-brand-50 text-brand-700' : 'text-ink hover:bg-brand-50',
             )
           }
         >
-          <Icon size={18} />
+          <Icon size={18} className="shrink-0" />
           {t(labelKey)}
         </NavLink>
       ))}
       {staff && (
         <div className="mt-auto flex flex-col gap-2 border-t border-border-soft px-2 pt-3">
-          <div className="text-xs text-muted">{staff.name}</div>
-          <Button variant="ghost" size="sm" className="justify-start px-0" onClick={logout}>
+          <div className="truncate text-xs whitespace-nowrap text-muted">{staff.name}</div>
+          <Button variant="ghost" size="sm" className="justify-start whitespace-nowrap px-0" onClick={logout}>
             {t('actions.logout')}
           </Button>
         </div>

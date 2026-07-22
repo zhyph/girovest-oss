@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../../components/ui/button.tsx'
 import { Input } from '../../components/ui/input.tsx'
+import { PhoneInput } from '../../components/ui/phone-input.tsx'
 import { Modal } from '../../components/ui/modal.tsx'
 import { clientSchema, type Client, type ClientFormValues } from './clientSchemas.ts'
 import { useCreateClient, useUpdateClient, useDeleteClient } from './useClients.ts'
@@ -20,6 +21,7 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors },
   } = useForm<ClientFormValues>({
     resolver: zodResolver(clientSchema),
@@ -63,12 +65,18 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
         </label>
         <label className="flex flex-col gap-1 text-sm">
           {t('fields.phone')}
-          <Input {...register('phone')} />
+          <Controller
+            name="phone"
+            control={control}
+            render={({ field }) => (
+              <PhoneInput value={field.value} onChange={field.onChange} id="phone" aria-label={t('fields.phone')} />
+            )}
+          />
           {errors.phone && <span className="text-xs text-red-600">{t('validation.phoneRequired')}</span>}
         </label>
         <label className="flex flex-col gap-1 text-sm">
           {t('fields.email')}
-          <Input {...register('email')} />
+          <Input type="email" inputMode="email" {...register('email')} />
           {errors.email && <span className="text-xs text-red-600">{t('validation.emailInvalid')}</span>}
         </label>
         <label className="flex flex-col gap-1 text-sm">
