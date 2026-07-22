@@ -39,6 +39,35 @@ export function resolveDatabaseUrl(userDataPath: string): string {
   return `file:${path.join(userDataPath, 'dev.db')}`
 }
 
+// The packaged server directory lives inside the app's read-only mounted
+// resources (e.g. an AppImage's squashfs mount, or an ASAR-adjacent
+// directory on Windows/NSIS installs users don't have write access to).
+// That's fine for running the bundled server itself, but Prisma's
+// schema-engine (used by `migrate deploy`) self-heals by copying its binary
+// from its own global cache into node_modules/@prisma/engines/ whenever it
+// doesn't find what it expects there — and that copy's *target* must be
+// writable. Confirmed directly against a real packaged AppImage: this fails
+// with EROFS against the read-only mount. Copy the whole server directory
+// into a writable location under userData once per app version (re-copying
+// only when the version marker doesn't match, so a normal launch doesn't
+// pay for a full copy every time), and run everything from there instead.
+export function ensureWritableServerRuntime(
+  sourceDir: string,
+  userDataPath: string,
+  version: string,
+): string {
+  const runtimeDir = path.join(userDataPath, 'server-runtime')
+  const versionMarkerPath = path.join(runtimeDir, '.version')
+  const isCurrent =
+    fs.existsSync(versionMarkerPath) && fs.readFileSync(versionMarkerPath, 'utf-8') === version
+  if (!isCurrent) {
+    fs.rmSync(runtimeDir, { recursive: true, force: true })
+    fs.cpSync(sourceDir, runtimeDir, { recursive: true })
+    fs.writeFileSync(versionMarkerPath, version, 'utf-8')
+  }
+  return runtimeDir
+}
+
 export async function waitForServerReady(
   url: string,
   timeoutMs = 10_000,
@@ -81,11 +110,21 @@ function runMigrations(serverCwd: string, env: NodeJS.ProcessEnv): Promise<void>
 
 async function startServer(): Promise<boolean> {
   const userDataPath = app.getPath('userData')
-  const serverCwd = resolveServerRuntimeCwd(
-    app.isPackaged,
-    app.getAppPath(),
-    process.resourcesPath,
-  )
+  // Packaged: copy the whole resources directory (not just resources/server)
+  // into the writable runtime location, preserving the server/node_modules
+  // sibling relationship Node's module resolution depends on — the shared,
+  // hoisted npm-workspace dependencies (effect, dotenv, zod, cors, ...) live
+  // in resources/node_modules, a *sibling* of resources/server, not nested
+  // under it, and resolution walks up from server/node_modules to find them.
+  // Copying only resources/server (an earlier version of this fix) broke
+  // that walk-up entirely — confirmed directly by reproducing the resulting
+  // "Cannot find module 'effect'" error before catching and fixing it here.
+  const serverCwd = app.isPackaged
+    ? path.join(
+        ensureWritableServerRuntime(process.resourcesPath, userDataPath, app.getVersion()),
+        'server',
+      )
+    : resolveServerRuntimeCwd(app.isPackaged, app.getAppPath(), process.resourcesPath)
 
   const env: NodeJS.ProcessEnv = {
     ...process.env,
