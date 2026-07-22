@@ -61,4 +61,33 @@ describe('SetupPage', () => {
 
     expect(await screen.findByText('Esta loja já foi configurada.')).toBeInTheDocument()
   })
+
+  it('shows field-level errors on an empty submit instead of a generic banner', async () => {
+    renderSetupPage()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Criar loja' }))
+
+    expect(await screen.findByText('Nome da loja é obrigatório')).toBeInTheDocument()
+    expect(screen.getByText('Endereço é obrigatório')).toBeInTheDocument()
+    expect(screen.getByText('Seu nome é obrigatório')).toBeInTheDocument()
+    expect(screen.getByText('Usuário é obrigatório')).toBeInTheDocument()
+    expect(screen.getByText('Senha deve ter pelo menos 8 caracteres')).toBeInTheDocument()
+    expect(screen.queryByText('Algo deu errado. Tente novamente.')).not.toBeInTheDocument()
+    expect(apiFetch).not.toHaveBeenCalled()
+  })
+
+  it('shows a too-short password error without touching the other fields', async () => {
+    renderSetupPage()
+
+    await userEvent.type(screen.getByLabelText('Nome da loja'), 'Loja Teste')
+    await userEvent.type(screen.getByLabelText('Endereço'), 'Rua Teste, 1')
+    await userEvent.type(screen.getByLabelText('Seu nome'), 'Dona Ana')
+    await userEvent.type(screen.getByLabelText('Usuário'), 'dona-ana')
+    await userEvent.type(screen.getByLabelText('Senha'), 'curta')
+    await userEvent.click(screen.getByRole('button', { name: 'Criar loja' }))
+
+    expect(await screen.findByText('Senha deve ter pelo menos 8 caracteres')).toBeInTheDocument()
+    expect(screen.queryByText('Nome da loja é obrigatório')).not.toBeInTheDocument()
+    expect(apiFetch).not.toHaveBeenCalled()
+  })
 })

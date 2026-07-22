@@ -6,6 +6,13 @@
   "ownerLoginField": "Usuário",
   "ownerPasswordField": "Senha",
   "submit": "Criar loja",
+  "validation": {
+    "shopNameRequired": "Nome da loja é obrigatório",
+    "shopAddressRequired": "Endereço é obrigatório",
+    "ownerNameRequired": "Seu nome é obrigatório",
+    "ownerLoginRequired": "Usuário é obrigatório",
+    "ownerPasswordTooShort": "Senha deve ter pelo menos 8 caracteres"
+  },
   "errors": {
     "SETUP_ALREADY_COMPLETE": "Esta loja já foi configurada."
   }

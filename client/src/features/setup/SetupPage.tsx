@@ -1,27 +1,33 @@
-import { useState, type FormEvent } from 'react'
+import { useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
 import { Navigate } from 'react-router'
 import { Button } from '../../components/ui/button.tsx'
 import { Input } from '../../components/ui/input.tsx'
 import { Card, CardBody, CardHeader } from '../../components/ui/card.tsx'
 import { useCompleteSetup } from '../../lib/useSetup.ts'
+import { setupSchema, type SetupFormValues } from './setupSchema.ts'
 
 export function SetupPage() {
   const { t } = useTranslation(['setup', 'common'])
   const completeSetup = useCompleteSetup()
-  const [shopName, setShopName] = useState('')
-  const [shopAddress, setShopAddress] = useState('')
-  const [ownerName, setOwnerName] = useState('')
-  const [ownerLogin, setOwnerLogin] = useState('')
-  const [ownerPassword, setOwnerPassword] = useState('')
   const [errorCode, setErrorCode] = useState<string | null>(null)
   const [done, setDone] = useState(false)
 
-  async function handleSubmit(event: FormEvent) {
-    event.preventDefault()
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<SetupFormValues>({
+    resolver: zodResolver(setupSchema),
+    defaultValues: { shopName: '', shopAddress: '', ownerName: '', ownerLogin: '', ownerPassword: '' },
+  })
+
+  async function onSubmit(values: SetupFormValues) {
     setErrorCode(null)
     try {
-      await completeSetup.mutateAsync({ shopName, shopAddress, ownerName, ownerLogin, ownerPassword })
+      await completeSetup.mutateAsync(values)
       setDone(true)
     } catch (error) {
       setErrorCode((error as { code?: string }).code ?? 'UNKNOWN')
@@ -39,30 +45,41 @@ export function SetupPage() {
           <h1 className="text-lg font-semibold">{t('setup:title')}</h1>
         </CardHeader>
         <CardBody>
-          <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+          <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3">
             <label className="flex flex-col gap-1 text-sm">
               {t('setup:shopNameField')}
-              <Input value={shopName} onChange={(e) => setShopName(e.target.value)} />
+              <Input {...register('shopName')} />
+              {errors.shopName && (
+                <span className="text-xs text-red-600">{t('setup:validation.shopNameRequired')}</span>
+              )}
             </label>
             <label className="flex flex-col gap-1 text-sm">
               {t('setup:shopAddressField')}
-              <Input value={shopAddress} onChange={(e) => setShopAddress(e.target.value)} />
+              <Input {...register('shopAddress')} />
+              {errors.shopAddress && (
+                <span className="text-xs text-red-600">{t('setup:validation.shopAddressRequired')}</span>
+              )}
             </label>
             <label className="flex flex-col gap-1 text-sm">
               {t('setup:ownerNameField')}
-              <Input value={ownerName} onChange={(e) => setOwnerName(e.target.value)} />
+              <Input {...register('ownerName')} />
+              {errors.ownerName && (
+                <span className="text-xs text-red-600">{t('setup:validation.ownerNameRequired')}</span>
+              )}
             </label>
             <label className="flex flex-col gap-1 text-sm">
               {t('setup:ownerLoginField')}
-              <Input value={ownerLogin} onChange={(e) => setOwnerLogin(e.target.value)} />
+              <Input {...register('ownerLogin')} />
+              {errors.ownerLogin && (
+                <span className="text-xs text-red-600">{t('setup:validation.ownerLoginRequired')}</span>
+              )}
             </label>
             <label className="flex flex-col gap-1 text-sm">
               {t('setup:ownerPasswordField')}
-              <Input
-                type="password"
-                value={ownerPassword}
-                onChange={(e) => setOwnerPassword(e.target.value)}
-              />
+              <Input type="password" {...register('ownerPassword')} />
+              {errors.ownerPassword && (
+                <span className="text-xs text-red-600">{t('setup:validation.ownerPasswordTooShort')}</span>
+              )}
             </label>
             {errorCode && (
               <p className="text-sm text-red-600">
