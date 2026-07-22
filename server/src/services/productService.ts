@@ -20,6 +20,7 @@ export interface ProductDTO {
   photos: string[]
   status: ProductStatus
   availability: DerivedAvailability
+  hasAllocationHistory: boolean
   createdAt: Date
 }
 
@@ -62,12 +63,13 @@ interface ProductRow {
   createdAt: Date
 }
 
-function toDTO(row: ProductRow, availability: DerivedAvailability): ProductDTO {
+function toDTO(row: ProductRow, availability: DerivedAvailability, hasAllocationHistory: boolean): ProductDTO {
   return {
     ...row,
     photos: JSON.parse(row.photos) as string[],
     status: row.status as ProductStatus,
     availability,
+    hasAllocationHistory,
   }
 }
 
@@ -113,6 +115,25 @@ async function availabilityByProductId(productIds: string[]): Promise<Map<string
   return result
 }
 
+async function hasHistory(productId: string): Promise<boolean> {
+  const count = await prisma.allocation.count({ where: { productId } })
+  return count > 0
+}
+
+async function historyByProductId(productIds: string[]): Promise<Set<string>> {
+  const result = new Set<string>()
+  if (productIds.length === 0) return result
+  const allocations = await prisma.allocation.findMany({
+    where: { productId: { in: productIds } },
+    select: { productId: true },
+    distinct: ['productId'],
+  })
+  for (const allocation of allocations) {
+    result.add(allocation.productId)
+  }
+  return result
+}
+
 export async function createProduct(data: CreateProductInput): Promise<ProductDTO> {
   const row = await prisma.product.create({
     data: {
@@ -127,13 +148,16 @@ export async function createProduct(data: CreateProductInput): Promise<ProductDT
       photos: JSON.stringify(data.photos ?? []),
     },
   })
-  return toDTO(row, 'available')
+  return toDTO(row, 'available', false)
 }
 
 export async function listProducts(): Promise<ProductDTO[]> {
   const rows = await prisma.product.findMany({ orderBy: { createdAt: 'desc' } })
   const availability = await availabilityByProductId(rows.map((row) => row.id))
-  return rows.map((row) => toDTO(row, availability.get(row.id) ?? 'available'))
+  const withHistory = await historyByProductId(rows.map((row) => row.id))
+  return rows.map((row) =>
+    toDTO(row, availability.get(row.id) ?? 'available', withHistory.has(row.id)),
+  )
 }
 
 export async function getProduct(id: string): Promise<ProductDTO> {
@@ -141,7 +165,7 @@ export async function getProduct(id: string): Promise<ProductDTO> {
   if (!row) {
     throw new AppError(ErrorCodes.NOT_FOUND, 404, `Product ${id} not found`)
   }
-  return toDTO(row, await availabilityFor(id))
+  return toDTO(row, await availabilityFor(id), await hasHistory(id))
 }
 
 export async function updateProduct(id: string, data: UpdateProductInput): Promise<ProductDTO> {
@@ -153,7 +177,7 @@ export async function updateProduct(id: string, data: UpdateProductInput): Promi
       photos: data.photos ? JSON.stringify(data.photos) : undefined,
     },
   })
-  return toDTO(row, await availabilityFor(id))
+  return toDTO(row, await availabilityFor(id), await hasHistory(id))
 }
 
 export async function deleteProduct(id: string): Promise<void> {

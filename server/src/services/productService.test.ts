@@ -137,4 +137,32 @@ describe.sequential('productService', () => {
     const [listed] = await listProducts()
     expect(listed.availability).toBe('rented')
   })
+
+  it('reports hasAllocationHistory, independent of availability', async () => {
+    const staff = await prisma.staff.create({
+      data: { name: 'S', login: 'staff-dhist', passwordHash: 'x', role: 'staff', locationId },
+    })
+    const client = await prisma.client.create({ data: { name: 'C', phone: '1', email: 'c2@example.com' } })
+    const product = await createProduct({
+      locationId, name: 'A', category: 'festa', size: 'M', color: 'azul', rentalPrice: 1, depositAmount: 1,
+    })
+
+    expect(product.hasAllocationHistory).toBe(false)
+
+    await prisma.allocation.create({
+      data: {
+        productId: product.id, clientId: client.id, staffId: staff.id,
+        checkoutDate: new Date('2026-01-01'), dueDate: new Date('2026-01-05'),
+        status: 'returned', actualReturnDate: new Date('2026-01-04'), priceCharged: 1,
+      },
+    })
+
+    const fetched = await getProduct(product.id)
+    expect(fetched.hasAllocationHistory).toBe(true)
+    // returned means it's no longer occupied — history and current availability are different axes
+    expect(fetched.availability).toBe('available')
+
+    const [listed] = await listProducts()
+    expect(listed.hasAllocationHistory).toBe(true)
+  })
 })
