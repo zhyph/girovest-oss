@@ -2,6 +2,8 @@
   "name": "girovest-server",
   "version": "0.1.0",
   "private": true,
+  "description": "Girovest API server — Express + Prisma, SQLite or Postgres.",
+  "author": "Girovest",
   "type": "module",
   "scripts": {
     "db:schema": "node scripts/build-prisma-schema.mjs",

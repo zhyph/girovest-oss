@@ -1,6 +1,12 @@
 {
   "name": "girovest",
   "private": true,
+  "description": "Dress rental shop management — clients, products, and allocations, with a calendar view. Ships as an offline desktop app (Electron) and a hosted website from one codebase.",
+  "author": "Girovest",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zhyph/girovest.git"
+  },
   "workspaces": [
     "server",
     "client"
