@@ -77,7 +77,7 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
           </p>
         )}
         <div className="mt-2 flex justify-between gap-2">
-          {client && (
+          {client && !client.hasAllocationHistory && (
             <Button type="button" variant="ghost" onClick={handleDelete} disabled={deleteClient.isPending}>
               {t('common:actions.delete', { ns: 'common' })}
             </Button>

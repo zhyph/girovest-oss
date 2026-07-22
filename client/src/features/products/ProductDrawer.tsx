@@ -98,7 +98,7 @@ export function ProductDrawer({ product, onClose }: { product: Product | null; o
           </p>
         )}
         <div className="mt-2 flex justify-between gap-2">
-          {product && (
+          {product && !product.hasAllocationHistory && (
             <Button type="button" variant="ghost" onClick={handleDelete} disabled={deleteProduct.isPending}>
               {t('common:actions.delete', { ns: 'common' })}
             </Button>

@@ -21,5 +21,6 @@ export interface Product extends ProductFormValues {
   id: string
   status: ProductStatus
   availability: ProductAvailability
+  hasAllocationHistory: boolean
   createdAt: string
 }

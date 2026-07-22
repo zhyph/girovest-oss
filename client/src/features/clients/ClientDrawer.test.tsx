@@ -5,7 +5,10 @@ import '../../i18n.ts'
 import { ClientDrawer } from './ClientDrawer.tsx'
 import * as useClientsModule from './useClients.ts'
 
-const client = { id: 'c1', name: 'Maria Silva', phone: '119', email: 'm@x.com', notes: '', createdAt: '2026-01-01' }
+const client = {
+  id: 'c1', name: 'Maria Silva', phone: '119', email: 'm@x.com', notes: '', createdAt: '2026-01-01',
+  hasAllocationHistory: false,
+}
 
 function mockClientHooks(
   deleteImpl: () => Promise<unknown> = vi.fn(),
@@ -70,5 +73,11 @@ describe('ClientDrawer', () => {
 
     expect(await screen.findByText('Algo deu errado. Tente novamente.')).toBeInTheDocument()
     expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('hides Excluir when the client has allocation history, per the drawer spec', () => {
+    mockClientHooks(vi.fn())
+    render(<ClientDrawer client={{ ...client, hasAllocationHistory: true }} onClose={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: 'Excluir' })).not.toBeInTheDocument()
   })
 })

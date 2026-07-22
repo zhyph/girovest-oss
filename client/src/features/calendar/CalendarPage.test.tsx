@@ -45,6 +45,7 @@ function makeProduct(overrides: Partial<Product> = {}): Product {
     depositAmount: 50,
     status: 'active',
     availability: 'available',
+    hasAllocationHistory: false,
     createdAt: '2026-07-01T00:00:00.000Z',
     ...overrides,
   }

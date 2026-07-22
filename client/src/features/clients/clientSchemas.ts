@@ -11,5 +11,6 @@ export type ClientFormValues = z.infer<typeof clientSchema>
 
 export interface Client extends ClientFormValues {
   id: string
+  hasAllocationHistory: boolean
   createdAt: string
 }

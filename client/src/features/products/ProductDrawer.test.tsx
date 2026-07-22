@@ -9,6 +9,7 @@ import * as useAuthModule from '../../lib/useAuth.ts'
 const product = {
   id: 'p1', locationId: 'l1', name: 'Vestido Azul', category: 'casual', size: 'P', color: 'azul',
   rentalPrice: 150, depositAmount: 50, status: 'active' as const, availability: 'available' as const,
+  hasAllocationHistory: false,
   createdAt: '2026-01-01',
 }
 
@@ -70,5 +71,11 @@ describe('ProductDrawer', () => {
 
     expect(await screen.findByText('Algo deu errado. Tente novamente.')).toBeInTheDocument()
     expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('hides Excluir when the product has allocation history, per the drawer spec', () => {
+    mockProductHooks(vi.fn())
+    render(<ProductDrawer product={{ ...product, hasAllocationHistory: true }} onClose={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: 'Excluir' })).not.toBeInTheDocument()
   })
 })
