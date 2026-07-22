@@ -3,8 +3,8 @@ import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../../components/ui/button.tsx'
-import { Input } from '../../components/ui/input.tsx'
 import { CurrencyInput } from '../../components/ui/currency-input.tsx'
+import { DateInput } from '../../components/ui/date-input.tsx'
 import { useClients } from '../clients/useClients.ts'
 import { useProducts } from '../products/useProducts.ts'
 import { newAllocationSchema, type NewAllocationFormValues } from './allocationSchemas.ts'
@@ -53,11 +53,23 @@ export function NewAllocationForm({ onClose }: { onClose: () => void }) {
         </label>
         <label className="flex flex-col gap-1 text-sm">
           {t('fields.checkoutDate')}
-          <Input type="date" {...register('checkoutDate')} />
+          <Controller
+            name="checkoutDate"
+            control={control}
+            render={({ field }) => (
+              <DateInput value={field.value} onChange={field.onChange} id="checkoutDate" aria-label={t('fields.checkoutDate')} />
+            )}
+          />
         </label>
         <label className="flex flex-col gap-1 text-sm">
           {t('fields.dueDate')}
-          <Input type="date" {...register('dueDate')} />
+          <Controller
+            name="dueDate"
+            control={control}
+            render={({ field }) => (
+              <DateInput value={field.value} onChange={field.onChange} id="dueDate" aria-label={t('fields.dueDate')} />
+            )}
+          />
         </label>
         <label className="flex flex-col gap-1 text-sm">
           {t('fields.product')}

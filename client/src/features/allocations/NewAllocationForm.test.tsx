@@ -25,8 +25,8 @@ describe('NewAllocationForm', () => {
     mockPickerHooks(false)
     render(<NewAllocationForm onClose={vi.fn()} />)
 
-    await userEvent.type(screen.getByLabelText('Data de saída'), '2026-08-01')
-    await userEvent.type(screen.getByLabelText('Data de devolução'), '2026-08-05')
+    await userEvent.type(screen.getByLabelText('Data de saída'), '01082026')
+    await userEvent.type(screen.getByLabelText('Data de devolução'), '05082026')
     await userEvent.selectOptions(screen.getByLabelText('Produto'), 'p1')
 
     expect(screen.getByText('Não disponível no período escolhido')).toBeInTheDocument()
@@ -37,11 +37,20 @@ describe('NewAllocationForm', () => {
     mockPickerHooks(true)
     render(<NewAllocationForm onClose={vi.fn()} />)
 
-    await userEvent.type(screen.getByLabelText('Data de saída'), '2026-08-01')
-    await userEvent.type(screen.getByLabelText('Data de devolução'), '2026-08-05')
+    await userEvent.type(screen.getByLabelText('Data de saída'), '01082026')
+    await userEvent.type(screen.getByLabelText('Data de devolução'), '05082026')
     await userEvent.selectOptions(screen.getByLabelText('Produto'), 'p1')
 
     expect(screen.queryByText('Não disponível no período escolhido')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Salvar' })).toBeEnabled()
+  })
+
+  it('masks the date fields as DD/MM/AAAA regardless of OS locale', async () => {
+    mockPickerHooks(true)
+    render(<NewAllocationForm onClose={vi.fn()} />)
+
+    await userEvent.type(screen.getByLabelText('Data de saída'), '01082026')
+
+    expect(screen.getByLabelText('Data de saída')).toHaveValue('01/08/2026')
   })
 })
