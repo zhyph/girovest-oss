@@ -26,6 +26,50 @@
 
 :root {
   color-scheme: light;
+
+  /* shadcn/ui semantic tokens, mapped onto the warm-boutique palette above so
+     generated components inherit the same visual identity instead of the
+     default stone neutrals. */
+  --background: #faf6f0; /* cream */
+  --foreground: #362a28; /* ink */
+  --card: #ffffff;
+  --card-foreground: #362a28;
+  --popover: #ffffff;
+  --popover-foreground: #362a28;
+  --primary: #b85c6e; /* brand-500 */
+  --primary-foreground: #ffffff;
+  --secondary: #fbeef1; /* brand-50 */
+  --secondary-foreground: #7a2f40; /* brand-700 */
+  --muted: #f4ece4;
+  --muted-foreground: #8c7a72; /* muted */
+  --accent: #fbeef1; /* brand-50 */
+  --accent-foreground: #7a2f40; /* brand-700 */
+  --destructive: #b3261e;
+  --border: #e9dcd3; /* border-soft */
+  --input: #e9dcd3;
+  --ring: #b85c6e; /* brand-500 */
+  --radius: 0.5rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
 }
 
 body {

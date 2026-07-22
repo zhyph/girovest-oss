@@ -4,6 +4,29 @@ React + TypeScript + Vite frontend, built both as a plain web app (hosted
 website mode) and wrapped in Electron (offline desktop mode). Tailwind CSS v4,
 TanStack Query, react-hook-form + zod, react-i18next (pt-BR), react-router.
 
+## UI components
+
+Uses [shadcn/ui](https://ui.shadcn.com) (config in `components.json`) on top of
+the hand-rolled primitives in `src/components/ui/`. The `@/*` import alias maps
+to `src/` (see `tsconfig.json` + `vite.config.ts`). shadcn's semantic tokens
+(`--primary`, `--border`, `--ring`, ...) are defined in `src/index.css` and
+mapped onto the warm-boutique brand palette, so generated components inherit the
+existing visual identity rather than the default stone neutrals.
+
+The [React Bits](https://reactbits.dev) animation registry is registered as
+`@react-bits` in `components.json`. Add components from either registry with the
+shadcn CLI, run from this `client/` workspace so it finds `components.json`:
+
+```bash
+npx shadcn@latest add @shadcn/dialog
+npx shadcn@latest add @react-bits/FadeContent-TS-TW   # variant suffix: TS-TW = TypeScript + Tailwind
+```
+
+Note: the shadcn MCP server resolves `components.json` from its working
+directory. In this monorepo it must run with `-c client` (or be launched from
+`client/`) — from the repo root it only sees the built-in `@shadcn` registry,
+not `@react-bits`.
+
 ## Setup
 
 ```bash
