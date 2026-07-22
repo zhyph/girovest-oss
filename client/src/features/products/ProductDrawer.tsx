@@ -162,7 +162,7 @@ export function ProductDrawer({ product, onClose }: { product: Product | null; o
               {photos.map((url, index) => (
                 <li key={url + index} className="flex items-center gap-2 text-xs">
                   <img src={url} alt="" className="h-8 w-8 rounded object-cover" />
-                  <span className="flex-1 truncate text-muted">{url}</span>
+                  <span className="flex-1 truncate text-muted-text">{url}</span>
                   <Button type="button" variant="ghost" size="sm" onClick={() => removePhoto(index)}>
                     {t('photos.remove')}
                   </Button>

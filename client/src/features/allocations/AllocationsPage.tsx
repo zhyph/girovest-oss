@@ -181,7 +181,7 @@ export function AllocationsPage() {
         <h1 className="text-xl font-semibold">{t('title')}</h1>
         <Button onClick={() => setShowForm(true)}>{t('newAllocation')}</Button>
       </div>
-      {allocations && allocations.length === 0 && <p className="text-muted">{t('empty')}</p>}
+      {allocations && allocations.length === 0 && <p className="text-muted-text">{t('empty')}</p>}
       <div className="flex flex-col gap-1">
         {allocations?.map((allocation) => (
           <div
@@ -190,8 +190,8 @@ export function AllocationsPage() {
           >
             <div className="flex min-w-0 flex-col gap-0.5">
               <span className="truncate font-medium">{productNames.get(allocation.productId) ?? allocation.productId}</span>
-              <span className="truncate text-muted">{clientNames.get(allocation.clientId) ?? allocation.clientId}</span>
-              <span className="text-xs text-muted">
+              <span className="truncate text-muted-text">{clientNames.get(allocation.clientId) ?? allocation.clientId}</span>
+              <span className="text-xs text-muted-text">
                 {dateFormatter.format(parseDateOnly(allocation.checkoutDate))} –{' '}
                 {dateFormatter.format(parseDateOnly(allocation.dueDate))}
               </span>

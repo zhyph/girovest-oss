@@ -47,7 +47,7 @@ export function Sidebar() {
       ))}
       {staff && (
         <div className="mt-auto flex flex-col gap-2 border-t border-border-soft px-2 pt-3">
-          <div className="truncate text-xs whitespace-nowrap text-muted">
+          <div className="truncate text-xs whitespace-nowrap text-muted-text">
             <span className="hidden group-hover:inline group-focus-within:inline lg:inline">{staff.name}</span>
           </div>
           <Button variant="ghost" size="sm" className="justify-start whitespace-nowrap px-0" onClick={logout}>

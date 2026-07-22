@@ -32,6 +32,12 @@
     "cancel": "Cancelar"
   },
   "unavailableProduct": "Não disponível no período escolhido",
+  "validation": {
+    "clientRequired": "Selecione um cliente.",
+    "productRequired": "Selecione um produto.",
+    "checkoutDateRequired": "Informe a data de saída.",
+    "dueDateRequired": "Informe a data de devolução."
+  },
   "errors": {
     "PRODUCT_UNAVAILABLE": "Produto não disponível para as datas escolhidas.",
     "PRODUCT_NOT_IN_CIRCULATION": "Este produto não está disponível para aluguel.",

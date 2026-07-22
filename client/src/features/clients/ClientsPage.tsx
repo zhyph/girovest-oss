@@ -39,13 +39,13 @@ export function ClientsPage() {
         className="mb-3"
         aria-label={t('searchPlaceholder')}
       />
-      {clients && clients.length === 0 && <p className="text-muted">{t('empty')}</p>}
+      {clients && clients.length === 0 && <p className="text-muted-text">{t('empty')}</p>}
       {clients && clients.length > 0 && filteredClients?.length === 0 && (
-        <p className="text-muted">{t('noResults')}</p>
+        <p className="text-muted-text">{t('noResults')}</p>
       )}
       {filteredClients && filteredClients.length > 0 && (
         <div className="overflow-hidden rounded-md border border-border-soft">
-          <div className="flex justify-between bg-gray-50 px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
+          <div className="flex justify-between bg-gray-50 px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-text">
             <span>{t('fields.name')}</span>
             <span>{t('fields.phone')}</span>
           </div>
@@ -60,7 +60,7 @@ export function ClientsPage() {
                 )}
               >
                 <span>{client.name}</span>
-                <span className="text-muted">{client.phone}</span>
+                <span className="text-muted-text">{client.phone}</span>
               </button>
             ))}
           </div>

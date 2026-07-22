@@ -13,7 +13,7 @@ function StatTile({ label, value, danger }: { label: string; value: number; dang
   return (
     <Card className={danger && value > 0 ? 'border-red-300 bg-red-50' : undefined}>
       <CardBody>
-        <div className="text-xs uppercase tracking-wide text-muted">{label}</div>
+        <div className="text-xs uppercase tracking-wide text-muted-text">{label}</div>
         <div className="text-2xl font-semibold">
           <CountUp to={value} duration={0.6} />
         </div>
@@ -43,7 +43,7 @@ export function DashboardPage() {
       {isLoading && (
         <Card>
           <CardBody>
-            <div className="text-center text-sm text-muted">{t('loading')}</div>
+            <div className="text-center text-sm text-muted-text">{t('loading')}</div>
           </CardBody>
         </Card>
       )}
@@ -63,9 +63,9 @@ export function DashboardPage() {
           </div>
           <Card className="mt-4">
             <CardBody>
-              <div className="mb-2 text-xs uppercase tracking-wide text-muted">{t('upcoming')}</div>
+              <div className="mb-2 text-xs uppercase tracking-wide text-muted-text">{t('upcoming')}</div>
               {upcoming.length === 0 ? (
-                <p className="text-sm text-muted">{t('upcomingEmpty')}</p>
+                <p className="text-sm text-muted-text">{t('upcomingEmpty')}</p>
               ) : (
                 <ul className="flex flex-col gap-1">
                   {upcoming.map((allocation) => (
@@ -75,7 +75,7 @@ export function DashboardPage() {
                         {' — '}
                         {clientNames.get(allocation.clientId) ?? allocation.clientId}
                       </span>
-                      <span className="text-muted">{dateFormatter.format(parseDateOnly(allocation.checkoutDate))}</span>
+                      <span className="text-muted-text">{dateFormatter.format(parseDateOnly(allocation.checkoutDate))}</span>
                     </li>
                   ))}
                 </ul>

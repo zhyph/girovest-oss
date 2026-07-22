@@ -16,7 +16,13 @@ export function NewAllocationForm({ onClose }: { onClose: () => void }) {
   const { data: products } = useProducts()
   const createAllocation = useCreateAllocation()
 
-  const { register, handleSubmit, control, watch } = useForm<NewAllocationFormValues>({
+  const {
+    register,
+    handleSubmit,
+    control,
+    watch,
+    formState: { errors },
+  } = useForm<NewAllocationFormValues>({
     resolver: zodResolver(newAllocationSchema),
     defaultValues: { productId: '', clientId: '', checkoutDate: '', dueDate: '', priceCharged: 0 },
   })
@@ -51,6 +57,7 @@ export function NewAllocationForm({ onClose }: { onClose: () => void }) {
               <option key={client.id} value={client.id}>{client.name}</option>
             ))}
           </select>
+          {errors.clientId && <span className="text-xs text-red-600">{t('validation.clientRequired')}</span>}
         </label>
         <label className="flex flex-col gap-1 text-sm">
           {t('fields.checkoutDate')}
@@ -61,6 +68,7 @@ export function NewAllocationForm({ onClose }: { onClose: () => void }) {
               <DateInput value={field.value} onChange={field.onChange} id="checkoutDate" aria-label={t('fields.checkoutDate')} />
             )}
           />
+          {errors.checkoutDate && <span className="text-xs text-red-600">{t('validation.checkoutDateRequired')}</span>}
         </label>
         <label className="flex flex-col gap-1 text-sm">
           {t('fields.dueDate')}
@@ -71,6 +79,7 @@ export function NewAllocationForm({ onClose }: { onClose: () => void }) {
               <DateInput value={field.value} onChange={field.onChange} id="dueDate" aria-label={t('fields.dueDate')} />
             )}
           />
+          {errors.dueDate && <span className="text-xs text-red-600">{t('validation.dueDateRequired')}</span>}
         </label>
         <label className="flex flex-col gap-1 text-sm">
           {t('fields.product')}
@@ -80,6 +89,7 @@ export function NewAllocationForm({ onClose }: { onClose: () => void }) {
               <option key={product.id} value={product.id}>{product.name}</option>
             ))}
           </select>
+          {errors.productId && <span className="text-xs text-red-600">{t('validation.productRequired')}</span>}
           {selectedProductId && checkoutDate && dueDate && availability.data?.available === false && (
             <span className="text-xs text-red-600">{t('unavailableProduct')}</span>
           )}

@@ -52,13 +52,13 @@ export function ProductsPage() {
         className="mb-3"
         aria-label={t('searchPlaceholder')}
       />
-      {products && products.length === 0 && <p className="text-muted">{t('empty')}</p>}
+      {products && products.length === 0 && <p className="text-muted-text">{t('empty')}</p>}
       {products && products.length > 0 && filteredProducts?.length === 0 && (
-        <p className="text-muted">{t('noResults')}</p>
+        <p className="text-muted-text">{t('noResults')}</p>
       )}
       {filteredProducts && filteredProducts.length > 0 && (
         <div className="overflow-hidden rounded-md border border-border-soft">
-          <div className="flex justify-between bg-gray-50 px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
+          <div className="flex justify-between bg-gray-50 px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-text">
             <span>{t('fields.name')}</span>
             <span className="flex gap-4">
               <span>{t('fields.size')}</span>
@@ -76,7 +76,7 @@ export function ProductsPage() {
                 )}
               >
                 <span>{product.name}</span>
-                <span className="flex items-center gap-4 text-muted">
+                <span className="flex items-center gap-4 text-muted-text">
                   <span>{product.size}</span>
                   {product.status === 'active' ? (
                     <Badge tone={AVAILABILITY_TONE[product.availability]}>

@@ -36,7 +36,7 @@ export function AgendaView({
   const formatter = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit' })
 
   if (allocations.length === 0) {
-    return <p className="text-muted">{t('empty')}</p>
+    return <p className="text-muted-text">{t('empty')}</p>
   }
 
   const sorted = [...allocations].sort(
@@ -56,16 +56,16 @@ export function AgendaView({
     <div className="flex flex-col gap-4">
       {GROUP_ORDER.filter((group) => grouped.has(group)).map((group) => (
         <div key={group} className="flex flex-col gap-2">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">{t(`groups.${group}`)}</h2>
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-text">{t(`groups.${group}`)}</h2>
           {grouped.get(group)!.map((allocation) => (
             <div key={allocation.id} className="flex justify-between rounded-md border border-border-soft p-2 text-sm">
               <div className="flex flex-col">
                 <span>{productNames.get(allocation.productId) ?? allocation.productId}</span>
-                <span className="text-xs text-muted">
+                <span className="text-xs text-muted-text">
                   {clientNames.get(allocation.clientId) ?? allocation.clientId}
                 </span>
               </div>
-              <span className="text-muted">{formatter.format(parseDateOnly(allocation[dateField]))}</span>
+              <span className="text-muted-text">{formatter.format(parseDateOnly(allocation[dateField]))}</span>
             </div>
           ))}
         </div>
