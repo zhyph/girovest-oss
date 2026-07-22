@@ -7,6 +7,6 @@ describe('i18n', () => {
   })
 
   it('resolves a key from the common namespace', () => {
-    expect(i18n.t('common:appName')).toBe('Ateliê')
+    expect(i18n.t('common:appName')).toBe('Girovest')
   })
 })

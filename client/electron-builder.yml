@@ -1,5 +1,5 @@
-appId: com.dressstore.app
-productName: Dress Store
+appId: com.girovest.app
+productName: Girovest
 directories:
   output: release
 files:

@@ -163,8 +163,8 @@ if (app) {
   // userData path from package.json's name as soon as it's ready, so setting
   // the name any later (e.g. inside startServer(), which used to run this
   // after whenReady()) is a no-op and userData silently lands in the wrong
-  // directory (dress-store-client instead of dress-store-app).
-  app.setName('dress-store-app')
+  // directory (girovest-client instead of girovest).
+  app.setName('girovest')
 
   app.whenReady().then(async () => {
     const started = await startServer()

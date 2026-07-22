@@ -1,5 +1,5 @@
 {
-  "name": "dress-store-app",
+  "name": "girovest",
   "private": true,
   "workspaces": [
     "server",

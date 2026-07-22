@@ -1,12 +1,12 @@
 {
-  "name": "dress-store-client",
+  "name": "girovest-client",
   "private": true,
   "version": "0.1.0",
   "type": "module",
   "main": "out/main/index.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/placeholder-owner/placeholder-repo.git"
+    "url": "https://github.com/zhyph/girovest.git"
   },
   "scripts": {
     "dev": "vite",

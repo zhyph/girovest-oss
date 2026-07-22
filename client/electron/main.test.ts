@@ -12,20 +12,20 @@ import {
 
 describe('resolveServerCwd', () => {
   it('resolves to the server workspace relative to the electron app root', () => {
-    const result = resolveServerCwd('/home/user/dress-store-app/client')
-    expect(result).toBe(path.resolve('/home/user/dress-store-app/client', '..', 'server'))
+    const result = resolveServerCwd('/home/user/girovest/client')
+    expect(result).toBe(path.resolve('/home/user/girovest/client', '..', 'server'))
   })
 })
 
 describe('resolveServerRuntimeCwd', () => {
   it('resolves relative to resourcesPath when packaged', () => {
-    const result = resolveServerRuntimeCwd(true, '/unused', '/opt/dress-store-app/resources')
-    expect(result).toBe(path.join('/opt/dress-store-app/resources', 'server'))
+    const result = resolveServerRuntimeCwd(true, '/unused', '/opt/girovest/resources')
+    expect(result).toBe(path.join('/opt/girovest/resources', 'server'))
   })
 
   it('falls back to resolveServerCwd when not packaged', () => {
-    const result = resolveServerRuntimeCwd(false, '/home/user/dress-store-app/client', '/unused')
-    expect(result).toBe(resolveServerCwd('/home/user/dress-store-app/client'))
+    const result = resolveServerRuntimeCwd(false, '/home/user/girovest/client', '/unused')
+    expect(result).toBe(resolveServerCwd('/home/user/girovest/client'))
   })
 })
 
@@ -70,7 +70,7 @@ describe('resolveJwtSecret', () => {
 
 describe('resolveDatabaseUrl', () => {
   it('builds a file: URL pointing at dev.db inside the given directory', () => {
-    const userDataPath = '/home/user/.config/dress-store-app'
+    const userDataPath = '/home/user/.config/girovest'
     expect(resolveDatabaseUrl(userDataPath)).toBe(`file:${path.join(userDataPath, 'dev.db')}`)
   })
 })

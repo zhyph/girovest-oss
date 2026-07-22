@@ -20,7 +20,7 @@ function renderWithQueryClient(ui: React.ReactElement) {
 describe('ProductsPage', () => {
   it('lists products with their status', () => {
     vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [product], isLoading: false } as never)
-    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1' }, isLoadingStaff: false, login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste' }, isLoadingStaff: false, login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
 
     renderWithQueryClient(<ProductsPage />)
 
@@ -30,7 +30,7 @@ describe('ProductsPage', () => {
 
   it('opens the drawer in edit mode when a row is clicked', async () => {
     vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [product], isLoading: false } as never)
-    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1' }, isLoadingStaff: false, login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste' }, isLoadingStaff: false, login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
 
     renderWithQueryClient(<ProductsPage />)
     await userEvent.click(screen.getByText('Vestido Azul'))

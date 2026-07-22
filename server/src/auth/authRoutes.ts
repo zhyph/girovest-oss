@@ -35,9 +35,18 @@ authRouter.post('/login', async (req, res) => {
 })
 
 authRouter.get('/me', requireAuth, async (req, res) => {
-  const staff = await prisma.staff.findUnique({ where: { id: req.staff!.staffId } })
+  const staff = await prisma.staff.findUnique({
+    where: { id: req.staff!.staffId },
+    include: { location: true },
+  })
   if (!staff) {
     throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Staff account no longer exists')
   }
-  res.json({ id: staff.id, name: staff.name, role: staff.role, locationId: staff.locationId })
+  res.json({
+    id: staff.id,
+    name: staff.name,
+    role: staff.role,
+    locationId: staff.locationId,
+    locationName: staff.location.name,
+  })
 })

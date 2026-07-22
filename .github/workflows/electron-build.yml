@@ -79,7 +79,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: dress-store-app-${{ matrix.os }}
+          name: girovest-${{ matrix.os }}
           path: |
             client/release/*.exe
             client/release/*.AppImage
