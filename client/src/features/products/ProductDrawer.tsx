@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../../components/ui/button.tsx'
 import { Input } from '../../components/ui/input.tsx'
+import { CurrencyInput } from '../../components/ui/currency-input.tsx'
 import { useAuth } from '../../lib/useAuth.ts'
 import { productSchema, type Product, type ProductFormValues } from './productSchemas.ts'
 import { useCreateProduct, useUpdateProduct, useDeleteProduct } from './useProducts.ts'
@@ -20,6 +21,7 @@ export function ProductDrawer({ product, onClose }: { product: Product | null; o
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors },
   } = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
@@ -80,12 +82,24 @@ export function ProductDrawer({ product, onClose }: { product: Product | null; o
         </label>
         <label className="flex flex-col gap-1 text-sm">
           {t('fields.rentalPrice')}
-          <Input type="number" step="0.01" {...register('rentalPrice', { valueAsNumber: true })} />
+          <Controller
+            name="rentalPrice"
+            control={control}
+            render={({ field }) => (
+              <CurrencyInput value={field.value} onChange={field.onChange} id="rentalPrice" aria-label={t('fields.rentalPrice')} />
+            )}
+          />
           {errors.rentalPrice && <span className="text-xs text-red-600">{t('validation.rentalPriceInvalid')}</span>}
         </label>
         <label className="flex flex-col gap-1 text-sm">
           {t('fields.depositAmount')}
-          <Input type="number" step="0.01" {...register('depositAmount', { valueAsNumber: true })} />
+          <Controller
+            name="depositAmount"
+            control={control}
+            render={({ field }) => (
+              <CurrencyInput value={field.value} onChange={field.onChange} id="depositAmount" aria-label={t('fields.depositAmount')} />
+            )}
+          />
           {errors.depositAmount && <span className="text-xs text-red-600">{t('validation.depositAmountInvalid')}</span>}
         </label>
         <label className="flex flex-col gap-1 text-sm">

@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../../components/ui/button.tsx'
 import { Input } from '../../components/ui/input.tsx'
+import { CurrencyInput } from '../../components/ui/currency-input.tsx'
 import { useClients } from '../clients/useClients.ts'
 import { useProducts } from '../products/useProducts.ts'
 import { newAllocationSchema, type NewAllocationFormValues } from './allocationSchemas.ts'
@@ -16,7 +17,7 @@ export function NewAllocationForm({ onClose }: { onClose: () => void }) {
   const createAllocation = useCreateAllocation()
   const [errorCode, setErrorCode] = useState<string | null>(null)
 
-  const { register, handleSubmit, watch } = useForm<NewAllocationFormValues>({
+  const { register, handleSubmit, control, watch } = useForm<NewAllocationFormValues>({
     resolver: zodResolver(newAllocationSchema),
     defaultValues: { productId: '', clientId: '', checkoutDate: '', dueDate: '', priceCharged: 0 },
   })
@@ -72,7 +73,13 @@ export function NewAllocationForm({ onClose }: { onClose: () => void }) {
         </label>
         <label className="flex flex-col gap-1 text-sm">
           {t('fields.priceCharged')}
-          <Input type="number" step="0.01" {...register('priceCharged', { valueAsNumber: true })} />
+          <Controller
+            name="priceCharged"
+            control={control}
+            render={({ field }) => (
+              <CurrencyInput value={field.value} onChange={field.onChange} id="priceCharged" aria-label={t('fields.priceCharged')} />
+            )}
+          />
         </label>
         {errorCode && (
           <p className="text-sm text-red-600">
