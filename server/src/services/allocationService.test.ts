@@ -99,7 +99,7 @@ describe('allocationService', () => {
       dueDate: new Date('2026-09-05'),
       priceCharged: 100,
     })
-    await checkOutAllocation(first.id, {})
+    await checkOutAllocation(first.id, {}, new Date('2026-09-01'))
 
     // due_date (Sep 5) has passed; product is still physically out.
     await expect(
@@ -119,7 +119,7 @@ describe('allocationService', () => {
       dueDate: new Date('2026-09-05'),
       priceCharged: 100,
     })
-    await checkOutAllocation(first.id, {})
+    await checkOutAllocation(first.id, {}, new Date('2026-09-01'))
     await returnAllocation(first.id, {})
 
     const second = await createAllocation({
@@ -138,11 +138,36 @@ describe('allocationService', () => {
       dueDate: new Date('2026-09-05'),
       priceCharged: 100,
     })
-    await checkOutAllocation(allocation.id, {})
+    await checkOutAllocation(allocation.id, {}, new Date('2026-09-01'))
 
-    await expect(checkOutAllocation(allocation.id, {})).rejects.toMatchObject({
+    await expect(checkOutAllocation(allocation.id, {}, new Date('2026-09-01'))).rejects.toMatchObject({
       code: 'INVALID_ALLOCATION_TRANSITION',
     })
+  })
+
+  it('rejects checking out an allocation before its checkout date arrives', async () => {
+    const allocation = await createAllocation({
+      productId, clientId, staffId,
+      checkoutDate: new Date('2026-09-01'),
+      dueDate: new Date('2026-09-05'),
+      priceCharged: 100,
+    })
+
+    await expect(
+      checkOutAllocation(allocation.id, {}, new Date('2026-08-31')),
+    ).rejects.toMatchObject({ code: 'CHECKOUT_TOO_EARLY' })
+  })
+
+  it('allows checking out exactly on the checkout date', async () => {
+    const allocation = await createAllocation({
+      productId, clientId, staffId,
+      checkoutDate: new Date('2026-09-01'),
+      dueDate: new Date('2026-09-05'),
+      priceCharged: 100,
+    })
+
+    const result = await checkOutAllocation(allocation.id, {}, new Date('2026-09-01'))
+    expect(result.status).toBe('checked_out')
   })
 
   it('cancels a reserved allocation and frees the product', async () => {

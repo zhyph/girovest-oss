@@ -58,23 +58,26 @@ describe('happy path: register client -> register dress -> allocate -> check out
     const productId = productResponse.body.id
 
     const availabilityBefore = await auth(
-      request(app).get(`/api/allocations/products/${productId}/availability?asOf=2026-09-05`),
+      request(app).get(`/api/allocations/products/${productId}/availability?asOf=2020-01-05`),
     )
     expect(availabilityBefore.status).toBe(200)
     expect(availabilityBefore.body.status).toBe('available')
 
+    // Fixed dates safely in the past (rather than "now") so the check-out
+    // step below — which validates against the real server clock — is
+    // never blocked by CHECKOUT_TOO_EARLY regardless of when this test runs.
     const allocationResponse = await auth(request(app).post('/api/allocations')).send({
       productId,
       clientId,
-      checkoutDate: '2026-09-01',
-      dueDate: '2026-09-05',
+      checkoutDate: '2020-01-01',
+      dueDate: '2020-01-05',
       priceCharged: 350,
     })
     expect(allocationResponse.status).toBe(201)
     const allocationId = allocationResponse.body.id
 
     const availabilityReserved = await auth(
-      request(app).get(`/api/allocations/products/${productId}/availability?asOf=2026-09-03`),
+      request(app).get(`/api/allocations/products/${productId}/availability?asOf=2020-01-03`),
     )
     expect(availabilityReserved.status).toBe(200)
     expect(availabilityReserved.body.status).toBe('reserved')
@@ -82,8 +85,8 @@ describe('happy path: register client -> register dress -> allocate -> check out
     const secondAttempt = await auth(request(app).post('/api/allocations')).send({
       productId,
       clientId,
-      checkoutDate: '2026-09-02',
-      dueDate: '2026-09-06',
+      checkoutDate: '2020-01-02',
+      dueDate: '2020-01-06',
       priceCharged: 350,
     })
     expect(secondAttempt.status).toBe(409)
@@ -96,7 +99,7 @@ describe('happy path: register client -> register dress -> allocate -> check out
     expect(checkOutResponse.body.status).toBe('checked_out')
 
     const availabilityRented = await auth(
-      request(app).get(`/api/allocations/products/${productId}/availability?asOf=2026-09-03`),
+      request(app).get(`/api/allocations/products/${productId}/availability?asOf=2020-01-03`),
     )
     expect(availabilityRented.status).toBe(200)
     expect(availabilityRented.body.status).toBe('rented')
@@ -108,7 +111,7 @@ describe('happy path: register client -> register dress -> allocate -> check out
     expect(returnResponse.body.status).toBe('returned')
 
     const availabilityAfter = await auth(
-      request(app).get(`/api/allocations/products/${productId}/availability?asOf=2026-09-06`),
+      request(app).get(`/api/allocations/products/${productId}/availability?asOf=2020-01-06`),
     )
     expect(availabilityAfter.status).toBe(200)
     expect(availabilityAfter.body.status).toBe('available')

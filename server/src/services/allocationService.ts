@@ -104,13 +104,20 @@ export interface CheckOutInput {
   depositCollected?: number
 }
 
-export async function checkOutAllocation(id: string, data: CheckOutInput) {
+export async function checkOutAllocation(id: string, data: CheckOutInput, asOf: Date = new Date()) {
   const allocation = await getAllocationOrThrow(id)
   if (allocation.status !== 'reserved') {
     throw new AppError(
       ErrorCodes.INVALID_ALLOCATION_TRANSITION,
       409,
       `Cannot check out an allocation with status ${allocation.status}`,
+    )
+  }
+  if (asOf.getTime() < allocation.checkoutDate.getTime()) {
+    throw new AppError(
+      ErrorCodes.CHECKOUT_TOO_EARLY,
+      409,
+      'Cannot check out before the allocation\'s checkout date',
     )
   }
   const result = await prisma.allocation.updateMany({

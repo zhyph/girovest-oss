@@ -24,7 +24,8 @@
     "PRODUCT_UNAVAILABLE": "Produto não disponível para as datas escolhidas.",
     "PRODUCT_NOT_IN_CIRCULATION": "Este produto não está disponível para aluguel.",
     "DUE_DATE_BEFORE_CHECKOUT": "A data de devolução deve ser após a data de saída.",
-    "INVALID_ALLOCATION_TRANSITION": "Esta ação não é permitida no status atual."
+    "INVALID_ALLOCATION_TRANSITION": "Esta ação não é permitida no status atual.",
+    "CHECKOUT_TOO_EARLY": "Não é possível fazer check-out antes da data de saída."
   },
   "empty": "Nenhuma alocação registrada ainda."
 }
