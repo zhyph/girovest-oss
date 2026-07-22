@@ -24,12 +24,16 @@ export function Modal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-ink/40" onClick={onClose} aria-hidden="true" />
+      <div
+        className="absolute inset-0 bg-ink/40 opacity-100 transition-opacity duration-150 starting:opacity-0"
+        onClick={onClose}
+        aria-hidden="true"
+      />
       <div
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="relative z-10 w-full max-w-sm rounded-lg bg-white p-5 shadow-xl"
+        className="relative z-10 w-full max-w-sm scale-100 rounded-lg bg-white p-5 opacity-100 shadow-xl transition-all duration-150 starting:scale-95 starting:opacity-0"
       >
         <h2 className="mb-3 text-base font-semibold text-ink">{title}</h2>
         {children}

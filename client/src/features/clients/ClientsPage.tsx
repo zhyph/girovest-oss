@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../../components/ui/button.tsx'
 import { Input } from '../../components/ui/input.tsx'
+import { cn } from '../../lib/cn.ts'
 import { useClients } from './useClients.ts'
 import { ClientDrawer } from './ClientDrawer.tsx'
 import type { Client } from './clientSchemas.ts'
@@ -42,18 +43,29 @@ export function ClientsPage() {
       {clients && clients.length > 0 && filteredClients?.length === 0 && (
         <p className="text-muted">{t('noResults')}</p>
       )}
-      <div className="flex flex-col gap-1">
-        {filteredClients?.map((client) => (
-          <button
-            key={client.id}
-            onClick={() => setEditing(client)}
-            className="flex justify-between rounded-md p-2 text-left text-sm hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-cream"
-          >
-            <span>{client.name}</span>
-            <span className="text-muted">{client.phone}</span>
-          </button>
-        ))}
-      </div>
+      {filteredClients && filteredClients.length > 0 && (
+        <div className="overflow-hidden rounded-md border border-border-soft">
+          <div className="flex justify-between bg-gray-50 px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
+            <span>{t('fields.name')}</span>
+            <span>{t('fields.phone')}</span>
+          </div>
+          <div className="flex flex-col">
+            {filteredClients.map((client, index) => (
+              <button
+                key={client.id}
+                onClick={() => setEditing(client)}
+                className={cn(
+                  'flex justify-between p-2 text-left text-sm hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-cream',
+                  index % 2 === 1 && 'bg-gray-50/50',
+                )}
+              >
+                <span>{client.name}</span>
+                <span className="text-muted">{client.phone}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       {editing !== undefined && (
         <ClientDrawer key={editing?.id ?? 'new'} client={editing} onClose={() => setEditing(undefined)} />
       )}

@@ -41,8 +41,8 @@ export function NewAllocationForm({ onClose }: { onClose: () => void }) {
 
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-ink/40" onClick={onClose} aria-hidden="true" />
-      <div className="fixed inset-y-0 right-0 z-50 w-96 border-l border-border-soft bg-white p-4 shadow-lg">
+      <div className="fixed inset-0 z-40 bg-ink/40 opacity-100 transition-opacity duration-200 starting:opacity-0" onClick={onClose} aria-hidden="true" />
+      <div className="fixed inset-y-0 right-0 z-50 w-96 translate-x-0 border-l border-border-soft bg-white p-4 shadow-lg transition-transform duration-200 ease-out starting:translate-x-full">
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3">
         <label className="flex flex-col gap-1 text-sm">
           {t('fields.client')}
