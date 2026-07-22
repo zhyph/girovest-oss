@@ -4,7 +4,7 @@ import 'dotenv/config'
 import * as p from '@clack/prompts'
 import bcrypt from 'bcrypt'
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
-import { PrismaClient } from '../src/generated/prisma/client.js'
+import { Prisma, PrismaClient } from '../src/generated/prisma/client.js'
 
 const adapter = new PrismaBetterSqlite3({ url: process.env.DATABASE_URL ?? 'file:./dev.db' })
 const prisma = new PrismaClient({ adapter })
@@ -250,4 +250,14 @@ async function main() {
   await prisma.$disconnect()
 }
 
-main()
+main().catch(async (error: unknown) => {
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2021') {
+    p.log.error('Database tables are missing — the schema has not been migrated yet.')
+    p.log.info('Run `npm run db:migrate` to create them, then try again.')
+    await prisma.$disconnect()
+    process.exitCode = 1
+    return
+  }
+  await prisma.$disconnect()
+  throw error
+})
