@@ -2,9 +2,22 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../../components/ui/button.tsx'
 import { Input } from '../../components/ui/input.tsx'
+import { Badge } from '../../components/ui/badge.tsx'
 import { useProducts } from './useProducts.ts'
 import { ProductDrawer } from './ProductDrawer.tsx'
-import type { Product } from './productSchemas.ts'
+import type { Product, ProductAvailability, ProductStatus } from './productSchemas.ts'
+
+const AVAILABILITY_TONE: Record<ProductAvailability, 'neutral' | 'success' | 'warning' | 'danger'> = {
+  available: 'success',
+  reserved: 'neutral',
+  rented: 'warning',
+}
+
+const STATUS_TONE: Record<ProductStatus, 'neutral' | 'success' | 'warning' | 'danger'> = {
+  active: 'success',
+  maintenance: 'warning',
+  retired: 'neutral',
+}
 
 export function ProductsPage() {
   const { t } = useTranslation(['products', 'common'])
@@ -47,16 +60,18 @@ export function ProductsPage() {
           <button
             key={product.id}
             onClick={() => setEditing(product)}
-            className="flex justify-between rounded-md p-2 text-left text-sm hover:bg-brand-50"
+            className="flex items-center justify-between rounded-md p-2 text-left text-sm hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-cream"
           >
             <span>{product.name}</span>
-            <span className="flex gap-4 text-muted">
+            <span className="flex items-center gap-4 text-muted">
               <span>{product.size}</span>
-              <span>
-                {product.status === 'active'
-                  ? t(`availability.${product.availability}`)
-                  : t(`status.${product.status}`)}
-              </span>
+              {product.status === 'active' ? (
+                <Badge tone={AVAILABILITY_TONE[product.availability]}>
+                  {t(`availability.${product.availability}`)}
+                </Badge>
+              ) : (
+                <Badge tone={STATUS_TONE[product.status]}>{t(`status.${product.status}`)}</Badge>
+              )}
             </span>
           </button>
         ))}

@@ -1,7 +1,7 @@
 import type { ButtonHTMLAttributes } from 'react'
 import { cn } from '../../lib/cn.ts'
 
-type Variant = 'primary' | 'secondary' | 'ghost'
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger'
 type Size = 'sm' | 'md' | 'icon'
 
 const variantClasses: Record<Variant, string> = {
@@ -9,6 +9,7 @@ const variantClasses: Record<Variant, string> = {
   secondary:
     'bg-white text-ink border border-border-soft hover:border-brand-300 hover:bg-brand-50 active:bg-brand-100',
   ghost: 'bg-transparent text-ink hover:bg-brand-50 active:bg-brand-100',
+  danger: 'bg-transparent text-red-600 hover:bg-red-50 active:bg-red-100',
 }
 
 const sizeClasses: Record<Size, string> = {
@@ -26,7 +27,7 @@ export function Button({ variant = 'primary', size = 'md', className, ...props }
   return (
     <button
       className={cn(
-        'inline-flex items-center justify-center gap-2 rounded-md font-medium transition-colors',
+        'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium transition-colors',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-cream',
         'disabled:opacity-50 disabled:pointer-events-none',
         variantClasses[variant],

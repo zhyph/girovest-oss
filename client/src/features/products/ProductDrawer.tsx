@@ -176,7 +176,7 @@ export function ProductDrawer({ product, onClose }: { product: Product | null; o
           {product && !product.hasAllocationHistory && (
             <Button
               type="button"
-              variant="ghost"
+              variant="danger"
               onClick={() => setConfirmingDelete(true)}
               disabled={deleteProduct.isPending}
             >
@@ -204,7 +204,7 @@ export function ProductDrawer({ product, onClose }: { product: Product | null; o
             <Button type="button" variant="secondary" onClick={() => setConfirmingDelete(false)}>
               {t('common:actions.cancel', { ns: 'common' })}
             </Button>
-            <Button type="button" onClick={handleDelete} disabled={deleteProduct.isPending}>
+            <Button type="button" variant="danger" onClick={handleDelete} disabled={deleteProduct.isPending}>
               {t('common:actions.delete', { ns: 'common' })}
             </Button>
           </div>

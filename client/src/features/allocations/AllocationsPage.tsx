@@ -4,6 +4,7 @@ import { Button } from '../../components/ui/button.tsx'
 import { Input } from '../../components/ui/input.tsx'
 import { CurrencyInput } from '../../components/ui/currency-input.tsx'
 import { Modal } from '../../components/ui/modal.tsx'
+import { Badge } from '../../components/ui/badge.tsx'
 import { useToast } from '../../components/ui/toast.tsx'
 import { parseDateOnly } from '../../lib/date.ts'
 import { useClients } from '../clients/useClients.ts'
@@ -18,6 +19,13 @@ import { NewAllocationForm } from './NewAllocationForm.tsx'
 import type { Allocation } from './allocationSchemas.ts'
 
 const dateFormatter = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+
+const STATUS_TONE: Record<Allocation['status'], 'neutral' | 'success' | 'warning' | 'danger'> = {
+  reserved: 'neutral',
+  checked_out: 'warning',
+  returned: 'success',
+  cancelled: 'neutral',
+}
 
 function resolveErrorCode(error: unknown): string {
   return (error as { code?: string })?.code ?? 'UNKNOWN'
@@ -179,18 +187,20 @@ export function AllocationsPage() {
         {allocations?.map((allocation) => (
           <div
             key={allocation.id}
-            className="flex items-center justify-between rounded-md border border-border-soft p-2 text-sm"
+            className="flex items-center justify-between gap-3 rounded-md border border-border-soft p-2 text-sm"
           >
-            <div className="flex flex-col gap-0.5">
-              <span className="font-medium">{productNames.get(allocation.productId) ?? allocation.productId}</span>
-              <span className="text-muted">{clientNames.get(allocation.clientId) ?? allocation.clientId}</span>
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <span className="truncate font-medium">{productNames.get(allocation.productId) ?? allocation.productId}</span>
+              <span className="truncate text-muted">{clientNames.get(allocation.clientId) ?? allocation.clientId}</span>
               <span className="text-xs text-muted">
                 {dateFormatter.format(parseDateOnly(allocation.checkoutDate))} –{' '}
                 {dateFormatter.format(parseDateOnly(allocation.dueDate))}
               </span>
-              <span>{t(`status.${allocation.status}`)}</span>
+              <Badge tone={STATUS_TONE[allocation.status]}>{t(`status.${allocation.status}`)}</Badge>
             </div>
-            <RowActions allocation={allocation} />
+            <div className="shrink-0">
+              <RowActions allocation={allocation} />
+            </div>
           </div>
         ))}
       </div>

@@ -47,7 +47,7 @@ export function ClientsPage() {
           <button
             key={client.id}
             onClick={() => setEditing(client)}
-            className="flex justify-between rounded-md p-2 text-left text-sm hover:bg-brand-50"
+            className="flex justify-between rounded-md p-2 text-left text-sm hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-cream"
           >
             <span>{client.name}</span>
             <span className="text-muted">{client.phone}</span>

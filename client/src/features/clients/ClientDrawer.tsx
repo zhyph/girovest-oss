@@ -91,7 +91,7 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
           {client && !client.hasAllocationHistory && (
             <Button
               type="button"
-              variant="ghost"
+              variant="danger"
               onClick={() => setConfirmingDelete(true)}
               disabled={deleteClient.isPending}
             >
@@ -119,7 +119,7 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
             <Button type="button" variant="secondary" onClick={() => setConfirmingDelete(false)}>
               {t('common:actions.cancel', { ns: 'common' })}
             </Button>
-            <Button type="button" onClick={handleDelete} disabled={deleteClient.isPending}>
+            <Button type="button" variant="danger" onClick={handleDelete} disabled={deleteClient.isPending}>
               {t('common:actions.delete', { ns: 'common' })}
             </Button>
           </div>
