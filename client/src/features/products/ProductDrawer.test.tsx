@@ -5,7 +5,7 @@ import '../../i18n.ts'
 import { ProductDrawer } from './ProductDrawer.tsx'
 import * as useProductsModule from './useProducts.ts'
 import * as useAuthModule from '../../lib/useAuth.ts'
-import { ToastProvider } from '../../components/ui/toast.tsx'
+import { Toaster } from '../../components/ui/sonner.tsx'
 
 const product = {
   id: 'p1', locationId: 'l1', name: 'Vestido Azul', category: 'casual', size: 'P', color: 'azul',
@@ -15,7 +15,7 @@ const product = {
 }
 
 function renderWithToast(ui: React.ReactElement) {
-  return render(<ToastProvider>{ui}</ToastProvider>)
+  return render(<>{ui}<Toaster /></>)
 }
 
 function mockProductHooks(

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Button } from '../../components/ui/button.tsx'
 import { CurrencyInput } from '../../components/ui/currency-input.tsx'
 import { DateInput } from '../../components/ui/date-input.tsx'
-import { useToast } from '../../components/ui/toast.tsx'
+import { showErrorToast } from '../../lib/toast.ts'
 import { useClients } from '../clients/useClients.ts'
 import { useProducts } from '../products/useProducts.ts'
 import { newAllocationSchema, type NewAllocationFormValues } from './allocationSchemas.ts'
@@ -12,7 +12,6 @@ import { useCreateAllocation, useProductAvailability } from './useAllocations.ts
 
 export function NewAllocationForm({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation('allocations')
-  const { showToast } = useToast()
   const { data: clients } = useClients()
   const { data: products } = useProducts()
   const createAllocation = useCreateAllocation()
@@ -33,7 +32,7 @@ export function NewAllocationForm({ onClose }: { onClose: () => void }) {
       onClose()
     } catch (error) {
       const code = (error as { code?: string }).code ?? 'UNKNOWN'
-      showToast(t(`errors.${code}`, { defaultValue: t('common:errors.UNKNOWN', { ns: 'common' }) }))
+      showErrorToast(t(`errors.${code}`, { defaultValue: t('common:errors.UNKNOWN', { ns: 'common' }) }))
     }
   }
 

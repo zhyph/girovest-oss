@@ -25,12 +25,12 @@ describe('Modal', () => {
 
   it('calls onClose when the backdrop is clicked', async () => {
     const onClose = vi.fn()
-    const { container } = render(
+    render(
       <Modal open onClose={onClose} title="Excluir Maria?">
         <p>conteúdo</p>
       </Modal>,
     )
-    await userEvent.click(container.querySelector('[aria-hidden="true"]')!)
+    await userEvent.click(document.querySelector('[data-slot="dialog-overlay"]')!)
     expect(onClose).toHaveBeenCalledOnce()
   })
 

@@ -6,13 +6,12 @@ import { Button } from '../../components/ui/button.tsx'
 import { Input } from '../../components/ui/input.tsx'
 import { PhoneInput } from '../../components/ui/phone-input.tsx'
 import { Modal } from '../../components/ui/modal.tsx'
-import { useToast } from '../../components/ui/toast.tsx'
+import { showErrorToast } from '../../lib/toast.ts'
 import { clientSchema, type Client, type ClientFormValues } from './clientSchemas.ts'
 import { useCreateClient, useUpdateClient, useDeleteClient } from './useClients.ts'
 
 export function ClientDrawer({ client, onClose }: { client: Client | null; onClose: () => void }) {
   const { t } = useTranslation('clients')
-  const { showToast } = useToast()
   const createClient = useCreateClient()
   const updateClient = useUpdateClient()
   const deleteClient = useDeleteClient()
@@ -29,7 +28,7 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
 
   function showError(error: unknown) {
     const code = (error as { code?: string }).code ?? 'UNKNOWN'
-    showToast(t(`errors.${code}`, { defaultValue: t('common:errors.UNKNOWN', { ns: 'common' }) }))
+    showErrorToast(t(`errors.${code}`, { defaultValue: t('common:errors.UNKNOWN', { ns: 'common' }) }))
   }
 
   async function onSubmit(values: ClientFormValues) {

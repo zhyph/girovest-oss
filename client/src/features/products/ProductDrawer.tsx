@@ -6,7 +6,7 @@ import { Button } from '../../components/ui/button.tsx'
 import { Input } from '../../components/ui/input.tsx'
 import { CurrencyInput } from '../../components/ui/currency-input.tsx'
 import { Modal } from '../../components/ui/modal.tsx'
-import { useToast } from '../../components/ui/toast.tsx'
+import { showErrorToast } from '../../lib/toast.ts'
 import { useAuth } from '../../lib/useAuth.ts'
 import { productSchema, type Product, type ProductFormValues, type ProductStatus } from './productSchemas.ts'
 import { useCreateProduct, useUpdateProduct, useDeleteProduct } from './useProducts.ts'
@@ -15,7 +15,6 @@ const STATUS_OPTIONS: ProductStatus[] = ['active', 'maintenance', 'retired']
 
 export function ProductDrawer({ product, onClose }: { product: Product | null; onClose: () => void }) {
   const { t } = useTranslation('products')
-  const { showToast } = useToast()
   const { staff } = useAuth()
   const createProduct = useCreateProduct()
   const updateProduct = useUpdateProduct()
@@ -50,7 +49,7 @@ export function ProductDrawer({ product, onClose }: { product: Product | null; o
 
   function showError(error: unknown) {
     const code = (error as { code?: string }).code ?? 'UNKNOWN'
-    showToast(t(`errors.${code}`, { defaultValue: t('common:errors.UNKNOWN', { ns: 'common' }) }))
+    showErrorToast(t(`errors.${code}`, { defaultValue: t('common:errors.UNKNOWN', { ns: 'common' }) }))
   }
 
   async function onSubmit(values: ProductFormValues) {

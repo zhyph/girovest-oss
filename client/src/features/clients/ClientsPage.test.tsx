@@ -5,13 +5,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import '../../i18n.ts'
 import { ClientsPage } from './ClientsPage.tsx'
 import * as useClientsModule from './useClients.ts'
-import { ToastProvider } from '../../components/ui/toast.tsx'
+import { Toaster } from '../../components/ui/sonner.tsx'
 
 function renderWithQueryClient(ui: React.ReactElement) {
   const queryClient = new QueryClient()
   return render(
     <QueryClientProvider client={queryClient}>
-      <ToastProvider>{ui}</ToastProvider>
+      <>{ui}<Toaster /></>
     </QueryClientProvider>,
   )
 }

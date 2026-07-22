@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, HashRouter } from 'react-router'
 import { AppRouter } from './app/router.tsx'
 import { useAuth } from './lib/useAuth.ts'
-import { ToastProvider } from './components/ui/toast.tsx'
+import { Toaster } from './components/ui/sonner.tsx'
 import i18n from './i18n.ts'
 
 const queryClient = new QueryClient()
@@ -34,12 +34,11 @@ function DocumentTitleSync() {
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ToastProvider>
-        <Router>
-          <DocumentTitleSync />
-          <AppRouter />
-        </Router>
-      </ToastProvider>
+      <Router>
+        <DocumentTitleSync />
+        <AppRouter />
+      </Router>
+      <Toaster position="bottom-right" />
     </QueryClientProvider>
   )
 }

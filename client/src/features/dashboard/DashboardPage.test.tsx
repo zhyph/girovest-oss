@@ -12,7 +12,7 @@ function mockProductsAndClients() {
 }
 
 describe('DashboardPage', () => {
-  it('shows the three today counts', () => {
+  it('shows the three today counts', async () => {
     mockProductsAndClients()
     vi.spyOn(useDashboardModule, 'useDashboard').mockReturnValue({
       goingOutToday: [{ id: '1' }] as never,
@@ -26,9 +26,11 @@ describe('DashboardPage', () => {
     render(<DashboardPage />)
 
     expect(screen.getByText('Saindo hoje')).toBeInTheDocument()
-    expect(screen.getByText('1')).toBeInTheDocument()
+    // Stat values render via CountUp, an animated counter (spring-based, not
+    // instant) — findByText retries until the animation settles on 1/2.
+    expect(await screen.findByText('1')).toBeInTheDocument()
     expect(screen.getByText('Atrasados')).toBeInTheDocument()
-    expect(screen.getByText('2')).toBeInTheDocument()
+    expect(await screen.findByText('2')).toBeInTheDocument()
   })
 
   it('shows loading message when isLoading is true', () => {

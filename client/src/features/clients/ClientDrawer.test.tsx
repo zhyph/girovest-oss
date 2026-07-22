@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import '../../i18n.ts'
 import { ClientDrawer } from './ClientDrawer.tsx'
 import * as useClientsModule from './useClients.ts'
-import { ToastProvider } from '../../components/ui/toast.tsx'
+import { Toaster } from '../../components/ui/sonner.tsx'
 
 const client = {
   id: 'c1', name: 'Maria Silva', phone: '119', email: 'm@x.com', notes: '', createdAt: '2026-01-01',
@@ -12,7 +12,7 @@ const client = {
 }
 
 function renderWithToast(ui: React.ReactElement) {
-  return render(<ToastProvider>{ui}</ToastProvider>)
+  return render(<>{ui}<Toaster /></>)
 }
 
 function mockClientHooks(

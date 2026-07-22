@@ -6,7 +6,7 @@ import '../../i18n.ts'
 import { ProductsPage } from './ProductsPage.tsx'
 import * as useProductsModule from './useProducts.ts'
 import * as useAuthModule from '../../lib/useAuth.ts'
-import { ToastProvider } from '../../components/ui/toast.tsx'
+import { Toaster } from '../../components/ui/sonner.tsx'
 
 const product = {
   id: 'p1', locationId: 'l1', name: 'Vestido Azul', category: 'casual', size: 'P', color: 'azul',
@@ -19,7 +19,7 @@ function renderWithQueryClient(ui: React.ReactElement) {
   const queryClient = new QueryClient()
   return render(
     <QueryClientProvider client={queryClient}>
-      <ToastProvider>{ui}</ToastProvider>
+      <>{ui}<Toaster /></>
     </QueryClientProvider>,
   )
 }

@@ -6,11 +6,11 @@ import { AllocationsPage } from './AllocationsPage.tsx'
 import * as useAllocationsModule from './useAllocations.ts'
 import * as useProductsModule from '../products/useProducts.ts'
 import * as useClientsModule from '../clients/useClients.ts'
-import { ToastProvider } from '../../components/ui/toast.tsx'
+import { Toaster } from '../../components/ui/sonner.tsx'
 import type { Allocation } from './allocationSchemas.ts'
 
 function renderWithToast(ui: React.ReactElement) {
-  return render(<ToastProvider>{ui}</ToastProvider>)
+  return render(<>{ui}<Toaster /></>)
 }
 
 const reserved: Allocation = {

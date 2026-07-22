@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Card, CardBody } from '../../components/ui/card.tsx'
+import CountUp from '../../components/CountUp.tsx'
 import { parseDateOnly } from '../../lib/date.ts'
 import { useClients } from '../clients/useClients.ts'
 import { useProducts } from '../products/useProducts.ts'
@@ -13,7 +14,9 @@ function StatTile({ label, value, danger }: { label: string; value: number; dang
     <Card className={danger && value > 0 ? 'border-red-300 bg-red-50' : undefined}>
       <CardBody>
         <div className="text-xs uppercase tracking-wide text-muted">{label}</div>
-        <div className="text-2xl font-semibold">{value}</div>
+        <div className="text-2xl font-semibold">
+          <CountUp to={value} duration={0.6} />
+        </div>
       </CardBody>
     </Card>
   )

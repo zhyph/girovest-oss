@@ -5,7 +5,7 @@ import { Input } from '../../components/ui/input.tsx'
 import { CurrencyInput } from '../../components/ui/currency-input.tsx'
 import { Modal } from '../../components/ui/modal.tsx'
 import { Badge } from '../../components/ui/badge.tsx'
-import { useToast } from '../../components/ui/toast.tsx'
+import { showErrorToast } from '../../lib/toast.ts'
 import { parseDateOnly } from '../../lib/date.ts'
 import { useClients } from '../clients/useClients.ts'
 import { useProducts } from '../products/useProducts.ts'
@@ -33,7 +33,6 @@ function resolveErrorCode(error: unknown): string {
 
 function RowActions({ allocation }: { allocation: Allocation }) {
   const { t } = useTranslation('allocations')
-  const { showToast } = useToast()
   const checkOut = useCheckOutAllocation()
   const returnAllocation = useReturnAllocation()
   const cancel = useCancelAllocation()
@@ -47,7 +46,7 @@ function RowActions({ allocation }: { allocation: Allocation }) {
 
   function showActionError(error: unknown) {
     const code = resolveErrorCode(error)
-    showToast(t(`errors.${code}`, { defaultValue: t('common:errors.UNKNOWN', { ns: 'common' }) }))
+    showErrorToast(t(`errors.${code}`, { defaultValue: t('common:errors.UNKNOWN', { ns: 'common' }) }))
   }
 
   async function handleCheckOut() {

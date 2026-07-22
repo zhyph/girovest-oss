@@ -6,10 +6,10 @@ import { NewAllocationForm } from './NewAllocationForm.tsx'
 import * as useClientsModule from '../clients/useClients.ts'
 import * as useProductsModule from '../products/useProducts.ts'
 import * as useAllocationsModule from './useAllocations.ts'
-import { ToastProvider } from '../../components/ui/toast.tsx'
+import { Toaster } from '../../components/ui/sonner.tsx'
 
 function renderWithToast(ui: React.ReactElement) {
-  return render(<ToastProvider>{ui}</ToastProvider>)
+  return render(<>{ui}<Toaster /></>)
 }
 
 const client = { id: 'c1', name: 'Maria Silva', phone: '119', email: 'm@x.com', notes: '', createdAt: '2026-01-01' }
