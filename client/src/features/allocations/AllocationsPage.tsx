@@ -4,6 +4,7 @@ import { Button } from '../../components/ui/button.tsx'
 import { Input } from '../../components/ui/input.tsx'
 import { CurrencyInput } from '../../components/ui/currency-input.tsx'
 import { Modal } from '../../components/ui/modal.tsx'
+import { useToast } from '../../components/ui/toast.tsx'
 import { parseDateOnly } from '../../lib/date.ts'
 import { useClients } from '../clients/useClients.ts'
 import { useProducts } from '../products/useProducts.ts'
@@ -24,10 +25,10 @@ function resolveErrorCode(error: unknown): string {
 
 function RowActions({ allocation }: { allocation: Allocation }) {
   const { t } = useTranslation('allocations')
+  const { showToast } = useToast()
   const checkOut = useCheckOutAllocation()
   const returnAllocation = useReturnAllocation()
   const cancel = useCancelAllocation()
-  const [errorCode, setErrorCode] = useState<string | null>(null)
   const [showCheckOutDialog, setShowCheckOutDialog] = useState(false)
   const [showReturnDialog, setShowReturnDialog] = useState(false)
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
@@ -36,37 +37,35 @@ function RowActions({ allocation }: { allocation: Allocation }) {
   const [conditionNotesIn, setConditionNotesIn] = useState('')
   const [depositReturned, setDepositReturned] = useState(0)
 
-  const errorMessage = errorCode
-    ? t(`errors.${errorCode}`, { defaultValue: t('common:errors.UNKNOWN', { ns: 'common' }) })
-    : null
+  function showActionError(error: unknown) {
+    const code = resolveErrorCode(error)
+    showToast(t(`errors.${code}`, { defaultValue: t('common:errors.UNKNOWN', { ns: 'common' }) }))
+  }
 
   async function handleCheckOut() {
-    setErrorCode(null)
     try {
       await checkOut.mutateAsync({ id: allocation.id, conditionNotesOut, depositCollected })
       setShowCheckOutDialog(false)
     } catch (error) {
-      setErrorCode(resolveErrorCode(error))
+      showActionError(error)
     }
   }
 
   async function handleReturn() {
-    setErrorCode(null)
     try {
       await returnAllocation.mutateAsync({ id: allocation.id, conditionNotesIn, depositReturned })
       setShowReturnDialog(false)
     } catch (error) {
-      setErrorCode(resolveErrorCode(error))
+      showActionError(error)
     }
   }
 
   async function handleCancel() {
-    setErrorCode(null)
     try {
       await cancel.mutateAsync(allocation.id)
       setShowCancelConfirm(false)
     } catch (error) {
-      setErrorCode(resolveErrorCode(error))
+      showActionError(error)
     }
   }
 
@@ -81,7 +80,6 @@ function RowActions({ allocation }: { allocation: Allocation }) {
             {t('actions.cancel')}
           </Button>
         </div>
-        {errorMessage && <span className="text-xs text-red-600">{errorMessage}</span>}
         <Modal open={showCheckOutDialog} onClose={() => setShowCheckOutDialog(false)} title={t('checkOutDialog.title')}>
           <div className="flex flex-col gap-3">
             <label className="flex flex-col gap-1 text-sm">
@@ -126,7 +124,6 @@ function RowActions({ allocation }: { allocation: Allocation }) {
         <Button size="sm" onClick={() => setShowReturnDialog(true)} disabled={returnAllocation.isPending}>
           {t('actions.return')}
         </Button>
-        {errorMessage && <span className="text-xs text-red-600">{errorMessage}</span>}
         <Modal open={showReturnDialog} onClose={() => setShowReturnDialog(false)} title={t('returnDialog.title')}>
           <div className="flex flex-col gap-3">
             <label className="flex flex-col gap-1 text-sm">

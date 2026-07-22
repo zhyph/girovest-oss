@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/button.tsx'
 import { Input } from '../../components/ui/input.tsx'
 import { CurrencyInput } from '../../components/ui/currency-input.tsx'
 import { Modal } from '../../components/ui/modal.tsx'
+import { useToast } from '../../components/ui/toast.tsx'
 import { useAuth } from '../../lib/useAuth.ts'
 import { productSchema, type Product, type ProductFormValues, type ProductStatus } from './productSchemas.ts'
 import { useCreateProduct, useUpdateProduct, useDeleteProduct } from './useProducts.ts'
@@ -14,17 +15,15 @@ const STATUS_OPTIONS: ProductStatus[] = ['active', 'maintenance', 'retired']
 
 export function ProductDrawer({ product, onClose }: { product: Product | null; onClose: () => void }) {
   const { t } = useTranslation('products')
+  const { showToast } = useToast()
   const { staff } = useAuth()
   const createProduct = useCreateProduct()
   const updateProduct = useUpdateProduct()
   const deleteProduct = useDeleteProduct()
   const [confirmingDelete, setConfirmingDelete] = useState(false)
-  const [deleteErrorCode, setDeleteErrorCode] = useState<string | null>(null)
-  const [submitErrorCode, setSubmitErrorCode] = useState<string | null>(null)
   const [status, setStatus] = useState<ProductStatus>(product?.status ?? 'active')
   const [photos, setPhotos] = useState<string[]>(product?.photos ?? [])
   const [newPhotoUrl, setNewPhotoUrl] = useState('')
-  const errorCode = deleteErrorCode ?? submitErrorCode
   const {
     register,
     handleSubmit,
@@ -49,8 +48,12 @@ export function ProductDrawer({ product, onClose }: { product: Product | null; o
     setPhotos((current) => current.filter((_, i) => i !== index))
   }
 
+  function showError(error: unknown) {
+    const code = (error as { code?: string }).code ?? 'UNKNOWN'
+    showToast(t(`errors.${code}`, { defaultValue: t('common:errors.UNKNOWN', { ns: 'common' }) }))
+  }
+
   async function onSubmit(values: ProductFormValues) {
-    setSubmitErrorCode(null)
     try {
       if (product) {
         await updateProduct.mutateAsync({ id: product.id, values: { ...values, status, photos } })
@@ -59,18 +62,17 @@ export function ProductDrawer({ product, onClose }: { product: Product | null; o
       }
       onClose()
     } catch (error) {
-      setSubmitErrorCode((error as { code?: string }).code ?? 'UNKNOWN')
+      showError(error)
     }
   }
 
   async function handleDelete() {
     if (!product) return
-    setDeleteErrorCode(null)
     try {
       await deleteProduct.mutateAsync(product.id)
       onClose()
     } catch (error) {
-      setDeleteErrorCode((error as { code?: string }).code ?? 'UNKNOWN')
+      showError(error)
     } finally {
       setConfirmingDelete(false)
     }
@@ -170,11 +172,6 @@ export function ProductDrawer({ product, onClose }: { product: Product | null; o
             </ul>
           )}
         </div>
-        {errorCode && (
-          <p className="text-xs text-red-600">
-            {t(`errors.${errorCode}`, { defaultValue: t('common:errors.UNKNOWN', { ns: 'common' }) })}
-          </p>
-        )}
         <div className="mt-2 flex justify-between gap-2">
           {product && !product.hasAllocationHistory && (
             <Button

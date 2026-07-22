@@ -4,10 +4,15 @@ import userEvent from '@testing-library/user-event'
 import '../../i18n.ts'
 import { ClientDrawer } from './ClientDrawer.tsx'
 import * as useClientsModule from './useClients.ts'
+import { ToastProvider } from '../../components/ui/toast.tsx'
 
 const client = {
   id: 'c1', name: 'Maria Silva', phone: '119', email: 'm@x.com', notes: '', createdAt: '2026-01-01',
   hasAllocationHistory: false,
+}
+
+function renderWithToast(ui: React.ReactElement) {
+  return render(<ToastProvider>{ui}</ToastProvider>)
 }
 
 function mockClientHooks(
@@ -24,7 +29,7 @@ describe('ClientDrawer', () => {
   it('closes when the backdrop is clicked', async () => {
     const onClose = vi.fn()
     mockClientHooks()
-    const { container } = render(<ClientDrawer client={null} onClose={onClose} />)
+    const { container } = renderWithToast(<ClientDrawer client={null} onClose={onClose} />)
 
     await userEvent.click(container.querySelector('[aria-hidden="true"]')!)
 
@@ -33,13 +38,13 @@ describe('ClientDrawer', () => {
 
   it('does not show a delete button in create mode', () => {
     mockClientHooks(vi.fn())
-    render(<ClientDrawer client={null} onClose={vi.fn()} />)
+    renderWithToast(<ClientDrawer client={null} onClose={vi.fn()} />)
     expect(screen.queryByRole('button', { name: 'Excluir' })).not.toBeInTheDocument()
   })
 
   it('shows the translated error when deleting a client with allocation history', async () => {
     mockClientHooks(vi.fn().mockRejectedValue({ code: 'CANNOT_DELETE_WITH_HISTORY', message: 'nope' }))
-    render(<ClientDrawer client={client} onClose={vi.fn()} />)
+    renderWithToast(<ClientDrawer client={client} onClose={vi.fn()} />)
 
     await userEvent.click(screen.getByRole('button', { name: 'Excluir' }))
     const dialog = screen.getByRole('dialog')
@@ -53,7 +58,7 @@ describe('ClientDrawer', () => {
   it('asks for confirmation before deleting, and does not delete if confirmation is dismissed', async () => {
     const deleteImpl = vi.fn()
     mockClientHooks(deleteImpl)
-    render(<ClientDrawer client={client} onClose={vi.fn()} />)
+    renderWithToast(<ClientDrawer client={client} onClose={vi.fn()} />)
 
     await userEvent.click(screen.getByRole('button', { name: 'Excluir' }))
     expect(screen.getByRole('dialog')).toBeInTheDocument()
@@ -66,7 +71,7 @@ describe('ClientDrawer', () => {
 
   it('masks a typed phone number as (DDD) NNNNN-NNNN', async () => {
     mockClientHooks(vi.fn())
-    render(<ClientDrawer client={null} onClose={vi.fn()} />)
+    renderWithToast(<ClientDrawer client={null} onClose={vi.fn()} />)
 
     await userEvent.type(screen.getByLabelText('Telefone'), '11987654321')
 
@@ -76,7 +81,7 @@ describe('ClientDrawer', () => {
   it('closes the drawer when delete succeeds', async () => {
     const onClose = vi.fn()
     mockClientHooks(vi.fn().mockResolvedValue(undefined))
-    render(<ClientDrawer client={client} onClose={onClose} />)
+    renderWithToast(<ClientDrawer client={client} onClose={onClose} />)
 
     await userEvent.click(screen.getByRole('button', { name: 'Excluir' }))
     const dialog = screen.getByRole('dialog')
@@ -89,7 +94,7 @@ describe('ClientDrawer', () => {
     const onClose = vi.fn()
     const createImpl = vi.fn().mockRejectedValue({ code: 'UNKNOWN', message: 'network error' })
     mockClientHooks(vi.fn(), createImpl)
-    render(<ClientDrawer client={null} onClose={onClose} />)
+    renderWithToast(<ClientDrawer client={null} onClose={onClose} />)
 
     await userEvent.type(screen.getByLabelText('Nome'), 'Nova Cliente')
     await userEvent.type(screen.getByLabelText('Telefone'), '11999999999')
@@ -104,7 +109,7 @@ describe('ClientDrawer', () => {
     const onClose = vi.fn()
     const updateImpl = vi.fn().mockRejectedValue({ code: 'UNKNOWN', message: 'network error' })
     mockClientHooks(vi.fn(), vi.fn(), updateImpl)
-    render(<ClientDrawer client={client} onClose={onClose} />)
+    renderWithToast(<ClientDrawer client={client} onClose={onClose} />)
 
     await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
 
@@ -114,7 +119,7 @@ describe('ClientDrawer', () => {
 
   it('hides Excluir when the client has allocation history, per the drawer spec', () => {
     mockClientHooks(vi.fn())
-    render(<ClientDrawer client={{ ...client, hasAllocationHistory: true }} onClose={vi.fn()} />)
+    renderWithToast(<ClientDrawer client={{ ...client, hasAllocationHistory: true }} onClose={vi.fn()} />)
     expect(screen.queryByRole('button', { name: 'Excluir' })).not.toBeInTheDocument()
   })
 })

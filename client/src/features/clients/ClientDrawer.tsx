@@ -6,18 +6,17 @@ import { Button } from '../../components/ui/button.tsx'
 import { Input } from '../../components/ui/input.tsx'
 import { PhoneInput } from '../../components/ui/phone-input.tsx'
 import { Modal } from '../../components/ui/modal.tsx'
+import { useToast } from '../../components/ui/toast.tsx'
 import { clientSchema, type Client, type ClientFormValues } from './clientSchemas.ts'
 import { useCreateClient, useUpdateClient, useDeleteClient } from './useClients.ts'
 
 export function ClientDrawer({ client, onClose }: { client: Client | null; onClose: () => void }) {
   const { t } = useTranslation('clients')
+  const { showToast } = useToast()
   const createClient = useCreateClient()
   const updateClient = useUpdateClient()
   const deleteClient = useDeleteClient()
   const [confirmingDelete, setConfirmingDelete] = useState(false)
-  const [deleteErrorCode, setDeleteErrorCode] = useState<string | null>(null)
-  const [submitErrorCode, setSubmitErrorCode] = useState<string | null>(null)
-  const errorCode = deleteErrorCode ?? submitErrorCode
   const {
     register,
     handleSubmit,
@@ -28,8 +27,12 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
     defaultValues: client ?? { name: '', phone: '', email: '', notes: '' },
   })
 
+  function showError(error: unknown) {
+    const code = (error as { code?: string }).code ?? 'UNKNOWN'
+    showToast(t(`errors.${code}`, { defaultValue: t('common:errors.UNKNOWN', { ns: 'common' }) }))
+  }
+
   async function onSubmit(values: ClientFormValues) {
-    setSubmitErrorCode(null)
     try {
       if (client) {
         await updateClient.mutateAsync({ id: client.id, values })
@@ -38,18 +41,17 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
       }
       onClose()
     } catch (error) {
-      setSubmitErrorCode((error as { code?: string }).code ?? 'UNKNOWN')
+      showError(error)
     }
   }
 
   async function handleDelete() {
     if (!client) return
-    setDeleteErrorCode(null)
     try {
       await deleteClient.mutateAsync(client.id)
       onClose()
     } catch (error) {
-      setDeleteErrorCode((error as { code?: string }).code ?? 'UNKNOWN')
+      showError(error)
     } finally {
       setConfirmingDelete(false)
     }
@@ -85,11 +87,6 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
           {t('fields.notes')}
           <Input {...register('notes')} />
         </label>
-        {errorCode && (
-          <p className="text-xs text-red-600">
-            {t(`errors.${errorCode}`, { defaultValue: t('common:errors.UNKNOWN', { ns: 'common' }) })}
-          </p>
-        )}
         <div className="mt-2 flex justify-between gap-2">
           {client && !client.hasAllocationHistory && (
             <Button

@@ -6,6 +6,11 @@ import { NewAllocationForm } from './NewAllocationForm.tsx'
 import * as useClientsModule from '../clients/useClients.ts'
 import * as useProductsModule from '../products/useProducts.ts'
 import * as useAllocationsModule from './useAllocations.ts'
+import { ToastProvider } from '../../components/ui/toast.tsx'
+
+function renderWithToast(ui: React.ReactElement) {
+  return render(<ToastProvider>{ui}</ToastProvider>)
+}
 
 const client = { id: 'c1', name: 'Maria Silva', phone: '119', email: 'm@x.com', notes: '', createdAt: '2026-01-01' }
 const product = {
@@ -24,7 +29,7 @@ describe('NewAllocationForm', () => {
   it('closes when the backdrop is clicked', async () => {
     const onClose = vi.fn()
     mockPickerHooks(true)
-    const { container } = render(<NewAllocationForm onClose={onClose} />)
+    const { container } = renderWithToast(<NewAllocationForm onClose={onClose} />)
 
     await userEvent.click(container.querySelector('[aria-hidden="true"]')!)
 
@@ -33,7 +38,7 @@ describe('NewAllocationForm', () => {
 
   it('disables Salvar and shows a warning when the product is unavailable for the chosen range', async () => {
     mockPickerHooks(false)
-    render(<NewAllocationForm onClose={vi.fn()} />)
+    renderWithToast(<NewAllocationForm onClose={vi.fn()} />)
 
     await userEvent.type(screen.getByLabelText('Data de saída'), '01082026')
     await userEvent.type(screen.getByLabelText('Data de devolução'), '05082026')
@@ -45,7 +50,7 @@ describe('NewAllocationForm', () => {
 
   it('leaves Salvar enabled when the product is available for the chosen range', async () => {
     mockPickerHooks(true)
-    render(<NewAllocationForm onClose={vi.fn()} />)
+    renderWithToast(<NewAllocationForm onClose={vi.fn()} />)
 
     await userEvent.type(screen.getByLabelText('Data de saída'), '01082026')
     await userEvent.type(screen.getByLabelText('Data de devolução'), '05082026')
@@ -57,7 +62,7 @@ describe('NewAllocationForm', () => {
 
   it('masks the date fields as DD/MM/AAAA regardless of OS locale', async () => {
     mockPickerHooks(true)
-    render(<NewAllocationForm onClose={vi.fn()} />)
+    renderWithToast(<NewAllocationForm onClose={vi.fn()} />)
 
     await userEvent.type(screen.getByLabelText('Data de saída'), '01082026')
 

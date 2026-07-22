@@ -1,10 +1,10 @@
-import { useState } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../../components/ui/button.tsx'
 import { CurrencyInput } from '../../components/ui/currency-input.tsx'
 import { DateInput } from '../../components/ui/date-input.tsx'
+import { useToast } from '../../components/ui/toast.tsx'
 import { useClients } from '../clients/useClients.ts'
 import { useProducts } from '../products/useProducts.ts'
 import { newAllocationSchema, type NewAllocationFormValues } from './allocationSchemas.ts'
@@ -12,10 +12,10 @@ import { useCreateAllocation, useProductAvailability } from './useAllocations.ts
 
 export function NewAllocationForm({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation('allocations')
+  const { showToast } = useToast()
   const { data: clients } = useClients()
   const { data: products } = useProducts()
   const createAllocation = useCreateAllocation()
-  const [errorCode, setErrorCode] = useState<string | null>(null)
 
   const { register, handleSubmit, control, watch } = useForm<NewAllocationFormValues>({
     resolver: zodResolver(newAllocationSchema),
@@ -28,12 +28,12 @@ export function NewAllocationForm({ onClose }: { onClose: () => void }) {
   const availability = useProductAvailability(selectedProductId, checkoutDate, dueDate)
 
   async function onSubmit(values: NewAllocationFormValues) {
-    setErrorCode(null)
     try {
       await createAllocation.mutateAsync(values)
       onClose()
     } catch (error) {
-      setErrorCode((error as { code?: string }).code ?? 'UNKNOWN')
+      const code = (error as { code?: string }).code ?? 'UNKNOWN'
+      showToast(t(`errors.${code}`, { defaultValue: t('common:errors.UNKNOWN', { ns: 'common' }) }))
     }
   }
 
@@ -95,11 +95,6 @@ export function NewAllocationForm({ onClose }: { onClose: () => void }) {
             )}
           />
         </label>
-        {errorCode && (
-          <p className="text-sm text-red-600">
-            {t(`errors.${errorCode}`, { defaultValue: t('common:errors.UNKNOWN', { ns: 'common' }) })}
-          </p>
-        )}
         <div className="mt-2 flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={onClose}>
             {t('common:actions.cancel', { ns: 'common' })}

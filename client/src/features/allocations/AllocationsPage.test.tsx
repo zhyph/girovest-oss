@@ -6,7 +6,12 @@ import { AllocationsPage } from './AllocationsPage.tsx'
 import * as useAllocationsModule from './useAllocations.ts'
 import * as useProductsModule from '../products/useProducts.ts'
 import * as useClientsModule from '../clients/useClients.ts'
+import { ToastProvider } from '../../components/ui/toast.tsx'
 import type { Allocation } from './allocationSchemas.ts'
+
+function renderWithToast(ui: React.ReactElement) {
+  return render(<ToastProvider>{ui}</ToastProvider>)
+}
 
 const reserved: Allocation = {
   id: 'a1', productId: 'p1', clientId: 'c1', staffId: 's1', checkoutDate: '2026-08-01', dueDate: '2026-08-05',
@@ -48,20 +53,20 @@ function mockAllocationHooks(
 describe('AllocationsPage', () => {
   it('shows Check-out/Cancelar for a reserved row', () => {
     mockAllocationHooks([reserved])
-    render(<AllocationsPage />)
+    renderWithToast(<AllocationsPage />)
     expect(screen.getByRole('button', { name: 'Check-out' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Cancelar' })).toBeInTheDocument()
   })
 
   it('shows Devolver for a checked_out row', () => {
     mockAllocationHooks([checkedOut])
-    render(<AllocationsPage />)
+    renderWithToast(<AllocationsPage />)
     expect(screen.getByRole('button', { name: 'Devolver' })).toBeInTheDocument()
   })
 
   it('shows no action buttons for a returned row', () => {
     mockAllocationHooks([returned])
-    render(<AllocationsPage />)
+    renderWithToast(<AllocationsPage />)
     expect(screen.queryByRole('button', { name: 'Check-out' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Devolver' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Cancelar' })).not.toBeInTheDocument()
@@ -70,7 +75,7 @@ describe('AllocationsPage', () => {
   it('shows a translated error when check-out is rejected with INVALID_ALLOCATION_TRANSITION', async () => {
     const checkOut = vi.fn().mockRejectedValue({ code: 'INVALID_ALLOCATION_TRANSITION' })
     mockAllocationHooks([reserved], { checkOut })
-    render(<AllocationsPage />)
+    renderWithToast(<AllocationsPage />)
 
     await userEvent.click(screen.getByRole('button', { name: 'Check-out' }))
     const dialog = screen.getByRole('dialog', { name: 'Check-out' })
@@ -84,7 +89,7 @@ describe('AllocationsPage', () => {
   it('shows a fallback error when cancel is rejected with an unknown code', async () => {
     const cancel = vi.fn().mockRejectedValue({ code: 'SOMETHING_WEIRD' })
     mockAllocationHooks([reserved], { cancel })
-    render(<AllocationsPage />)
+    renderWithToast(<AllocationsPage />)
 
     await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
     const dialog = screen.getByRole('dialog', { name: 'Cancelar esta alocação?' })
@@ -96,7 +101,7 @@ describe('AllocationsPage', () => {
   it('sends condition notes and deposit collected when confirming check-out', async () => {
     const checkOut = vi.fn().mockResolvedValue(undefined)
     mockAllocationHooks([reserved], { checkOut })
-    render(<AllocationsPage />)
+    renderWithToast(<AllocationsPage />)
 
     await userEvent.click(screen.getByRole('button', { name: 'Check-out' }))
     const dialog = screen.getByRole('dialog', { name: 'Check-out' })
@@ -112,7 +117,7 @@ describe('AllocationsPage', () => {
   it('sends condition notes and deposit returned when confirming a return', async () => {
     const returnAllocation = vi.fn().mockResolvedValue(undefined)
     mockAllocationHooks([checkedOut], { returnAllocation })
-    render(<AllocationsPage />)
+    renderWithToast(<AllocationsPage />)
 
     await userEvent.click(screen.getByRole('button', { name: 'Devolver' }))
     const dialog = screen.getByRole('dialog', { name: 'Devolução' })
