@@ -56,7 +56,9 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
   }
 
   return (
-    <div className="fixed inset-y-0 right-0 w-80 border-l border-border-soft bg-white p-4 shadow-lg">
+    <>
+      <div className="fixed inset-0 z-40 bg-ink/40" onClick={onClose} aria-hidden="true" />
+      <div className="fixed inset-y-0 right-0 z-50 w-80 border-l border-border-soft bg-white p-4 shadow-lg">
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3">
         <label className="flex flex-col gap-1 text-sm">
           {t('fields.name')}
@@ -126,6 +128,7 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
           </div>
         </Modal>
       )}
-    </div>
+      </div>
+    </>
   )
 }

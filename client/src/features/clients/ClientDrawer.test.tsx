@@ -21,6 +21,16 @@ function mockClientHooks(
 }
 
 describe('ClientDrawer', () => {
+  it('closes when the backdrop is clicked', async () => {
+    const onClose = vi.fn()
+    mockClientHooks()
+    const { container } = render(<ClientDrawer client={null} onClose={onClose} />)
+
+    await userEvent.click(container.querySelector('[aria-hidden="true"]')!)
+
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
   it('does not show a delete button in create mode', () => {
     mockClientHooks(vi.fn())
     render(<ClientDrawer client={null} onClose={vi.fn()} />)

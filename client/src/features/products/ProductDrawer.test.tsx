@@ -28,6 +28,16 @@ function mockProductHooks(
 }
 
 describe('ProductDrawer', () => {
+  it('closes when the backdrop is clicked', async () => {
+    const onClose = vi.fn()
+    mockProductHooks()
+    const { container } = render(<ProductDrawer product={null} onClose={onClose} />)
+
+    await userEvent.click(container.querySelector('[aria-hidden="true"]')!)
+
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
   it('does not show a delete button in create mode', () => {
     mockProductHooks(vi.fn())
     render(<ProductDrawer product={null} onClose={vi.fn()} />)

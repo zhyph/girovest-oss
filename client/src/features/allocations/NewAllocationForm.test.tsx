@@ -21,6 +21,16 @@ function mockPickerHooks(available: boolean) {
 }
 
 describe('NewAllocationForm', () => {
+  it('closes when the backdrop is clicked', async () => {
+    const onClose = vi.fn()
+    mockPickerHooks(true)
+    const { container } = render(<NewAllocationForm onClose={onClose} />)
+
+    await userEvent.click(container.querySelector('[aria-hidden="true"]')!)
+
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
   it('disables Salvar and shows a warning when the product is unavailable for the chosen range', async () => {
     mockPickerHooks(false)
     render(<NewAllocationForm onClose={vi.fn()} />)

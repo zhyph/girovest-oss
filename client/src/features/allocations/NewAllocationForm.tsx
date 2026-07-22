@@ -40,7 +40,9 @@ export function NewAllocationForm({ onClose }: { onClose: () => void }) {
   const activeProducts = products?.filter((p) => p.status === 'active') ?? []
 
   return (
-    <div className="fixed inset-y-0 right-0 w-96 border-l border-border-soft bg-white p-4 shadow-lg">
+    <>
+      <div className="fixed inset-0 z-40 bg-ink/40" onClick={onClose} aria-hidden="true" />
+      <div className="fixed inset-y-0 right-0 z-50 w-96 border-l border-border-soft bg-white p-4 shadow-lg">
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3">
         <label className="flex flex-col gap-1 text-sm">
           {t('fields.client')}
@@ -110,6 +112,7 @@ export function NewAllocationForm({ onClose }: { onClose: () => void }) {
           </Button>
         </div>
       </form>
-    </div>
+      </div>
+    </>
   )
 }
