@@ -25,7 +25,9 @@ export function Sidebar() {
       )}
     >
       <div className="mb-3 truncate px-2 text-lg font-semibold whitespace-nowrap text-brand-600">
-        {staff?.locationName ?? t('appName')}
+        <span className="hidden group-hover:inline group-focus-within:inline lg:inline">
+          {staff?.locationName ?? t('appName')}
+        </span>
       </div>
       {links.map(({ to, labelKey, icon: Icon }) => (
         <NavLink
@@ -40,14 +42,18 @@ export function Sidebar() {
           }
         >
           <Icon size={18} className="shrink-0" />
-          {t(labelKey)}
+          <span className="hidden group-hover:inline group-focus-within:inline lg:inline">{t(labelKey)}</span>
         </NavLink>
       ))}
       {staff && (
         <div className="mt-auto flex flex-col gap-2 border-t border-border-soft px-2 pt-3">
-          <div className="truncate text-xs whitespace-nowrap text-muted">{staff.name}</div>
+          <div className="truncate text-xs whitespace-nowrap text-muted">
+            <span className="hidden group-hover:inline group-focus-within:inline lg:inline">{staff.name}</span>
+          </div>
           <Button variant="ghost" size="sm" className="justify-start whitespace-nowrap px-0" onClick={logout}>
-            {t('actions.logout')}
+            <span className="hidden group-hover:inline group-focus-within:inline lg:inline">
+              {t('actions.logout')}
+            </span>
           </Button>
         </div>
       )}

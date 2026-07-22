@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ToastProvider, useToast } from './toast.tsx'
 
@@ -45,7 +45,7 @@ describe('ToastProvider / useToast', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
-  it('auto-dismisses after the toast duration elapses', async () => {
+  it('does not auto-dismiss — every message today is an error the staff needs to act on', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     render(
       <ToastProvider>
@@ -56,9 +56,9 @@ describe('ToastProvider / useToast', () => {
     await user.click(screen.getByText('disparar'))
     expect(screen.getByRole('alert')).toBeInTheDocument()
 
-    vi.advanceTimersByTime(5000)
+    vi.advanceTimersByTime(60000)
 
-    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
+    expect(screen.getByRole('alert')).toBeInTheDocument()
   })
 
   it('throws when useToast is used outside a ToastProvider', () => {

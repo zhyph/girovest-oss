@@ -58,6 +58,12 @@ describe('AllocationsPage', () => {
     expect(screen.getByRole('button', { name: 'Cancelar' })).toBeInTheDocument()
   })
 
+  it('does not stretch the status badge to the width of its flex-col card', () => {
+    mockAllocationHooks([reserved])
+    renderWithToast(<AllocationsPage />)
+    expect(screen.getByText('Reservado')).toHaveClass('self-start')
+  })
+
   it('shows Devolver for a checked_out row', () => {
     mockAllocationHooks([checkedOut])
     renderWithToast(<AllocationsPage />)

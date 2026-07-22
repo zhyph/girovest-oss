@@ -11,17 +11,15 @@ interface ToastContextValue {
 
 const ToastContext = createContext<ToastContextValue | null>(null)
 
-const TOAST_DURATION_MS = 5000
-
+// Every toast today is an error the staff member needs to actually read and
+// act on (save/delete/check-out/return/cancel failures) — none are routine
+// success confirmations — so these close only on click, never on a timer.
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([])
 
   const showToast = useCallback((message: string) => {
     const id = Date.now() + Math.random()
     setToasts((current) => [...current, { id, message }])
-    setTimeout(() => {
-      setToasts((current) => current.filter((toast) => toast.id !== id))
-    }, TOAST_DURATION_MS)
   }, [])
 
   function dismiss(id: number) {

@@ -196,7 +196,7 @@ export function AllocationsPage() {
                 {dateFormatter.format(parseDateOnly(allocation.checkoutDate))} –{' '}
                 {dateFormatter.format(parseDateOnly(allocation.dueDate))}
               </span>
-              <Badge tone={STATUS_TONE[allocation.status]}>{t(`status.${allocation.status}`)}</Badge>
+              <Badge className="self-start" tone={STATUS_TONE[allocation.status]}>{t(`status.${allocation.status}`)}</Badge>
             </div>
             <div className="shrink-0">
               <RowActions allocation={allocation} />

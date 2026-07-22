@@ -27,6 +27,26 @@ describe('Sidebar', () => {
     expect(screen.getByRole('link', { name: 'Alocações' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Calendário' })).toBeInTheDocument()
     expect(screen.getByText('Ana Owner')).toBeInTheDocument()
-    expect(screen.getByText('Ana Owner').parentElement).toHaveClass('border-t')
+    expect(screen.getByText('Ana Owner').closest('div')?.parentElement).toHaveClass('border-t')
+  })
+
+  it('hides nav labels and the staff name behind a hidden/group-hover span, not just overflow clipping', () => {
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      staff: { id: '1', name: 'Ana Owner', role: 'owner', locationId: 'l1', locationName: 'Loja Teste' },
+      isLoadingStaff: false,
+      login: vi.fn(),
+      logout: vi.fn(),
+      isLoggedIn: true,
+    })
+
+    render(
+      <MemoryRouter>
+        <Sidebar />
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByText('Painel').tagName).toBe('SPAN')
+    expect(screen.getByText('Painel')).toHaveClass('hidden', 'group-hover:inline', 'group-focus-within:inline', 'lg:inline')
+    expect(screen.getByText('Ana Owner')).toHaveClass('hidden', 'group-hover:inline', 'group-focus-within:inline', 'lg:inline')
   })
 })
