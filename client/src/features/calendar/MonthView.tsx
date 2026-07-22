@@ -13,6 +13,13 @@ const localizer = dateFnsLocalizer({
   locales: { 'pt-BR': ptBR },
 })
 
+const messages = {
+  today: 'Hoje',
+  previous: 'Anterior',
+  next: 'Próximo',
+  month: 'Mês',
+}
+
 export function MonthView({
   allocations,
   dateField,
@@ -50,6 +57,7 @@ export function MonthView({
         onSelectSlot={(slot) => onSelectDay(slot.start)}
         selectable
         culture="pt-BR"
+        messages={messages}
       />
     </div>
   )
