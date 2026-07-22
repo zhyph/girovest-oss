@@ -15,5 +15,6 @@
   "errors": {
     "CANNOT_DELETE_WITH_HISTORY": "Não é possível excluir um cliente com histórico de alocações."
   },
-  "empty": "Nenhum cliente cadastrado ainda."
+  "empty": "Nenhum cliente cadastrado ainda.",
+  "noResults": "Nenhum cliente encontrado para essa busca."
 }

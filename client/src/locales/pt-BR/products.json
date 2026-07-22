@@ -1,5 +1,6 @@
 {
   "title": "Produtos",
+  "searchPlaceholder": "Buscar por nome, categoria ou cor...",
   "fields": {
     "name": "Nome",
     "category": "Categoria",
@@ -35,6 +36,7 @@
     "depositAmountInvalid": "Caução deve ser zero ou maior"
   },
   "empty": "Nenhum produto cadastrado ainda.",
+  "noResults": "Nenhum produto encontrado para essa busca.",
   "errors": {
     "CANNOT_DELETE_WITH_HISTORY": "Não é possível excluir um produto com histórico de alocações."
   }

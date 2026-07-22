@@ -22,9 +22,17 @@ function endOfToday() {
   return d
 }
 
+function endOfUpcomingWindow() {
+  const d = new Date()
+  d.setDate(d.getDate() + 7)
+  d.setHours(23, 59, 59, 999)
+  return d
+}
+
 export function useDashboard() {
   const from = startOfToday().toISOString()
   const to = endOfToday().toISOString()
+  const upcomingTo = endOfUpcomingWindow().toISOString()
 
   const goingOut = useQuery({
     queryKey: ['calendar', 'going-out', from, to],
@@ -38,12 +46,17 @@ export function useDashboard() {
     queryKey: ['calendar', 'overdue', to],
     queryFn: () => apiFetch<AllocationSummary[]>(`/api/calendar/overdue?asOf=${to}`),
   })
+  const upcoming = useQuery({
+    queryKey: ['calendar', 'going-out', from, upcomingTo],
+    queryFn: () => apiFetch<AllocationSummary[]>(`/api/calendar/going-out?from=${from}&to=${upcomingTo}`),
+  })
 
   return {
     goingOutToday: goingOut.data ?? [],
     dueBackToday: dueBack.data ?? [],
     overdue: overdue.data ?? [],
-    isLoading: goingOut.isLoading || dueBack.isLoading || overdue.isLoading,
-    isError: goingOut.isError || dueBack.isError || overdue.isError,
+    upcoming: upcoming.data ?? [],
+    isLoading: goingOut.isLoading || dueBack.isLoading || overdue.isLoading || upcoming.isLoading,
+    isError: goingOut.isError || dueBack.isError || overdue.isError || upcoming.isError,
   }
 }

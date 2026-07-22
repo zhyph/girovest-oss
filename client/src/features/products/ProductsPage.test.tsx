@@ -61,4 +61,29 @@ describe('ProductsPage', () => {
     await userEvent.click(screen.getByText('Vestido Rosa'))
     expect(screen.getByLabelText('Nome')).toHaveValue('Vestido Rosa')
   })
+
+  it('filters the list by name, category, or color as the search box is typed into', async () => {
+    const other = { ...product, id: 'p2', name: 'Vestido Rosa', category: 'festa', color: 'rosa' }
+    vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [product, other], isLoading: false } as never)
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste' }, isLoadingStaff: false, login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
+
+    renderWithQueryClient(<ProductsPage />)
+    expect(screen.getByText('Vestido Azul')).toBeInTheDocument()
+    expect(screen.getByText('Vestido Rosa')).toBeInTheDocument()
+
+    await userEvent.type(screen.getByPlaceholderText('Buscar por nome, categoria ou cor...'), 'festa')
+
+    expect(screen.queryByText('Vestido Azul')).not.toBeInTheDocument()
+    expect(screen.getByText('Vestido Rosa')).toBeInTheDocument()
+  })
+
+  it('shows a no-results message when the search matches nothing', async () => {
+    vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [product], isLoading: false } as never)
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste' }, isLoadingStaff: false, login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
+
+    renderWithQueryClient(<ProductsPage />)
+    await userEvent.type(screen.getByPlaceholderText('Buscar por nome, categoria ou cor...'), 'zzz')
+
+    expect(screen.getByText('Nenhum produto encontrado para essa busca.')).toBeInTheDocument()
+  })
 })

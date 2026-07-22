@@ -4,5 +4,7 @@
   "dueBackToday": "Voltando hoje",
   "overdue": "Atrasados",
   "loading": "Carregando...",
-  "error": "Erro ao carregar dados do painel. Tente novamente."
+  "error": "Erro ao carregar dados do painel. Tente novamente.",
+  "upcoming": "Próximas alocações",
+  "upcomingEmpty": "Nada programado para os próximos dias."
 }

@@ -35,4 +35,35 @@ describe('ClientsPage', () => {
     await userEvent.click(screen.getByText('Maria Silva'))
     expect(screen.getByLabelText('Nome')).toHaveValue('Maria Silva')
   })
+
+  it('filters the list by name, phone, or email as the search box is typed into', async () => {
+    vi.spyOn(useClientsModule, 'useClients').mockReturnValue({
+      data: [
+        { id: '1', name: 'Maria Silva', phone: '11999990000', email: 'maria@x.com', notes: '', createdAt: '2026-01-01' },
+        { id: '2', name: 'Beatriz Costa', phone: '11888880000', email: 'beatriz@x.com', notes: '', createdAt: '2026-01-01' },
+      ],
+      isLoading: false,
+    } as never)
+
+    renderWithQueryClient(<ClientsPage />)
+    expect(screen.getByText('Maria Silva')).toBeInTheDocument()
+    expect(screen.getByText('Beatriz Costa')).toBeInTheDocument()
+
+    await userEvent.type(screen.getByPlaceholderText('Buscar por nome, telefone ou e-mail...'), 'beatriz')
+
+    expect(screen.queryByText('Maria Silva')).not.toBeInTheDocument()
+    expect(screen.getByText('Beatriz Costa')).toBeInTheDocument()
+  })
+
+  it('shows a no-results message when the search matches nothing', async () => {
+    vi.spyOn(useClientsModule, 'useClients').mockReturnValue({
+      data: [{ id: '1', name: 'Maria Silva', phone: '119', email: 'm@x.com', notes: '', createdAt: '2026-01-01' }],
+      isLoading: false,
+    } as never)
+
+    renderWithQueryClient(<ClientsPage />)
+    await userEvent.type(screen.getByPlaceholderText('Buscar por nome, telefone ou e-mail...'), 'zzz')
+
+    expect(screen.getByText('Nenhum cliente encontrado para essa busca.')).toBeInTheDocument()
+  })
 })
