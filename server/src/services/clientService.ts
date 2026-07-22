@@ -16,31 +16,76 @@ export interface UpdateClientInput {
   notes?: string | null
 }
 
-export function createClient(data: CreateClientInput) {
-  return prisma.client.create({ data })
+export interface ClientDTO {
+  id: string
+  name: string
+  phone: string
+  email: string
+  notes: string | null
+  hasAllocationHistory: boolean
+  createdAt: Date
 }
 
-export function listClients() {
-  return prisma.client.findMany({ orderBy: { createdAt: 'desc' } })
+interface ClientRow {
+  id: string
+  name: string
+  phone: string
+  email: string
+  notes: string | null
+  createdAt: Date
 }
 
-export async function getClient(id: string) {
-  const client = await prisma.client.findUnique({ where: { id } })
-  if (!client) {
+function toDTO(row: ClientRow, hasAllocationHistory: boolean): ClientDTO {
+  return { ...row, hasAllocationHistory }
+}
+
+async function hasHistory(clientId: string): Promise<boolean> {
+  const count = await prisma.allocation.count({ where: { clientId } })
+  return count > 0
+}
+
+async function historyByClientId(clientIds: string[]): Promise<Set<string>> {
+  const result = new Set<string>()
+  if (clientIds.length === 0) return result
+  const allocations = await prisma.allocation.findMany({
+    where: { clientId: { in: clientIds } },
+    select: { clientId: true },
+    distinct: ['clientId'],
+  })
+  for (const allocation of allocations) {
+    result.add(allocation.clientId)
+  }
+  return result
+}
+
+export async function createClient(data: CreateClientInput): Promise<ClientDTO> {
+  const row = await prisma.client.create({ data })
+  return toDTO(row, false)
+}
+
+export async function listClients(): Promise<ClientDTO[]> {
+  const rows = await prisma.client.findMany({ orderBy: { createdAt: 'desc' } })
+  const withHistory = await historyByClientId(rows.map((row) => row.id))
+  return rows.map((row) => toDTO(row, withHistory.has(row.id)))
+}
+
+export async function getClient(id: string): Promise<ClientDTO> {
+  const row = await prisma.client.findUnique({ where: { id } })
+  if (!row) {
     throw new AppError(ErrorCodes.NOT_FOUND, 404, `Client ${id} not found`)
   }
-  return client
+  return toDTO(row, await hasHistory(id))
 }
 
-export async function updateClient(id: string, data: UpdateClientInput) {
+export async function updateClient(id: string, data: UpdateClientInput): Promise<ClientDTO> {
   await getClient(id)
-  return prisma.client.update({ where: { id }, data })
+  const row = await prisma.client.update({ where: { id }, data })
+  return toDTO(row, await hasHistory(id))
 }
 
 export async function deleteClient(id: string): Promise<void> {
   await getClient(id)
-  const allocationCount = await prisma.allocation.count({ where: { clientId: id } })
-  if (allocationCount > 0) {
+  if (await hasHistory(id)) {
     throw new AppError(
       ErrorCodes.CANNOT_DELETE_WITH_HISTORY,
       409,

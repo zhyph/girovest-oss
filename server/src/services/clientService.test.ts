@@ -84,4 +84,43 @@ describe('clientService', () => {
 
     await expect(deleteClient(client.id)).rejects.toMatchObject({ code: 'CANNOT_DELETE_WITH_HISTORY' })
   })
+
+  it('reports hasAllocationHistory false for a client with no allocations', async () => {
+    const created = await createClient({ name: 'Maria', phone: '119', email: 'm@x.com' })
+    expect(created.hasAllocationHistory).toBe(false)
+
+    const fetched = await getClient(created.id)
+    expect(fetched.hasAllocationHistory).toBe(false)
+
+    const [listed] = await listClients()
+    expect(listed.hasAllocationHistory).toBe(false)
+  })
+
+  it('reports hasAllocationHistory true once the client has an allocation, even after it is returned', async () => {
+    const location = await prisma.location.create({ data: { name: 'L', address: 'A' } })
+    const staff = await prisma.staff.create({
+      data: { name: 'S', login: 'staff-hist', passwordHash: 'x', role: 'staff', locationId: location.id },
+    })
+    const product = await prisma.product.create({
+      data: {
+        locationId: location.id, name: 'Vestido', category: 'festa', size: 'M', color: 'azul',
+        rentalPrice: 100, depositAmount: 50, photos: '[]',
+      },
+    })
+    const client = await createClient({ name: 'Beatriz', phone: '129', email: 'b@x.com' })
+
+    await prisma.allocation.create({
+      data: {
+        productId: product.id, clientId: client.id, staffId: staff.id,
+        checkoutDate: new Date('2026-01-01'), dueDate: new Date('2026-01-05'),
+        status: 'returned', actualReturnDate: new Date('2026-01-04'), priceCharged: 100,
+      },
+    })
+
+    const fetched = await getClient(client.id)
+    expect(fetched.hasAllocationHistory).toBe(true)
+
+    const updated = await updateClient(client.id, { notes: 'updated' })
+    expect(updated.hasAllocationHistory).toBe(true)
+  })
 })
