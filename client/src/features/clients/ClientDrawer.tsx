@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../../components/ui/button.tsx'
 import { Input } from '../../components/ui/input.tsx'
+import { Modal } from '../../components/ui/modal.tsx'
 import { clientSchema, type Client, type ClientFormValues } from './clientSchemas.ts'
 import { useCreateClient, useUpdateClient, useDeleteClient } from './useClients.ts'
 
@@ -12,6 +13,7 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
   const createClient = useCreateClient()
   const updateClient = useUpdateClient()
   const deleteClient = useDeleteClient()
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [deleteErrorCode, setDeleteErrorCode] = useState<string | null>(null)
   const [submitErrorCode, setSubmitErrorCode] = useState<string | null>(null)
   const errorCode = deleteErrorCode ?? submitErrorCode
@@ -46,6 +48,8 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
       onClose()
     } catch (error) {
       setDeleteErrorCode((error as { code?: string }).code ?? 'UNKNOWN')
+    } finally {
+      setConfirmingDelete(false)
     }
   }
 
@@ -78,7 +82,12 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
         )}
         <div className="mt-2 flex justify-between gap-2">
           {client && !client.hasAllocationHistory && (
-            <Button type="button" variant="ghost" onClick={handleDelete} disabled={deleteClient.isPending}>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setConfirmingDelete(true)}
+              disabled={deleteClient.isPending}
+            >
               {t('common:actions.delete', { ns: 'common' })}
             </Button>
           )}
@@ -92,6 +101,23 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
           </div>
         </div>
       </form>
+      {client && (
+        <Modal
+          open={confirmingDelete}
+          onClose={() => setConfirmingDelete(false)}
+          title={t('common:confirmDelete.title', { ns: 'common', name: client.name })}
+        >
+          <p className="mb-4 text-sm text-ink">{t('common:confirmDelete.message', { ns: 'common' })}</p>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setConfirmingDelete(false)}>
+              {t('common:actions.cancel', { ns: 'common' })}
+            </Button>
+            <Button type="button" onClick={handleDelete} disabled={deleteClient.isPending}>
+              {t('common:actions.delete', { ns: 'common' })}
+            </Button>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }

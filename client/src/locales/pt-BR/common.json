@@ -17,5 +17,13 @@
   },
   "errors": {
     "UNKNOWN": "Algo deu errado. Tente novamente."
+  },
+  "confirmDelete": {
+    "title": "Excluir {{name}}?",
+    "message": "Esta ação não pode ser desfeita."
+  },
+  "confirmCancelAllocation": {
+    "title": "Cancelar esta alocação?",
+    "message": "A reserva será cancelada e o produto ficará disponível novamente."
   }
 }

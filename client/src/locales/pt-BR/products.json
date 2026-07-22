@@ -8,7 +8,13 @@
     "rentalPrice": "Preço do aluguel",
     "depositAmount": "Caução",
     "description": "Descrição",
-    "status": "Status"
+    "status": "Status",
+    "photos": "Fotos"
+  },
+  "photos": {
+    "urlPlaceholder": "URL da foto",
+    "add": "Adicionar",
+    "remove": "Remover"
   },
   "status": {
     "active": "Disponível",

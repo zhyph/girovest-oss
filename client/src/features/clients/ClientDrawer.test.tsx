@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '../../i18n.ts'
 import { ClientDrawer } from './ClientDrawer.tsx'
@@ -32,10 +32,26 @@ describe('ClientDrawer', () => {
     render(<ClientDrawer client={client} onClose={vi.fn()} />)
 
     await userEvent.click(screen.getByRole('button', { name: 'Excluir' }))
+    const dialog = screen.getByRole('dialog')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Excluir' }))
 
     expect(
       await screen.findByText('Não é possível excluir um cliente com histórico de alocações.'),
     ).toBeInTheDocument()
+  })
+
+  it('asks for confirmation before deleting, and does not delete if confirmation is dismissed', async () => {
+    const deleteImpl = vi.fn()
+    mockClientHooks(deleteImpl)
+    render(<ClientDrawer client={client} onClose={vi.fn()} />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Excluir' }))
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(deleteImpl).not.toHaveBeenCalled()
+
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(deleteImpl).not.toHaveBeenCalled()
   })
 
   it('closes the drawer when delete succeeds', async () => {
@@ -44,6 +60,8 @@ describe('ClientDrawer', () => {
     render(<ClientDrawer client={client} onClose={onClose} />)
 
     await userEvent.click(screen.getByRole('button', { name: 'Excluir' }))
+    const dialog = screen.getByRole('dialog')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Excluir' }))
 
     expect(onClose).toHaveBeenCalledOnce()
   })

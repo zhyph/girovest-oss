@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '../../i18n.ts'
 import { ProductDrawer } from './ProductDrawer.tsx'
@@ -39,10 +39,26 @@ describe('ProductDrawer', () => {
     render(<ProductDrawer product={product} onClose={vi.fn()} />)
 
     await userEvent.click(screen.getByRole('button', { name: 'Excluir' }))
+    const dialog = screen.getByRole('dialog')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Excluir' }))
 
     expect(
       await screen.findByText('Não é possível excluir um produto com histórico de alocações.'),
     ).toBeInTheDocument()
+  })
+
+  it('asks for confirmation before deleting, and does not delete if confirmation is dismissed', async () => {
+    const deleteImpl = vi.fn()
+    mockProductHooks(deleteImpl)
+    render(<ProductDrawer product={product} onClose={vi.fn()} />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Excluir' }))
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(deleteImpl).not.toHaveBeenCalled()
+
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(deleteImpl).not.toHaveBeenCalled()
   })
 
   it('shows a translated error and does not close the drawer when creating a product fails', async () => {
@@ -77,5 +93,54 @@ describe('ProductDrawer', () => {
     mockProductHooks(vi.fn())
     render(<ProductDrawer product={{ ...product, hasAllocationHistory: true }} onClose={vi.fn()} />)
     expect(screen.queryByRole('button', { name: 'Excluir' })).not.toBeInTheDocument()
+  })
+
+  it('does not show a status field in create mode', () => {
+    mockProductHooks(vi.fn())
+    render(<ProductDrawer product={null} onClose={vi.fn()} />)
+    expect(screen.queryByLabelText('Status')).not.toBeInTheDocument()
+  })
+
+  it('adds and removes photo URLs, and submits them on save', async () => {
+    const onClose = vi.fn()
+    const updateImpl = vi.fn().mockResolvedValue(undefined)
+    mockProductHooks(vi.fn(), vi.fn(), updateImpl)
+    render(<ProductDrawer product={product} onClose={onClose} />)
+
+    await userEvent.type(screen.getByPlaceholderText('URL da foto'), 'https://example.com/a.jpg')
+    await userEvent.click(screen.getByRole('button', { name: 'Adicionar' }))
+    expect(screen.getByText('https://example.com/a.jpg')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+
+    expect(updateImpl).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'p1',
+        values: expect.objectContaining({ photos: ['https://example.com/a.jpg'] }),
+      }),
+    )
+  })
+
+  it('removes a photo from the list', async () => {
+    mockProductHooks(vi.fn())
+    render(<ProductDrawer product={{ ...product, photos: ['https://example.com/a.jpg'] }} onClose={vi.fn()} />)
+
+    expect(screen.getByText('https://example.com/a.jpg')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Remover' }))
+    expect(screen.queryByText('https://example.com/a.jpg')).not.toBeInTheDocument()
+  })
+
+  it('submits a changed status alongside the other fields', async () => {
+    const onClose = vi.fn()
+    const updateImpl = vi.fn().mockResolvedValue(undefined)
+    mockProductHooks(vi.fn(), vi.fn(), updateImpl)
+    render(<ProductDrawer product={product} onClose={onClose} />)
+
+    await userEvent.selectOptions(screen.getByLabelText('Status'), 'maintenance')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+
+    expect(updateImpl).toHaveBeenCalledWith(
+      expect.objectContaining({ values: expect.objectContaining({ status: 'maintenance' }) }),
+    )
   })
 })
