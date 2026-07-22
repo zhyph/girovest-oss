@@ -24,6 +24,7 @@
   },
   "confirmCancelAllocation": {
     "title": "Cancelar esta alocação?",
-    "message": "A reserva será cancelada e o produto ficará disponível novamente."
+    "message": "A reserva será cancelada e o produto ficará disponível novamente.",
+    "confirm": "Sim, cancelar"
   }
 }

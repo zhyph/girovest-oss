@@ -1,6 +1,9 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../../components/ui/button.tsx'
+import { Input } from '../../components/ui/input.tsx'
+import { CurrencyInput } from '../../components/ui/currency-input.tsx'
+import { Modal } from '../../components/ui/modal.tsx'
 import { parseDateOnly } from '../../lib/date.ts'
 import { useClients } from '../clients/useClients.ts'
 import { useProducts } from '../products/useProducts.ts'
@@ -25,6 +28,13 @@ function RowActions({ allocation }: { allocation: Allocation }) {
   const returnAllocation = useReturnAllocation()
   const cancel = useCancelAllocation()
   const [errorCode, setErrorCode] = useState<string | null>(null)
+  const [showCheckOutDialog, setShowCheckOutDialog] = useState(false)
+  const [showReturnDialog, setShowReturnDialog] = useState(false)
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false)
+  const [conditionNotesOut, setConditionNotesOut] = useState('')
+  const [depositCollected, setDepositCollected] = useState(0)
+  const [conditionNotesIn, setConditionNotesIn] = useState('')
+  const [depositReturned, setDepositReturned] = useState(0)
 
   const errorMessage = errorCode
     ? t(`errors.${errorCode}`, { defaultValue: t('common:errors.UNKNOWN', { ns: 'common' }) })
@@ -33,7 +43,8 @@ function RowActions({ allocation }: { allocation: Allocation }) {
   async function handleCheckOut() {
     setErrorCode(null)
     try {
-      await checkOut.mutateAsync({ id: allocation.id })
+      await checkOut.mutateAsync({ id: allocation.id, conditionNotesOut, depositCollected })
+      setShowCheckOutDialog(false)
     } catch (error) {
       setErrorCode(resolveErrorCode(error))
     }
@@ -42,7 +53,8 @@ function RowActions({ allocation }: { allocation: Allocation }) {
   async function handleReturn() {
     setErrorCode(null)
     try {
-      await returnAllocation.mutateAsync({ id: allocation.id })
+      await returnAllocation.mutateAsync({ id: allocation.id, conditionNotesIn, depositReturned })
+      setShowReturnDialog(false)
     } catch (error) {
       setErrorCode(resolveErrorCode(error))
     }
@@ -52,6 +64,7 @@ function RowActions({ allocation }: { allocation: Allocation }) {
     setErrorCode(null)
     try {
       await cancel.mutateAsync(allocation.id)
+      setShowCancelConfirm(false)
     } catch (error) {
       setErrorCode(resolveErrorCode(error))
     }
@@ -61,24 +74,79 @@ function RowActions({ allocation }: { allocation: Allocation }) {
     return (
       <div className="flex flex-col items-end gap-1">
         <div className="flex gap-2">
-          <Button size="sm" onClick={handleCheckOut} disabled={checkOut.isPending}>
+          <Button size="sm" onClick={() => setShowCheckOutDialog(true)} disabled={checkOut.isPending}>
             {t('actions.checkOut')}
           </Button>
-          <Button size="sm" variant="secondary" onClick={handleCancel} disabled={cancel.isPending}>
+          <Button size="sm" variant="secondary" onClick={() => setShowCancelConfirm(true)} disabled={cancel.isPending}>
             {t('actions.cancel')}
           </Button>
         </div>
         {errorMessage && <span className="text-xs text-red-600">{errorMessage}</span>}
+        <Modal open={showCheckOutDialog} onClose={() => setShowCheckOutDialog(false)} title={t('checkOutDialog.title')}>
+          <div className="flex flex-col gap-3">
+            <label className="flex flex-col gap-1 text-sm">
+              {t('fields.conditionNotesOut')}
+              <Input value={conditionNotesOut} onChange={(event) => setConditionNotesOut(event.target.value)} />
+            </label>
+            <label className="flex flex-col gap-1 text-sm">
+              {t('fields.depositCollected')}
+              <CurrencyInput value={depositCollected} onChange={setDepositCollected} aria-label={t('fields.depositCollected')} />
+            </label>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="secondary" onClick={() => setShowCheckOutDialog(false)}>
+                {t('common:actions.cancel', { ns: 'common' })}
+              </Button>
+              <Button type="button" onClick={handleCheckOut} disabled={checkOut.isPending}>
+                {t('checkOutDialog.confirm')}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+        <Modal
+          open={showCancelConfirm}
+          onClose={() => setShowCancelConfirm(false)}
+          title={t('common:confirmCancelAllocation.title', { ns: 'common' })}
+        >
+          <p className="mb-4 text-sm text-ink">{t('common:confirmCancelAllocation.message', { ns: 'common' })}</p>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setShowCancelConfirm(false)}>
+              {t('common:actions.cancel', { ns: 'common' })}
+            </Button>
+            <Button type="button" onClick={handleCancel} disabled={cancel.isPending}>
+              {t('common:confirmCancelAllocation.confirm', { ns: 'common' })}
+            </Button>
+          </div>
+        </Modal>
       </div>
     )
   }
   if (allocation.status === 'checked_out') {
     return (
       <div className="flex flex-col items-end gap-1">
-        <Button size="sm" onClick={handleReturn} disabled={returnAllocation.isPending}>
+        <Button size="sm" onClick={() => setShowReturnDialog(true)} disabled={returnAllocation.isPending}>
           {t('actions.return')}
         </Button>
         {errorMessage && <span className="text-xs text-red-600">{errorMessage}</span>}
+        <Modal open={showReturnDialog} onClose={() => setShowReturnDialog(false)} title={t('returnDialog.title')}>
+          <div className="flex flex-col gap-3">
+            <label className="flex flex-col gap-1 text-sm">
+              {t('fields.conditionNotesIn')}
+              <Input value={conditionNotesIn} onChange={(event) => setConditionNotesIn(event.target.value)} />
+            </label>
+            <label className="flex flex-col gap-1 text-sm">
+              {t('fields.depositReturned')}
+              <CurrencyInput value={depositReturned} onChange={setDepositReturned} aria-label={t('fields.depositReturned')} />
+            </label>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="secondary" onClick={() => setShowReturnDialog(false)}>
+                {t('common:actions.cancel', { ns: 'common' })}
+              </Button>
+              <Button type="button" onClick={handleReturn} disabled={returnAllocation.isPending}>
+                {t('returnDialog.confirm')}
+              </Button>
+            </div>
+          </div>
+        </Modal>
       </div>
     )
   }

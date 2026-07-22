@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '../../i18n.ts'
 import { AllocationsPage } from './AllocationsPage.tsx'
@@ -73,6 +73,8 @@ describe('AllocationsPage', () => {
     render(<AllocationsPage />)
 
     await userEvent.click(screen.getByRole('button', { name: 'Check-out' }))
+    const dialog = screen.getByRole('dialog', { name: 'Check-out' })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Confirmar check-out' }))
 
     expect(
       await screen.findByText('Esta ação não é permitida no status atual.'),
@@ -85,7 +87,41 @@ describe('AllocationsPage', () => {
     render(<AllocationsPage />)
 
     await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+    const dialog = screen.getByRole('dialog', { name: 'Cancelar esta alocação?' })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Sim, cancelar' }))
 
     expect(await screen.findByText('Algo deu errado. Tente novamente.')).toBeInTheDocument()
+  })
+
+  it('sends condition notes and deposit collected when confirming check-out', async () => {
+    const checkOut = vi.fn().mockResolvedValue(undefined)
+    mockAllocationHooks([reserved], { checkOut })
+    render(<AllocationsPage />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Check-out' }))
+    const dialog = screen.getByRole('dialog', { name: 'Check-out' })
+    await userEvent.type(within(dialog).getByLabelText('Estado do produto na saída'), 'Sem manchas')
+    await userEvent.type(within(dialog).getByLabelText('Caução recebida'), '5000')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Confirmar check-out' }))
+
+    expect(checkOut).toHaveBeenCalledWith({
+      id: 'a1', conditionNotesOut: 'Sem manchas', depositCollected: 50,
+    })
+  })
+
+  it('sends condition notes and deposit returned when confirming a return', async () => {
+    const returnAllocation = vi.fn().mockResolvedValue(undefined)
+    mockAllocationHooks([checkedOut], { returnAllocation })
+    render(<AllocationsPage />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Devolver' }))
+    const dialog = screen.getByRole('dialog', { name: 'Devolução' })
+    await userEvent.type(within(dialog).getByLabelText('Estado do produto na devolução'), 'Bom estado')
+    await userEvent.type(within(dialog).getByLabelText('Caução devolvida'), '5000')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Confirmar devolução' }))
+
+    expect(returnAllocation).toHaveBeenCalledWith({
+      id: 'a2', conditionNotesIn: 'Bom estado', depositReturned: 50,
+    })
   })
 })

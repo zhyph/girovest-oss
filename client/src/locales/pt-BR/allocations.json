@@ -6,7 +6,19 @@
     "product": "Produto",
     "checkoutDate": "Data de saída",
     "dueDate": "Data de devolução",
-    "priceCharged": "Valor cobrado"
+    "priceCharged": "Valor cobrado",
+    "conditionNotesOut": "Estado do produto na saída",
+    "depositCollected": "Caução recebida",
+    "conditionNotesIn": "Estado do produto na devolução",
+    "depositReturned": "Caução devolvida"
+  },
+  "checkOutDialog": {
+    "title": "Check-out",
+    "confirm": "Confirmar check-out"
+  },
+  "returnDialog": {
+    "title": "Devolução",
+    "confirm": "Confirmar devolução"
   },
   "status": {
     "reserved": "Reservado",
