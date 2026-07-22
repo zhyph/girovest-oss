@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../../components/ui/button.tsx'
 import { useProducts } from '../products/useProducts.ts'
+import { useClients } from '../clients/useClients.ts'
 import { useCalendarTab, type CalendarTab } from './useCalendar.ts'
 import { AgendaView } from './AgendaView.tsx'
 import { MonthView } from './MonthView.tsx'
@@ -26,10 +27,15 @@ export function CalendarPage() {
   const { from, to } = monthRange(anchor)
   const { data: allocations } = useCalendarTab(tab, from, to)
   const { data: products } = useProducts()
+  const { data: clients } = useClients()
 
   const productNames = useMemo(
     () => new Map((products ?? []).map((product) => [product.id, product.name])),
     [products],
+  )
+  const clientNames = useMemo(
+    () => new Map((clients ?? []).map((client) => [client.id, client.name])),
+    [clients],
   )
 
   return (
@@ -52,7 +58,12 @@ export function CalendarPage() {
         </Button>
       </div>
       {view === 'agenda' ? (
-        <AgendaView allocations={allocations ?? []} dateField={tabDateField[tab]} productNames={productNames} />
+        <AgendaView
+          allocations={allocations ?? []}
+          dateField={tabDateField[tab]}
+          productNames={productNames}
+          clientNames={clientNames}
+        />
       ) : (
         <MonthView
           allocations={allocations ?? []}

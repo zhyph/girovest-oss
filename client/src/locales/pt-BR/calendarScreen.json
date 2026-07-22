@@ -7,5 +7,12 @@
   },
   "viewMonth": "Ver mês",
   "viewAgenda": "Ver agenda",
-  "empty": "Nada para mostrar neste período."
+  "empty": "Nada para mostrar neste período.",
+  "groups": {
+    "overdue": "Atrasado",
+    "today": "Hoje",
+    "tomorrow": "Amanhã",
+    "thisWeek": "Esta semana",
+    "later": "Mais tarde"
+  }
 }

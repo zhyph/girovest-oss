@@ -5,12 +5,14 @@ import '../../i18n.ts'
 import { CalendarPage } from './CalendarPage.tsx'
 import * as useCalendarModule from './useCalendar.ts'
 import * as useProductsModule from '../products/useProducts.ts'
+import * as useClientsModule from '../clients/useClients.ts'
 import type { Allocation } from '../allocations/allocationSchemas.ts'
 import type { Product } from '../products/productSchemas.ts'
 
 function mockHooks() {
   vi.spyOn(useCalendarModule, 'useCalendarTab').mockReturnValue({ data: [], isLoading: false } as never)
   vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [], isLoading: false } as never)
+  vi.spyOn(useClientsModule, 'useClients').mockReturnValue({ data: [], isLoading: false } as never)
 }
 
 function makeAllocation(overrides: Partial<Allocation> = {}): Allocation {
@@ -75,6 +77,7 @@ describe('CalendarPage', () => {
       data: [makeProduct({ id: 'product-1', name: 'Vestido Azul' })],
       isLoading: false,
     } as never)
+    vi.spyOn(useClientsModule, 'useClients').mockReturnValue({ data: [], isLoading: false } as never)
 
     render(<CalendarPage />)
 
@@ -91,6 +94,7 @@ describe('CalendarPage', () => {
       data: [makeProduct({ id: 'product-1', name: 'Vestido Azul' })],
       isLoading: false,
     } as never)
+    vi.spyOn(useClientsModule, 'useClients').mockReturnValue({ data: [], isLoading: false } as never)
 
     render(<CalendarPage />)
 
