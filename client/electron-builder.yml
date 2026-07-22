@@ -12,6 +12,21 @@ extraResources:
     to: server/node_modules
   - from: ../node_modules
     to: node_modules
+    # npm workspaces links each workspace package into the shared root
+    # node_modules by its package name -- girovest-client is a symlink back
+    # to ../client itself. Copying it here recurses straight into this same
+    # packaging run's own in-progress output (client/release/...), which
+    # only failed on Windows (a real CI failure, not theoretical): infinite
+    # path nesting until MAX_PATH is hit. Neither workspace-self-link is
+    # needed at runtime (server/node_modules already ships separately;
+    # client's own source has no business inside the packaged server's
+    # node_modules), so both are excluded outright.
+    filter:
+      - '**/*'
+      - '!girovest-client'
+      - '!girovest-client/**'
+      - '!girovest-server'
+      - '!girovest-server/**'
   - from: ../server/prisma
     to: server/prisma
     filter:
