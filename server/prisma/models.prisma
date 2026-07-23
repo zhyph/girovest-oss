@@ -99,8 +99,20 @@ model Contract {
   staff        Staff         @relation(fields: [staffId], references: [id])
   allocations  Allocation[]
   installments Installment[]
+  signingTokens SigningToken[]
 
   @@unique([locationId, number])
+}
+
+model SigningToken {
+  id         String    @id @default(uuid())
+  token      String    @unique
+  contractId String
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
 }
 
 model Installment {
