@@ -877,6 +877,17 @@ Add to `client/src/features/clients/clientSchemas.test.ts`, inside the existing 
     })
     expect(result.success).toBe(true)
   })
+
+  it('accepts a fully blank identity document or address line (a freshly added, untouched row)', () => {
+    const result = clientSchema.safeParse({
+      name: 'Maria Silva',
+      phone: '11999999999',
+      email: 'maria@example.com',
+      identityDocuments: [{ label: '', value: '' }],
+      addressLines: [{ label: '', value: '', sortOrder: 0 }],
+    })
+    expect(result.success).toBe(true)
+  })
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -934,6 +945,35 @@ export interface Client extends Omit<ClientFormValues, 'identityDocuments' | 'ad
   createdAt: string
 }
 ```
+
+**Post-review correction (found while reviewing Task 7):** a fully blank row — `label: ''` *and* `value: ''`, the state of a row staff just clicked "add" on and hasn't touched — must not block submission either, the same way a pre-seeded-but-untouched template row must not. But `label` can't simply drop its own required-ness the way `value` did: `identityDocumentSchema`/`addressLineSchema` must still reject a row with a real `value` and a blank `label` (a value with no label is genuinely malformed, and an existing test — "rejects an identity document with an empty label" — already locks this in). The correct rule is conditional: **label is required only when a value is present.** Both schemas use `.refine()` for this instead of an unconditional `label.min(1)`:
+
+```ts
+export const identityDocumentSchema = z
+  .object({
+    label: z.string(),
+    value: z.string(),
+    maskKey: z.string().nullable().optional(),
+  })
+  .refine((doc) => doc.value.trim() === '' || doc.label.trim() !== '', {
+    message: 'Label is required when a value is provided',
+    path: ['label'],
+  })
+
+export const addressLineSchema = z
+  .object({
+    label: z.string(),
+    value: z.string(),
+    sortOrder: z.number().int(),
+    maskKey: z.string().nullable().optional(),
+  })
+  .refine((doc) => doc.value.trim() === '' || doc.label.trim() !== '', {
+    message: 'Label is required when a value is provided',
+    path: ['label'],
+  })
+```
+
+This accepts `{label:'CPF', value:''}` (untouched template row) and `{label:'', value:''}` (untouched custom row) — both pass because `value` is blank, short-circuiting the check — while still rejecting `{label:'', value:'123'}` (a value with no label). `.refine()` on a `z.object()` doesn't change its inferred TypeScript output type, so `IdentityDocumentFormValue`/`AddressLineFormValue` and everything built on them are unaffected. The `onSubmit` filter that decides what's actually persisted (`value.trim() !== ''`) is unchanged and needs no update — it already drops both kinds of untouched rows correctly, since both have a blank `value`.
 
 **Why `value` has no `.min(1)`:** this plan's own Global Constraints state identity documents and address lines are never required to create or update a Client. `ClientDrawer` (Tasks 7–8) pre-seeds a *new* client's form with template rows (e.g. CPF, RG) whose `value` starts empty, so staff sees what to fill in — if `value` required a minimum length, submitting a brand-new client without touching those fields would fail validation, directly contradicting "lightweight to create a casual contact." `label` keeps `.min(1)` because a row's label is never machine-generated as blank — every row, template-seeded or staff-added, always has a real label string as soon as it exists.
 
