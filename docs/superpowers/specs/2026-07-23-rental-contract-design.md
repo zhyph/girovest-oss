@@ -232,8 +232,9 @@ locale that hasn't defined one) render as plain text input.
 ## Required-ness scope
 
 Identity documents and address lines are **not** required to save a Client —
-`ClientDrawer` stays lightweight (name + phone, as today), so a casual
-contact can be added before they've committed to renting. They're required
+`ClientDrawer` stays exactly as lightweight as it is today (name, phone,
+email, notes — no identity or address fields), so a casual contact can be
+added before they've committed to renting. They're required
 to **finalize a Contract**: step 1 of "New Contract" checks the selected
 client against the locale template and surfaces any missing required
 document/address rows inline, filled in without leaving the flow.
@@ -289,6 +290,21 @@ exactly as today; both apps share the same Prisma/SQLite connection within
 the one process, so a submission on `signingApp` is immediately visible to
 `app`.
 
+Two binding requirements this security boundary depends on, made explicit
+because they don't hold by accident:
+
+- `signingApp` must bind to the specific detected LAN IP (see LAN IP
+  selection below), never `0.0.0.0` — binding to all interfaces would
+  needlessly widen exposure beyond the one network the QR code targets.
+- `app`'s `127.0.0.1`-only binding is currently a property of *how
+  Electron spawns the server* (`client/electron/main.ts` sets
+  `HOST: '127.0.0.1'`), not of the server code itself — `server/src/server.ts`
+  defaults to `0.0.0.0` when run standalone (e.g. outside Electron, in
+  tests, or a future non-desktop deployment). This whole design's security
+  model assumes `app` is loopback-only; that assumption must keep being
+  enforced by whatever spawns the backend, not silently rely on the
+  standalone default.
+
 Flow:
 
 1. Staff clicks "Sign remotely" → the authenticated, localhost API creates a
@@ -343,9 +359,13 @@ on the digital path.
 
 Existing gap found while designing this feature: `CurrencyInput` hardcodes
 `Intl.NumberFormat('pt-BR', { currency: 'BRL' })`, `DateInput` hand-rolls a
-fixed `DD/MM/AAAA` mask, and several files (`AgendaView`, `DashboardPage`,
-the allocations date formatter) construct their own hardcoded
-`Intl.DateTimeFormat('pt-BR', ...)`. `Location.locale` already exists
+fixed `DD/MM/AAAA` mask, `PhoneInput` hand-rolls a fixed BR `(DDD)
+NNNNN-NNNN` mask, and several files (`AgendaView`, `DashboardPage`, the
+allocations date formatter) construct their own hardcoded
+`Intl.DateTimeFormat('pt-BR', ...)`. `PhoneInput` is directly in scope, not
+adjacent work — it's used in `ClientDrawer`, which every new Contract's
+client step (step 1 of `NewContractForm`) goes through. `Location.locale`
+already exists
 server-side for exactly this purpose but isn't surfaced to the frontend at
 all. Fixed as part of this work, since installments and contract totals are
 the heaviest new consumer of this exact hardcoding:
@@ -355,9 +375,10 @@ the heaviest new consumer of this exact hardcoding:
   `'pt-BR'` for the pre-auth window (login screen).
 - A small locale-config map (client-side, next to the identity/address/
   payment-method templates above) pairs each locale with its currency code
-  and date-mask pattern, e.g. `{ 'pt-BR': { currency: 'BRL', dateMask:
-  'DD/MM/YYYY' } }`. `CurrencyInput` and `DateInput` read this via
-  `useLocale()` instead of a literal.
+  and date/phone mask pattern, e.g. `{ 'pt-BR': { currency: 'BRL', dateMask:
+  'DD/MM/YYYY', phoneMask: 'br' } }`. `CurrencyInput`, `DateInput`, and
+  `PhoneInput` all read this via `useLocale()` instead of a literal, each
+  keeping their current pt-BR formatter as the `'pt-BR'` entry's behavior.
 - The scattered display-only date formatters consolidate into one shared
   `formatDate(date, locale)` helper.
 - `i18n.ts`'s initial `lng: 'pt-BR'` stays as the pre-auth default; once
@@ -390,7 +411,7 @@ Following the existing per-layer pattern (`*Service.test.ts`,
   `formatPhone` tests.
 - `NewContractForm.test.tsx`, `ContractsPage.test.tsx` — multi-step flow,
   inline client-completion step.
-- `useLocale`/`CurrencyInput`/`DateInput` tests updated for locale-driven
-  formatting instead of a hardcoded literal.
+- `useLocale`/`CurrencyInput`/`DateInput`/`PhoneInput` tests updated for
+  locale-driven formatting instead of a hardcoded literal.
 - Print view — structure/snapshot test rather than visual, no headless print
   pipeline needed.
