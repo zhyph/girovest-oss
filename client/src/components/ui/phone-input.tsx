@@ -1,22 +1,6 @@
 import { forwardRef, useState, useEffect, type InputHTMLAttributes } from 'react'
 import { cn } from '../../lib/cn.ts'
-
-/**
- * BR-specific phone mask: (DDD) NNNNN-NNNN for a 9-digit mobile local number,
- * or (DDD) NNNN-NNNN for an 8-digit landline. A future non-pt-BR locale
- * would swap this formatting function rather than this component's shape.
- */
-function formatPhone(raw: string): string {
-  const digits = raw.replace(/\D/g, '').slice(0, 11)
-  if (digits.length === 0) return ''
-  if (digits.length <= 2) return `(${digits}`
-  const ddd = digits.slice(0, 2)
-  const rest = digits.slice(2)
-  if (rest.length <= 4) return `(${ddd}) ${rest}`
-  const suffix = rest.slice(-4)
-  const prefix = rest.slice(0, -4)
-  return `(${ddd}) ${prefix}-${suffix}`
-}
+import { useLocale } from '../../lib/LocaleContext.tsx'
 
 type PhoneInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'type'> & {
   value: string
@@ -25,11 +9,13 @@ type PhoneInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'on
 
 export const PhoneInput = forwardRef<HTMLInputElement, PhoneInputProps>(
   function PhoneInput({ className, value, onChange, ...props }, ref) {
-    const [display, setDisplay] = useState(() => formatPhone(value))
+    const { config } = useLocale()
+    const { format } = config.phone
+    const [display, setDisplay] = useState(() => format(value))
 
     useEffect(() => {
-      setDisplay(formatPhone(value))
-    }, [value])
+      setDisplay(format(value))
+    }, [value, format])
 
     return (
       <input
@@ -38,7 +24,7 @@ export const PhoneInput = forwardRef<HTMLInputElement, PhoneInputProps>(
         inputMode="tel"
         value={display}
         onChange={(event) => {
-          const formatted = formatPhone(event.target.value)
+          const formatted = format(event.target.value)
           setDisplay(formatted)
           onChange(formatted)
         }}
