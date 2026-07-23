@@ -27,7 +27,9 @@ describe('happy path: register client -> register dress -> allocate -> check out
   })
 
   afterAll(async () => {
+    await prisma.installment.deleteMany()
     await prisma.allocation.deleteMany()
+    await prisma.contract.deleteMany()
     await prisma.product.deleteMany()
     await prisma.client.deleteMany()
     await prisma.staff.deleteMany()
@@ -66,15 +68,18 @@ describe('happy path: register client -> register dress -> allocate -> check out
     // Fixed dates safely in the past (rather than "now") so the check-out
     // step below — which validates against the real server clock — is
     // never blocked by CHECKOUT_TOO_EARLY regardless of when this test runs.
-    const allocationResponse = await auth(request(app).post('/api/allocations')).send({
-      productId,
+    const contractResponse = await auth(request(app).post('/api/contracts')).send({
+      locationId,
       clientId,
-      checkoutDate: '2020-01-01',
-      dueDate: '2020-01-05',
-      priceCharged: 350,
+      eventDate: '2020-01-03',
+      paymentMethod: 'PIX',
+      items: [
+        { productId, checkoutDate: '2020-01-01', dueDate: '2020-01-05', priceCharged: 350 },
+      ],
+      installments: [],
     })
-    expect(allocationResponse.status).toBe(201)
-    const allocationId = allocationResponse.body.id
+    expect(contractResponse.status).toBe(201)
+    const allocationId = contractResponse.body.allocations[0].id
 
     const availabilityReserved = await auth(
       request(app).get(`/api/allocations/products/${productId}/availability?asOf=2020-01-03`),
@@ -82,12 +87,15 @@ describe('happy path: register client -> register dress -> allocate -> check out
     expect(availabilityReserved.status).toBe(200)
     expect(availabilityReserved.body.status).toBe('reserved')
 
-    const secondAttempt = await auth(request(app).post('/api/allocations')).send({
-      productId,
+    const secondAttempt = await auth(request(app).post('/api/contracts')).send({
+      locationId,
       clientId,
-      checkoutDate: '2020-01-02',
-      dueDate: '2020-01-06',
-      priceCharged: 350,
+      eventDate: '2020-01-04',
+      paymentMethod: 'PIX',
+      items: [
+        { productId, checkoutDate: '2020-01-02', dueDate: '2020-01-06', priceCharged: 350 },
+      ],
+      installments: [],
     })
     expect(secondAttempt.status).toBe(409)
     expect(secondAttempt.body.code).toBe('PRODUCT_UNAVAILABLE')

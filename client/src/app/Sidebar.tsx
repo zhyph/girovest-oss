@@ -9,7 +9,7 @@ const links = [
   { to: '/', labelKey: 'nav.dashboard', icon: LayoutDashboard },
   { to: '/clientes', labelKey: 'nav.clients', icon: Users },
   { to: '/produtos', labelKey: 'nav.products', icon: Shirt },
-  { to: '/alocacoes', labelKey: 'nav.allocations', icon: ClipboardList },
+  { to: '/contratos', labelKey: 'nav.contracts', icon: ClipboardList },
   { to: '/calendario', labelKey: 'nav.calendar', icon: Calendar },
   { to: '/configuracoes', labelKey: 'nav.settings', icon: Settings },
 ]

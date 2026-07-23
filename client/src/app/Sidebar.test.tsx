@@ -24,7 +24,7 @@ describe('Sidebar', () => {
     expect(screen.getByRole('link', { name: 'Painel' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Clientes' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Produtos' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Alocações' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Contratos' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Calendário' })).toBeInTheDocument()
     expect(screen.getByText('Ana Owner')).toBeInTheDocument()
     expect(screen.getByText('Ana Owner').closest('div')?.parentElement).toHaveClass('border-t')

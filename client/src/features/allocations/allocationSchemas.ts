@@ -1,15 +1,3 @@
-import { z } from 'zod'
-
-export const newAllocationSchema = z.object({
-  productId: z.string().min(1),
-  clientId: z.string().min(1),
-  checkoutDate: z.string().min(1),
-  dueDate: z.string().min(1),
-  priceCharged: z.number().nonnegative(),
-})
-
-export type NewAllocationFormValues = z.infer<typeof newAllocationSchema>
-
 export type AllocationStatus = 'reserved' | 'checked_out' | 'returned' | 'cancelled'
 
 export interface Allocation {

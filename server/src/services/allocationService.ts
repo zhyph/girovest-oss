@@ -1,20 +1,9 @@
-import { Prisma } from '../generated/prisma/client.js'
 import { prisma } from '../db/client.js'
 import { AppError } from '../errors/AppError.js'
 import { ErrorCodes } from '../errors/errorCodes.js'
 import { isOccupiedForRange, derivedAvailability, type AllocationWindow, type AllocationStatus } from '../domain/occupancy.js'
 
-const MAX_WRITE_CONFLICT_RETRIES = 5
 const ACTIVE_STATUSES: AllocationStatus[] = ['reserved', 'checked_out']
-
-export interface CreateAllocationInput {
-  productId: string
-  clientId: string
-  staffId: string
-  checkoutDate: Date
-  dueDate: Date
-  priceCharged: number
-}
 
 function toWindow(allocation: { status: string; checkoutDate: Date; dueDate: Date; actualReturnDate: Date | null }): AllocationWindow {
   return {
@@ -23,72 +12,6 @@ function toWindow(allocation: { status: string; checkoutDate: Date; dueDate: Dat
     dueDate: allocation.dueDate,
     actualReturnDate: allocation.actualReturnDate,
   }
-}
-
-export async function createAllocation(input: CreateAllocationInput) {
-  if (input.dueDate.getTime() < input.checkoutDate.getTime()) {
-    throw new AppError(ErrorCodes.DUE_DATE_BEFORE_CHECKOUT, 400, 'Due date must be on or after checkout date')
-  }
-
-  const product = await prisma.product.findUnique({ where: { id: input.productId } })
-  if (!product) {
-    throw new AppError(ErrorCodes.NOT_FOUND, 404, `Product ${input.productId} not found`)
-  }
-  if (product.status !== 'active') {
-    throw new AppError(
-      ErrorCodes.PRODUCT_NOT_IN_CIRCULATION,
-      409,
-      `Product is ${product.status} and cannot be allocated`,
-    )
-  }
-
-  const useSerializable = process.env.DB_PROVIDER === 'postgresql'
-
-  for (let attempt = 0; attempt < MAX_WRITE_CONFLICT_RETRIES; attempt++) {
-    try {
-      return await prisma.$transaction(
-        async (tx) => {
-          const existing = await tx.allocation.findMany({
-            where: { productId: input.productId, status: { in: ACTIVE_STATUSES } },
-          })
-
-          const windows = existing.map(toWindow)
-
-          if (isOccupiedForRange(windows, input.checkoutDate, input.dueDate)) {
-            throw new AppError(
-              ErrorCodes.PRODUCT_UNAVAILABLE,
-              409,
-              'Product is not available for the requested dates',
-            )
-          }
-
-          return tx.allocation.create({
-            data: {
-              productId: input.productId,
-              clientId: input.clientId,
-              staffId: input.staffId,
-              checkoutDate: input.checkoutDate,
-              dueDate: input.dueDate,
-              status: 'reserved',
-              priceCharged: input.priceCharged,
-            },
-          })
-        },
-        useSerializable ? { isolationLevel: Prisma.TransactionIsolationLevel.Serializable } : undefined,
-      )
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034') {
-        continue
-      }
-      throw error
-    }
-  }
-
-  throw new AppError(
-    ErrorCodes.PRODUCT_UNAVAILABLE,
-    409,
-    'Could not complete allocation due to repeated write conflicts, please retry',
-  )
 }
 
 async function getAllocationOrThrow(id: string) {

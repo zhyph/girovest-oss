@@ -4,7 +4,6 @@ import { requireAuth } from '../auth/authMiddleware.js'
 import { AppError } from '../errors/AppError.js'
 import { ErrorCodes } from '../errors/errorCodes.js'
 import {
-  createAllocation,
   checkOutAllocation,
   returnAllocation,
   cancelAllocation,
@@ -20,14 +19,6 @@ allocationsRouter.get('/', async (_req, res) => {
   res.json(await listAllocations())
 })
 
-const createSchema = z.object({
-  productId: z.string().min(1),
-  clientId: z.string().min(1),
-  checkoutDate: z.coerce.date(),
-  dueDate: z.coerce.date(),
-  priceCharged: z.number().nonnegative(),
-})
-
 const checkOutSchema = z.object({
   conditionNotesOut: z.string().optional(),
   depositCollected: z.number().nonnegative().optional(),
@@ -37,15 +28,6 @@ const returnSchema = z.object({
   conditionNotesIn: z.string().optional(),
   depositReturned: z.number().nonnegative().optional(),
   actualReturnDate: z.coerce.date().optional(),
-})
-
-allocationsRouter.post('/', async (req, res) => {
-  const parsed = createSchema.safeParse(req.body)
-  if (!parsed.success || !req.staff) {
-    throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'Invalid allocation payload')
-  }
-  const allocation = await createAllocation({ ...parsed.data, staffId: req.staff.staffId })
-  res.status(201).json(allocation)
 })
 
 allocationsRouter.post('/:id/check-out', async (req, res) => {
