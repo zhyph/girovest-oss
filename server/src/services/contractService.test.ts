@@ -139,6 +139,42 @@ describe('createContract', () => {
       ),
     ).rejects.toThrow(AppError)
   })
+
+  it('CRITICAL: only one of two concurrent contract attempts for the same overlapping product/dates succeeds', async () => {
+    const attempt = () =>
+      createContract(
+        baseInput({
+          items: [
+            { productId, checkoutDate: new Date('2026-10-02'), dueDate: new Date('2026-10-05'), priceCharged: 100 },
+          ],
+        }),
+      )
+
+    const results = await Promise.allSettled([attempt(), attempt()])
+    const fulfilled = results.filter((r) => r.status === 'fulfilled')
+    const rejected = results.filter((r) => r.status === 'rejected')
+
+    expect(fulfilled).toHaveLength(1)
+    expect(rejected).toHaveLength(1)
+  })
+
+  it('CRITICAL: assigns unique sequential numbers to concurrent contracts for the same location on different products', async () => {
+    const attemptWithProduct = (product: string) =>
+      createContract(
+        baseInput({
+          items: [{ productId: product, checkoutDate: new Date('2026-10-02'), dueDate: new Date('2026-10-05'), priceCharged: 100 }],
+        }),
+      )
+
+    const results = await Promise.allSettled([attemptWithProduct(productId), attemptWithProduct(secondProductId)])
+    const fulfilled = results.filter(
+      (r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof createContract>>> => r.status === 'fulfilled',
+    )
+
+    expect(fulfilled).toHaveLength(2)
+    const numbers = fulfilled.map((r) => r.value.number).sort((a, b) => a - b)
+    expect(numbers).toEqual([1, 2])
+  })
 })
 
 describe('cancelContract', () => {
