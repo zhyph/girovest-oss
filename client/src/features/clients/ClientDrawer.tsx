@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useForm, Controller, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
+import { X } from 'lucide-react'
 import { Button } from '../../components/ui/button.tsx'
 import { Input } from '../../components/ui/input.tsx'
 import { PhoneInput } from '../../components/ui/phone-input.tsx'
@@ -95,7 +96,7 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
   return (
     <>
       <div className="fixed inset-0 z-40 bg-ink/40 opacity-100 transition-opacity duration-200 starting:opacity-0" onClick={onClose} aria-hidden="true" />
-      <div className="fixed inset-y-0 right-0 z-50 w-80 translate-x-0 border-l border-border-soft bg-white p-4 shadow-lg transition-transform duration-200 ease-out starting:translate-x-full">
+      <div className="fixed inset-y-0 right-0 z-50 w-96 translate-x-0 overflow-y-auto border-l border-border-soft bg-white p-4 shadow-lg transition-transform duration-200 ease-out starting:translate-x-full">
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3">
         <label className="flex flex-col gap-1 text-sm">
           {t('fields.name')}
@@ -126,7 +127,7 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
           <span className="text-sm font-medium">{t('identityDocuments.title')}</span>
           {identityDocuments.fields.map((field, index) => (
             <div key={field.id} className="flex items-end gap-2">
-              <label className="flex flex-1 flex-col gap-1 text-sm">
+              <label className="flex w-24 shrink-0 flex-col gap-1 text-sm">
                 {t('identityDocuments.label')}
                 <Input
                   {...register(`identityDocuments.${index}.label`)}
@@ -150,11 +151,12 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
               </label>
               <Button
                 type="button"
-                variant="secondary"
+                variant="ghost"
+                size="icon"
                 onClick={() => identityDocuments.remove(index)}
                 aria-label={t('identityDocuments.remove')}
               >
-                {t('identityDocuments.remove')}
+                <X size={16} />
               </Button>
             </div>
           ))}
@@ -170,7 +172,7 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
           <span className="text-sm font-medium">{t('addressLines.title')}</span>
           {addressLines.fields.map((field, index) => (
             <div key={field.id} className="flex items-end gap-2">
-              <label className="flex flex-1 flex-col gap-1 text-sm">
+              <label className="flex w-24 shrink-0 flex-col gap-1 text-sm">
                 {t('addressLines.label')}
                 <Input
                   {...register(`addressLines.${index}.label`)}
@@ -194,11 +196,12 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
               </label>
               <Button
                 type="button"
-                variant="secondary"
+                variant="ghost"
+                size="icon"
                 onClick={() => addressLines.remove(index)}
                 aria-label={t('addressLines.remove')}
               >
-                {t('addressLines.remove')}
+                <X size={16} />
               </Button>
             </div>
           ))}
