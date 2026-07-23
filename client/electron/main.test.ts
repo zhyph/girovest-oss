@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
+import net from 'net'
 import {
   resolveServerCwd,
   resolveServerRuntimeCwd,
@@ -9,6 +10,7 @@ import {
   resolveJwtSecret,
   resolveDatabaseUrl,
   ensureWritableServerRuntime,
+  waitForPortFree,
 } from './main.ts'
 
 describe('resolveServerCwd', () => {
@@ -73,6 +75,46 @@ describe('resolveDatabaseUrl', () => {
   it('builds a file: URL pointing at dev.db inside the given directory', () => {
     const userDataPath = '/home/user/.config/girovest'
     expect(resolveDatabaseUrl(userDataPath)).toBe(`file:${path.join(userDataPath, 'dev.db')}`)
+  })
+})
+
+describe('waitForPortFree', () => {
+  it('resolves true immediately when nothing holds the port', async () => {
+    // Grab an ephemeral port, release it, then check it.
+    const probe = net.createServer()
+    const port = await new Promise<number>((resolve) => {
+      probe.listen(0, '127.0.0.1', () => {
+        resolve((probe.address() as net.AddressInfo).port)
+      })
+    })
+    await new Promise((resolve) => probe.close(resolve))
+
+    await expect(waitForPortFree(port, '127.0.0.1', 1000, 50)).resolves.toBe(true)
+  })
+
+  it('resolves false when the port stays occupied past the timeout', async () => {
+    const blocker = net.createServer()
+    const port = await new Promise<number>((resolve) => {
+      blocker.listen(0, '127.0.0.1', () => {
+        resolve((blocker.address() as net.AddressInfo).port)
+      })
+    })
+
+    await expect(waitForPortFree(port, '127.0.0.1', 300, 50)).resolves.toBe(false)
+
+    await new Promise((resolve) => blocker.close(resolve))
+  })
+
+  it('resolves true once the holder releases the port mid-wait', async () => {
+    const blocker = net.createServer()
+    const port = await new Promise<number>((resolve) => {
+      blocker.listen(0, '127.0.0.1', () => {
+        resolve((blocker.address() as net.AddressInfo).port)
+      })
+    })
+    setTimeout(() => blocker.close(), 200)
+
+    await expect(waitForPortFree(port, '127.0.0.1', 3000, 50)).resolves.toBe(true)
   })
 })
 

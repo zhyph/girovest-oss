@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog } from 'electron'
 import { spawn, type ChildProcess } from 'child_process'
 import crypto from 'crypto'
 import fs from 'fs'
+import net from 'net'
 import path from 'path'
 import { backupDatabaseIfNeeded, writeBackupMarker } from './backup.ts'
 import { setupAutoUpdater } from './updater.ts'
@@ -68,6 +69,30 @@ export function ensureWritableServerRuntime(
     fs.writeFileSync(versionMarkerPath, version, 'utf-8')
   }
   return runtimeDir
+}
+
+// electron-updater's quitAndInstall spawns the NEW app instance before the
+// old one finishes quitting, so the new instance can reach startServer while
+// the old server still holds the port. Probe by actually binding (the only
+// reliable "is it free" test) until the old process releases it.
+export async function waitForPortFree(
+  port: number,
+  host: string,
+  timeoutMs = 5_000,
+  intervalMs = 150,
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    const free = await new Promise<boolean>((resolve) => {
+      const probe = net.createServer()
+      probe.once('error', () => resolve(false))
+      probe.once('listening', () => probe.close(() => resolve(true)))
+      probe.listen(port, host)
+    })
+    if (free) return true
+    await new Promise((resolve) => setTimeout(resolve, intervalMs))
+  }
+  return false
 }
 
 export async function waitForServerReady(
@@ -153,6 +178,12 @@ async function startServer(): Promise<boolean> {
     console.error('Database preparation failed:', error)
     return false
   }
+
+  // During an update restart the previous instance's server may not have
+  // released the port yet (see waitForPortFree). Not-free after the timeout
+  // isn't fatal by itself — fall through and let the server's own EADDRINUSE
+  // produce the existing crash dialog rather than duplicating it here.
+  await waitForPortFree(Number(env.PORT), env.HOST as string)
 
   serverProcess = spawn(process.execPath, [resolveServerEntry(app.isPackaged)], {
     cwd: serverCwd,
@@ -245,8 +276,19 @@ if (app) {
   })
 
   app.on('window-all-closed', () => {
+    app.quit()
+  })
+
+  // The server kill MUST live on will-quit, not window-all-closed: Electron
+  // does not emit window-all-closed when app.quit() is called by code — only
+  // when the user closes the windows themselves. electron-updater's
+  // quitAndInstall quits exactly that way, and with the kill on
+  // window-all-closed the server survived as an orphan holding port 3000,
+  // so the freshly installed version crash-looped on EADDRINUSE (observed
+  // directly on a real 0.2.1 -> 0.2.2 AppImage update). will-quit fires on
+  // every quit path, user-initiated or programmatic.
+  app.on('will-quit', () => {
     isShuttingDown = true
     serverProcess?.kill()
-    app.quit()
   })
 }
