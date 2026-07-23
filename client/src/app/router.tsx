@@ -9,6 +9,7 @@ import { ProductsPage } from '../features/products/ProductsPage.tsx'
 import { ContractsPage } from '../features/contracts/ContractsPage.tsx'
 import { CalendarPage } from '../features/calendar/CalendarPage.tsx'
 import { SettingsPage } from '../features/settings/SettingsPage.tsx'
+import { ContractPrintPage } from '../features/contracts/ContractPrintPage.tsx'
 
 export function AppRouter() {
   return (
@@ -24,6 +25,7 @@ export function AppRouter() {
           <Route path="/calendario" element={<CalendarPage />} />
           <Route path="/configuracoes" element={<SettingsPage />} />
         </Route>
+        <Route path="/contratos/:id/imprimir" element={<ContractPrintPage />} />
       </Route>
     </Routes>
   )

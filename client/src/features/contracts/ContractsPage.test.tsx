@@ -54,6 +54,7 @@ describe('ContractsPage', () => {
     expect(screen.getByText(/#3/)).toBeInTheDocument()
     expect(screen.getByText('Maria')).toBeInTheDocument()
     expect(screen.getByText('Vestido Azul')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Imprimir' })).toHaveAttribute('href', '/contratos/ct1/imprimir')
   })
 
   it('shows the New Contract button and opens the form', async () => {

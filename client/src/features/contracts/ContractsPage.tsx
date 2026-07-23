@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Link } from 'react-router'
 import { Button } from '../../components/ui/button.tsx'
 import { Input } from '../../components/ui/input.tsx'
 import { CurrencyInput } from '../../components/ui/currency-input.tsx'
@@ -229,7 +230,15 @@ export function ContractsPage() {
                   {formatDate(parseDateOnly(contract.eventDate), locale, { day: '2-digit', month: '2-digit', year: 'numeric' })}
                 </span>
               </div>
-              <ContractCancelAction contract={contract} />
+              <div className="flex items-center gap-2">
+                <Link
+                  to={`/contratos/${contract.id}/imprimir`}
+                  className="inline-flex h-8 items-center justify-center rounded-md border border-border-soft bg-white px-3 text-sm font-medium text-ink transition-colors hover:border-brand-300 hover:bg-brand-50"
+                >
+                  {t('print.action')}
+                </Link>
+                <ContractCancelAction contract={contract} />
+              </div>
             </div>
             <div className="flex flex-col gap-1">
               {contract.allocations.map((allocation) => (
