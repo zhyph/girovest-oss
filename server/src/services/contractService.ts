@@ -48,6 +48,30 @@ export async function createContract(input: CreateContractInput) {
     }
   }
 
+  // Occupancy checks below only compare each item against already-persisted
+  // Allocations — two items in the SAME request sharing a productId with
+  // overlapping dates would both pass (neither is in the DB yet) unless
+  // checked against each other explicitly here, before touching the DB at all.
+  for (let i = 0; i < input.items.length; i++) {
+    const item = input.items[i]
+    const siblingWindows: AllocationWindow[] = input.items
+      .filter((_, otherIndex) => otherIndex !== i)
+      .filter((other) => other.productId === item.productId)
+      .map((other) => ({
+        status: 'reserved' as AllocationStatus,
+        checkoutDate: other.checkoutDate,
+        dueDate: other.dueDate,
+        actualReturnDate: null,
+      }))
+    if (isOccupiedForRange(siblingWindows, item.checkoutDate, item.dueDate)) {
+      throw new AppError(
+        ErrorCodes.PRODUCT_UNAVAILABLE,
+        409,
+        `Product ${item.productId} is requested more than once with overlapping dates in the same contract`,
+      )
+    }
+  }
+
   const products = await prisma.product.findMany({ where: { id: { in: input.items.map((item) => item.productId) } } })
   const productsById = new Map(products.map((product) => [product.id, product]))
   for (const item of input.items) {

@@ -126,4 +126,17 @@ describe('createContract', () => {
     const contract = await createContract(baseInput({ installments: [] }))
     expect(contract.installments).toEqual([])
   })
+
+  it('rejects a contract that lists the same product twice with overlapping dates', async () => {
+    await expect(
+      createContract(
+        baseInput({
+          items: [
+            { productId, checkoutDate: new Date('2026-10-02'), dueDate: new Date('2026-10-05'), priceCharged: 100 },
+            { productId, checkoutDate: new Date('2026-10-03'), dueDate: new Date('2026-10-06'), priceCharged: 100 },
+          ],
+        }),
+      ),
+    ).rejects.toThrow(AppError)
+  })
 })
