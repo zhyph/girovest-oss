@@ -190,6 +190,18 @@ change), for both the SQLite and PostgreSQL schema directories:
    after upgrade instead of producing a contract with a blank legal
    section until a human retypes them.
 
+The same six clauses must also be seeded for **new** installs, not just
+existing ones migrating forward: `completeSetup`
+(`server/src/services/setupService.ts:26`) is the only other place a
+`Location` is created — the first-run setup wizard, called from
+`POST /api/setup`. Left as-is, it would hit the identical blank-legal-section
+gap the migration exists to avoid, just on the new-install path instead of
+the upgrade path. `completeSetup` seeds the same default clause text at
+`Location` creation time, from a shared constant the migration also reads
+from (defined once, used by both paths) — matching this doc's stated bar
+that staff should never need to fall back to paper because something's
+missing.
+
 Covered by a dedicated migration test: seed a pre-migration-shaped
 database (Allocations with no Contract), run the migration, assert every
 Allocation now has exactly one Contract, numbering is unique and
