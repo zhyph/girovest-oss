@@ -2,6 +2,7 @@ import { prisma } from '../db/client.js'
 import { AppError } from '../errors/AppError.js'
 import { ErrorCodes } from '../errors/errorCodes.js'
 import { hashPassword } from '../auth/passwords.js'
+import { DEFAULT_CONTRACT_CLAUSES } from '../constants/defaultContractClauses.js'
 
 export interface CompleteSetupInput {
   shopName: string
@@ -24,7 +25,13 @@ export async function completeSetup(
   }
 
   const location = await prisma.location.create({
-    data: { name: input.shopName, address: input.shopAddress },
+    data: {
+      name: input.shopName,
+      address: input.shopAddress,
+      contractClauses: {
+        create: DEFAULT_CONTRACT_CLAUSES.map((text, index) => ({ text, sortOrder: index })),
+      },
+    },
   })
 
   const staff = await prisma.staff.create({
