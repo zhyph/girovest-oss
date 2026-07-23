@@ -873,8 +873,23 @@ describe('createContract', () => {
     const contract = await createContract(baseInput({ installments: [] }))
     expect(contract.installments).toEqual([])
   })
+
+  it('rejects a contract that lists the same product twice with overlapping dates', async () => {
+    await expect(
+      createContract(
+        baseInput({
+          items: [
+            { productId, checkoutDate: new Date('2026-10-02'), dueDate: new Date('2026-10-05'), priceCharged: 100 },
+            { productId, checkoutDate: new Date('2026-10-03'), dueDate: new Date('2026-10-06'), priceCharged: 100 },
+          ],
+        }),
+      ),
+    ).rejects.toThrow(AppError)
+  })
 })
 ```
+
+**Post-review correction:** the original implementation only checked each item against already-persisted `Allocation` rows in the database. A task review found that two items in the *same* request sharing a `productId` with overlapping dates would both pass that check (neither is in the database yet), silently double-booking a product within a single contract — the exact failure mode this whole service exists to prevent. Fixed by adding an in-memory sibling-overlap check (reusing `isOccupiedForRange` against the *other* items in the same request) before any database work happens at all — see the added test above and the corresponding block in Step 3's implementation.
 
 - [ ] **Step 2: Run tests to verify they fail**
 
@@ -933,6 +948,29 @@ export async function createContract(input: CreateContractInput) {
   for (const item of input.items) {
     if (item.dueDate.getTime() < item.checkoutDate.getTime()) {
       throw new AppError(ErrorCodes.DUE_DATE_BEFORE_CHECKOUT, 400, 'Due date must be on or after checkout date')
+    }
+  }
+  // Occupancy checks below only compare each item against already-persisted
+  // Allocations — two items in the SAME request sharing a productId with
+  // overlapping dates would both pass (neither is in the DB yet) unless
+  // checked against each other explicitly here, before touching the DB at all.
+  for (let i = 0; i < input.items.length; i++) {
+    const item = input.items[i]
+    const siblingWindows: AllocationWindow[] = input.items
+      .filter((_, otherIndex) => otherIndex !== i)
+      .filter((other) => other.productId === item.productId)
+      .map((other) => ({
+        status: 'reserved' as AllocationStatus,
+        checkoutDate: other.checkoutDate,
+        dueDate: other.dueDate,
+        actualReturnDate: null,
+      }))
+    if (isOccupiedForRange(siblingWindows, item.checkoutDate, item.dueDate)) {
+      throw new AppError(
+        ErrorCodes.PRODUCT_UNAVAILABLE,
+        409,
+        `Product ${item.productId} is requested more than once with overlapping dates in the same contract`,
+      )
     }
   }
 
