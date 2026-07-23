@@ -1,7 +1,6 @@
-import { forwardRef, useState, useEffect, type InputHTMLAttributes } from 'react'
+import { forwardRef, useMemo, useState, useEffect, type InputHTMLAttributes } from 'react'
 import { cn } from '../../lib/cn.ts'
-
-const currencyFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
+import { useLocale } from '../../lib/LocaleContext.tsx'
 
 function parseDigitsToNumber(raw: string): number {
   const digitsOnly = raw.replace(/\D/g, '')
@@ -16,11 +15,16 @@ type CurrencyInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 
 
 export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
   function CurrencyInput({ className, value, onChange, ...props }, ref) {
+    const { locale, config } = useLocale()
+    const currencyFormatter = useMemo(
+      () => new Intl.NumberFormat(locale, { style: 'currency', currency: config.currency }),
+      [locale, config.currency],
+    )
     const [display, setDisplay] = useState(() => currencyFormatter.format(value))
 
     useEffect(() => {
       setDisplay(currencyFormatter.format(value))
-    }, [value])
+    }, [value, currencyFormatter])
 
     return (
       <input
