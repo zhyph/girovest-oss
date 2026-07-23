@@ -86,3 +86,7 @@ export const DEFAULT_LOCALE = 'pt-BR'
 export function getLocaleConfig(locale: string | undefined): LocaleConfig {
   return LOCALE_CONFIGS[locale ?? DEFAULT_LOCALE] ?? LOCALE_CONFIGS[DEFAULT_LOCALE]
 }
+
+export function formatCurrency(value: number, locale: string, currency: string): string {
+  return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(value)
+}

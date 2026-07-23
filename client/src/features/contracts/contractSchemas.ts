@@ -68,3 +68,50 @@ export interface Contract {
   allocations: ContractAllocation[]
   installments: ContractInstallment[]
 }
+
+export interface ContractDetailIdentityDocument {
+  id: string
+  label: string
+  value: string
+}
+
+export interface ContractDetailAddressLine {
+  id: string
+  label: string
+  value: string
+  sortOrder: number
+}
+
+export interface ContractDetailClient {
+  id: string
+  name: string
+  phone: string
+  email: string
+  identityDocuments: ContractDetailIdentityDocument[]
+  addressLines: ContractDetailAddressLine[]
+}
+
+export interface ContractDetailClause {
+  id: string
+  text: string
+  sortOrder: number
+}
+
+export interface ContractDetailLocation {
+  id: string
+  name: string
+  address: string
+  phone: string | null
+  locale: string
+  contractClauses: ContractDetailClause[]
+}
+
+export interface ContractDetailAllocation extends ContractAllocation {
+  product: { id: string; name: string }
+}
+
+export interface ContractDetail extends Omit<Contract, 'allocations'> {
+  allocations: ContractDetailAllocation[]
+  client: ContractDetailClient
+  location: ContractDetailLocation
+}

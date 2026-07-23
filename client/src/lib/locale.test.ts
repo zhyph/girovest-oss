@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_LOCALE, getLocaleConfig } from './locale.ts'
+import { DEFAULT_LOCALE, getLocaleConfig, formatCurrency } from './locale.ts'
 
 describe('getLocaleConfig', () => {
   it('returns the pt-BR config for "pt-BR"', () => {
@@ -57,5 +57,12 @@ describe('getLocaleConfig', () => {
     it('formats a 10-digit landline number as (DDD) NNNN-NNNN', () => {
       expect(phone.format('1132654321')).toBe('(11) 3265-4321')
     })
+  })
+})
+
+describe('formatCurrency', () => {
+  it('formats a value using the given locale and currency', () => {
+    const expected = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(1234.5)
+    expect(formatCurrency(1234.5, 'pt-BR', 'BRL')).toBe(expected)
   })
 })
