@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm, Controller, useFieldArray, useWatch, type Path } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
@@ -9,6 +9,7 @@ import { DateInput } from '../../components/ui/date-input.tsx'
 import { showErrorToast } from '../../lib/toast.ts'
 import { useLocale } from '../../lib/LocaleContext.tsx'
 import { getMissingRequiredFields } from '../../lib/clientReadiness.ts'
+import { getPaymentMethods } from '../../lib/paymentMethodTemplate.ts'
 import { useClients } from '../clients/useClients.ts'
 import { ClientDrawer } from '../clients/ClientDrawer.tsx'
 import type { Client } from '../clients/clientSchemas.ts'
@@ -119,6 +120,7 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
     handleSubmit,
     control,
     watch,
+    setValue,
     formState: { errors },
   } = useForm<NewContractFormValues>({
     resolver: zodResolver(newContractSchema),
@@ -133,9 +135,21 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
   })
 
   const items = useFieldArray({ control, name: 'items' })
+  const installments = useFieldArray({ control, name: 'installments' })
   const selectedClientId = watch('clientId')
   const selectedClient = clients?.find((client) => client.id === selectedClientId) ?? null
   const missingFields = selectedClient ? getMissingRequiredFields(selectedClient, locale) : []
+
+  // The form has no location selector of its own: a contract's locationId
+  // must still be sent to the API, so it's derived from whichever product
+  // the staff picked for the first item (products carry their own
+  // locationId — see ProductDrawer.tsx for the same source-of-truth).
+  const watchedItems = useWatch({ control, name: 'items' })
+  useEffect(() => {
+    const productId = watchedItems?.find((item) => item.productId)?.productId
+    const product = products?.find((candidate) => candidate.id === productId)
+    if (product) setValue('locationId', product.locationId)
+  }, [watchedItems, products, setValue])
 
   async function onSubmit(values: NewContractFormValues) {
     try {
@@ -148,6 +162,7 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
   }
 
   const activeProducts = products?.filter((product) => product.status === 'active') ?? []
+  const paymentMethods = getPaymentMethods(locale)
 
   return (
     <>
@@ -202,6 +217,63 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
               onClick={() => items.append({ productId: '', checkoutDate: '', dueDate: '', priceCharged: 0 })}
             >
               {t('items.add')}
+            </Button>
+          </div>
+          <label className="flex flex-col gap-1 text-sm">
+            {t('fields.paymentMethod')}
+            <select
+              {...register('paymentMethod')}
+              aria-label={t('fields.paymentMethod')}
+              className="h-10 rounded-md border border-border-soft px-2"
+            >
+              <option value="">—</option>
+              {paymentMethods.map((method) => (
+                <option key={method} value={method}>{method}</option>
+              ))}
+            </select>
+            {errors.paymentMethod && <span className="text-xs text-red-600">{t('validation.paymentMethodRequired')}</span>}
+          </label>
+          <div className="flex flex-col gap-2">
+            <span className="text-sm font-medium">{t('installments.title')}</span>
+            {installments.fields.map((field, index) => (
+              <div key={field.id} className="flex items-end gap-2">
+                <label className="flex flex-1 flex-col gap-1 text-sm">
+                  {t('fields.installmentDueDate')}
+                  <Controller
+                    name={`installments.${index}.dueDate`}
+                    control={control}
+                    render={({ field: dateField }) => (
+                      <DateInput value={dateField.value} onChange={dateField.onChange} aria-label={t('fields.installmentDueDate')} />
+                    )}
+                  />
+                </label>
+                <label className="flex flex-1 flex-col gap-1 text-sm">
+                  {t('fields.installmentAmount')}
+                  <Controller
+                    name={`installments.${index}.amount`}
+                    control={control}
+                    render={({ field: amountField }) => (
+                      <CurrencyInput value={amountField.value} onChange={amountField.onChange} aria-label={t('fields.installmentAmount')} />
+                    )}
+                  />
+                </label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => installments.remove(index)}
+                  aria-label={t('installments.remove')}
+                >
+                  <X size={16} />
+                </Button>
+              </div>
+            ))}
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => installments.append({ dueDate: '', amount: 0 })}
+            >
+              {t('installments.add')}
             </Button>
           </div>
           <div className="mt-2 flex justify-end gap-2">

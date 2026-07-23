@@ -91,4 +91,36 @@ describe('NewContractForm', () => {
     await userEvent.click(removeButtons[0])
     expect(screen.getAllByLabelText(/produto/i)).toHaveLength(1)
   })
+
+  it('lets staff add and remove installment rows', async () => {
+    mockHooks()
+    renderWithToast(<NewContractForm onClose={vi.fn()} />)
+    await userEvent.click(screen.getByRole('button', { name: /adicionar parcela/i }))
+    expect(screen.getAllByLabelText(/valor da parcela/i)).toHaveLength(1)
+    const removeButtons = screen.getAllByRole('button', { name: /remover parcela/i })
+    await userEvent.click(removeButtons[0])
+    expect(screen.queryAllByLabelText(/valor da parcela/i)).toHaveLength(0)
+  })
+
+  it('submits the full payload including payment method and installments', async () => {
+    const createImpl = vi.fn().mockResolvedValue(undefined)
+    vi.spyOn(useContractsModule, 'useCreateContract').mockReturnValue({ mutateAsync: createImpl, isPending: false } as never)
+    mockHooks()
+    vi.spyOn(useContractsModule, 'useCreateContract').mockReturnValue({ mutateAsync: createImpl, isPending: false } as never)
+    const onClose = vi.fn()
+    renderWithToast(<NewContractForm onClose={onClose} />)
+
+    await userEvent.selectOptions(screen.getByLabelText(/cliente/i), 'c1')
+    await userEvent.type(screen.getByLabelText(/data do evento/i), '03102026')
+    await userEvent.selectOptions(screen.getByLabelText(/produto/i), 'p1')
+    await userEvent.type(screen.getByLabelText(/retirada/i), '02102026')
+    await userEvent.type(screen.getByLabelText(/devolução/i), '05102026')
+    await userEvent.selectOptions(screen.getByLabelText(/forma de pagamento/i), 'PIX')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+
+    expect(createImpl).toHaveBeenCalledOnce()
+    expect(createImpl.mock.calls[0][0].paymentMethod).toBe('PIX')
+    expect(createImpl.mock.calls[0][0].clientId).toBe('c1')
+    expect(onClose).toHaveBeenCalledOnce()
+  })
 })

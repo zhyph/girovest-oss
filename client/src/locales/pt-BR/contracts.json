@@ -6,12 +6,20 @@
     "product": "Produto",
     "checkoutDate": "Retirada",
     "dueDate": "Devolução",
-    "priceCharged": "Valor"
+    "priceCharged": "Valor",
+    "paymentMethod": "Forma de Pagamento",
+    "installmentDueDate": "Vencimento da Parcela",
+    "installmentAmount": "Valor da Parcela"
   },
   "items": {
     "title": "Peças",
     "add": "Adicionar peça",
     "remove": "Remover peça"
+  },
+  "installments": {
+    "title": "Parcelas",
+    "add": "Adicionar parcela",
+    "remove": "Remover parcela"
   },
   "clientReadiness": {
     "missing": "Faltam campos obrigatórios: {{fields}}",
@@ -19,7 +27,8 @@
   },
   "validation": {
     "clientRequired": "Cliente é obrigatório",
-    "eventDateRequired": "Data do evento é obrigatória"
+    "eventDateRequired": "Data do evento é obrigatória",
+    "paymentMethodRequired": "Forma de pagamento é obrigatória"
   },
   "unavailableProduct": "Este produto não está disponível para essas datas."
 }
