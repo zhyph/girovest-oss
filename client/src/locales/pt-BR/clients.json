@@ -24,6 +24,15 @@
     "add": "Adicionar documento",
     "remove": "Remover documento"
   },
+  "addressLines": {
+    "title": "Endereço",
+    "label": "Rótulo",
+    "value": "Valor",
+    "labelFieldAria": "Rótulo da linha de endereço",
+    "valueFieldAria": "Valor da linha de endereço",
+    "add": "Adicionar linha de endereço",
+    "remove": "Remover linha de endereço"
+  },
   "empty": "Nenhum cliente cadastrado ainda.",
   "noResults": "Nenhum cliente encontrado para essa busca."
 }

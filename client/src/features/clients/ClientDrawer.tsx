@@ -53,6 +53,7 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
   })
 
   const identityDocuments = useFieldArray({ control, name: 'identityDocuments' })
+  const addressLines = useFieldArray({ control, name: 'addressLines' })
 
   function showError(error: unknown) {
     const code = (error as { code?: string }).code ?? 'UNKNOWN'
@@ -63,6 +64,9 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
     const normalized: ClientFormValues = {
       ...values,
       identityDocuments: values.identityDocuments.filter((doc) => doc.value.trim() !== ''),
+      addressLines: values.addressLines
+        .filter((line) => line.value.trim() !== '')
+        .map((line, index) => ({ ...line, sortOrder: index })),
     }
     try {
       if (client) {
@@ -160,6 +164,52 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
             onClick={() => identityDocuments.append({ label: '', value: '', maskKey: null })}
           >
             {t('identityDocuments.add')}
+          </Button>
+        </div>
+        <div className="flex flex-col gap-2">
+          <span className="text-sm font-medium">{t('addressLines.title')}</span>
+          {addressLines.fields.map((field, index) => (
+            <div key={field.id} className="flex items-end gap-2">
+              <label className="flex flex-1 flex-col gap-1 text-sm">
+                {t('addressLines.label')}
+                <Input
+                  {...register(`addressLines.${index}.label`)}
+                  aria-label={t('addressLines.labelFieldAria')}
+                />
+              </label>
+              <label className="flex flex-1 flex-col gap-1 text-sm">
+                {t('addressLines.value')}
+                <Controller
+                  name={`addressLines.${index}.value`}
+                  control={control}
+                  render={({ field: valueField }) => (
+                    <MaskedTextInput
+                      value={valueField.value}
+                      onChange={valueField.onChange}
+                      mask={getFieldMask(addressLines.fields[index].maskKey)}
+                      aria-label={t('addressLines.valueFieldAria')}
+                    />
+                  )}
+                />
+              </label>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => addressLines.remove(index)}
+                aria-label={t('addressLines.remove')}
+              >
+                {t('addressLines.remove')}
+              </Button>
+            </div>
+          ))}
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() =>
+              addressLines.append({ label: '', value: '', sortOrder: addressLines.fields.length, maskKey: null })
+            }
+          >
+            {t('addressLines.add')}
           </Button>
         </div>
         <div className="mt-2 flex justify-between gap-2">

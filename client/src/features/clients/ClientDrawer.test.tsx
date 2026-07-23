@@ -206,3 +206,64 @@ describe('ClientDrawer identity documents', () => {
     expect(createImpl.mock.calls[0][0].identityDocuments).toEqual([])
   })
 })
+
+describe('ClientDrawer address lines', () => {
+  it('pre-seeds the four pt-BR address line rows for a new client', () => {
+    mockClientHooks()
+    renderWithToast(<ClientDrawer client={null} onClose={vi.fn()} />)
+    expect(screen.getByDisplayValue('Endereço')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('Bairro')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('Cidade')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('Estado')).toBeInTheDocument()
+  })
+
+  it('lets staff add a custom address line row', async () => {
+    mockClientHooks()
+    renderWithToast(<ClientDrawer client={null} onClose={vi.fn()} />)
+    const addButton = screen.getByRole('button', { name: /adicionar linha de endereço/i })
+    await userEvent.click(addButton)
+    const labelInputs = screen.getAllByLabelText(/rótulo da linha de endereço/i)
+    expect(labelInputs).toHaveLength(5)
+  })
+
+  it('lets staff remove an address line row', async () => {
+    mockClientHooks()
+    renderWithToast(<ClientDrawer client={null} onClose={vi.fn()} />)
+    const removeButtons = screen.getAllByRole('button', { name: /remover linha de endereço/i })
+    await userEvent.click(removeButtons[0])
+    expect(screen.queryByDisplayValue('Endereço')).not.toBeInTheDocument()
+    expect(screen.getByDisplayValue('Bairro')).toBeInTheDocument()
+  })
+
+  it("shows an existing client's stored address lines, not the template defaults", () => {
+    mockClientHooks()
+    const existingClient: Client = {
+      id: 'c1',
+      name: 'Maria',
+      phone: '1',
+      email: 'a@example.com',
+      notes: '',
+      identityDocuments: [],
+      addressLines: [{ id: 'l1', label: 'Zip Code', value: '90210', sortOrder: 0, maskKey: null }],
+      hasAllocationHistory: false,
+      createdAt: '2026-01-01',
+    }
+    renderWithToast(<ClientDrawer client={existingClient} onClose={vi.fn()} />)
+    expect(screen.getByDisplayValue('Zip Code')).toBeInTheDocument()
+    expect(screen.queryByDisplayValue('Endereço')).not.toBeInTheDocument()
+  })
+
+  it('does not send blank template rows when creating a client without filling them in', async () => {
+    const createImpl = vi.fn().mockResolvedValue(undefined)
+    mockClientHooks(vi.fn(), createImpl)
+    renderWithToast(<ClientDrawer client={null} onClose={vi.fn()} />)
+
+    await userEvent.type(screen.getByLabelText('Nome'), 'Nova Cliente')
+    await userEvent.type(screen.getByLabelText('Telefone'), '11999999999')
+    await userEvent.type(screen.getByLabelText('E-mail'), 'nova@example.com')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+
+    expect(createImpl).toHaveBeenCalledOnce()
+    expect(createImpl.mock.calls[0][0].addressLines).toEqual([])
+  })
+})
