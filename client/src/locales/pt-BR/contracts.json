@@ -1,5 +1,7 @@
 {
+  "title": "Contratos",
   "newContract": "Novo Contrato",
+  "empty": "Nenhum contrato cadastrado ainda.",
   "fields": {
     "client": "Cliente",
     "eventDate": "Data do Evento",

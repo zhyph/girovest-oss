@@ -30,7 +30,7 @@ function resolveErrorCode(error: unknown): string {
   return (error as { code?: string })?.code ?? 'UNKNOWN'
 }
 
-function RowActions({ allocation }: { allocation: Allocation }) {
+export function RowActions({ allocation }: { allocation: Allocation }) {
   const { t } = useTranslation('allocations')
   const checkOut = useCheckOutAllocation()
   const returnAllocation = useReturnAllocation()
