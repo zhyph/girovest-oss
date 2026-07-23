@@ -4,6 +4,8 @@ import { BrowserRouter, HashRouter } from 'react-router'
 import { AppRouter } from './app/router.tsx'
 import { useAuth } from './lib/useAuth.ts'
 import { Toaster } from './components/ui/sonner.tsx'
+import { LocaleProvider } from './lib/LocaleContext.tsx'
+import { DEFAULT_LOCALE } from './lib/locale.ts'
 import i18n from './i18n.ts'
 
 const queryClient = new QueryClient()
@@ -31,12 +33,25 @@ function DocumentTitleSync() {
   return null
 }
 
+export function LocaleSync({ children }: { children: React.ReactNode }) {
+  const { staff } = useAuth()
+  const locale = staff?.locale ?? DEFAULT_LOCALE
+
+  useEffect(() => {
+    void i18n.changeLanguage(locale)
+  }, [locale])
+
+  return <LocaleProvider locale={locale}>{children}</LocaleProvider>
+}
+
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <Router>
         <DocumentTitleSync />
-        <AppRouter />
+        <LocaleSync>
+          <AppRouter />
+        </LocaleSync>
       </Router>
       <Toaster position="bottom-right" />
     </QueryClientProvider>
