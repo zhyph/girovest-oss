@@ -7,3 +7,7 @@ import { toast } from 'sonner'
 export function showErrorToast(message: string) {
   toast.error(message, { duration: Infinity })
 }
+
+export function showSuccessToast(message: string) {
+  toast.success(message, { duration: Infinity })
+}

@@ -8,6 +8,7 @@ import { ClientsPage } from '../features/clients/ClientsPage.tsx'
 import { ProductsPage } from '../features/products/ProductsPage.tsx'
 import { AllocationsPage } from '../features/allocations/AllocationsPage.tsx'
 import { CalendarPage } from '../features/calendar/CalendarPage.tsx'
+import { SettingsPage } from '../features/settings/SettingsPage.tsx'
 
 export function AppRouter() {
   return (
@@ -21,6 +22,7 @@ export function AppRouter() {
           <Route path="/produtos" element={<ProductsPage />} />
           <Route path="/alocacoes" element={<AllocationsPage />} />
           <Route path="/calendario" element={<CalendarPage />} />
+          <Route path="/configuracoes" element={<SettingsPage />} />
         </Route>
       </Route>
     </Routes>

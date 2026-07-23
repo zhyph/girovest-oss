@@ -1,0 +1,13 @@
+{
+  "title": "Configurações",
+  "fields": {
+    "phone": "Telefone"
+  },
+  "clauses": {
+    "title": "Cláusulas do Contrato",
+    "textFieldAria": "Texto da cláusula",
+    "add": "Adicionar cláusula",
+    "remove": "Remover cláusula"
+  },
+  "saved": "Configurações salvas."
+}

@@ -5,7 +5,8 @@
     "clients": "Clientes",
     "products": "Produtos",
     "allocations": "Alocações",
-    "calendar": "Calendário"
+    "calendar": "Calendário",
+    "settings": "Configurações"
   },
   "actions": {
     "save": "Salvar",
