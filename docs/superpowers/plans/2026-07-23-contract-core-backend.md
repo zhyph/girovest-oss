@@ -594,6 +594,8 @@ Expected: FAIL — `contractBackfill.ts` doesn't exist yet.
 
 Create `server/src/services/contractBackfill.ts`:
 
+**Post-review correction:** the Contract-create and Allocation-link were originally two separate calls (`contract.create` then `allocation.update`). A task review found this leaves a real crash window — this app runs as an Electron desktop process that can be force-quit or lose power mid-startup, and a crash between those two calls would leave a permanently orphaned `Contract` row with no `Allocation` ever pointing to it (the next boot would just create a *second* Contract for the still-unlinked Allocation, since it re-queries `contractId: null` — the invariant "every Allocation ends up with a Contract" still holds, but the DB accumulates phantom rows with "used" sequence numbers). Fixed below by using Prisma's nested `connect` on the Contract's `allocations` relation instead of a separate `update` — this makes the create-and-link a single Prisma Client call, which Prisma wraps in an implicit transaction automatically, with no explicit `$transaction` boilerplate needed.
+
 ```ts
 import { prisma } from '../db/client.js'
 import { DEFAULT_CONTRACT_CLAUSES } from '../constants/defaultContractClauses.js'
@@ -621,7 +623,7 @@ async function backfillOrphanAllocations(): Promise<void> {
     let nextNumber = (lastContract?.number ?? 0) + 1
 
     for (const orphan of locationOrphans) {
-      const contract = await prisma.contract.create({
+      await prisma.contract.create({
         data: {
           number: nextNumber,
           locationId,
@@ -629,9 +631,9 @@ async function backfillOrphanAllocations(): Promise<void> {
           staffId: orphan.staffId,
           eventDate: orphan.checkoutDate,
           paymentMethod: '(não informado)',
+          allocations: { connect: { id: orphan.id } },
         },
       })
-      await prisma.allocation.update({ where: { id: orphan.id }, data: { contractId: contract.id } })
       nextNumber += 1
     }
   }
