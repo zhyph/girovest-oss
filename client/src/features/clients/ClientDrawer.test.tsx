@@ -190,4 +190,19 @@ describe('ClientDrawer identity documents', () => {
     expect(createImpl).toHaveBeenCalledOnce()
     expect(createImpl.mock.calls[0][0].identityDocuments).toEqual([])
   })
+
+  it('saves successfully when a freshly added, fully blank document row is left untouched', async () => {
+    const createImpl = vi.fn().mockResolvedValue(undefined)
+    mockClientHooks(vi.fn(), createImpl)
+    renderWithToast(<ClientDrawer client={null} onClose={vi.fn()} />)
+
+    await userEvent.click(screen.getByRole('button', { name: /adicionar documento/i }))
+    await userEvent.type(screen.getByLabelText('Nome'), 'Nova Cliente')
+    await userEvent.type(screen.getByLabelText('Telefone'), '11999999999')
+    await userEvent.type(screen.getByLabelText('E-mail'), 'nova@example.com')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+
+    expect(createImpl).toHaveBeenCalledOnce()
+    expect(createImpl.mock.calls[0][0].identityDocuments).toEqual([])
+  })
 })

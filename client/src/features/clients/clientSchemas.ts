@@ -1,17 +1,27 @@
 import { z } from 'zod'
 
-export const identityDocumentSchema = z.object({
-  label: z.string().min(1),
-  value: z.string(),
-  maskKey: z.string().nullable().optional(),
-})
+export const identityDocumentSchema = z
+  .object({
+    label: z.string(),
+    value: z.string(),
+    maskKey: z.string().nullable().optional(),
+  })
+  .refine((doc) => doc.value.trim() === '' || doc.label.trim() !== '', {
+    message: 'Label is required when a value is provided',
+    path: ['label'],
+  })
 
-export const addressLineSchema = z.object({
-  label: z.string().min(1),
-  value: z.string(),
-  sortOrder: z.number().int(),
-  maskKey: z.string().nullable().optional(),
-})
+export const addressLineSchema = z
+  .object({
+    label: z.string(),
+    value: z.string(),
+    sortOrder: z.number().int(),
+    maskKey: z.string().nullable().optional(),
+  })
+  .refine((doc) => doc.value.trim() === '' || doc.label.trim() !== '', {
+    message: 'Label is required when a value is provided',
+    path: ['label'],
+  })
 
 export const clientSchema = z.object({
   name: z.string().min(1),

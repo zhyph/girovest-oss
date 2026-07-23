@@ -76,4 +76,15 @@ describe('clientSchema', () => {
     })
     expect(result.success).toBe(true)
   })
+
+  it('accepts a fully blank identity document or address line (a freshly added, untouched row)', () => {
+    const result = clientSchema.safeParse({
+      name: 'Maria Silva',
+      phone: '11999999999',
+      email: 'maria@example.com',
+      identityDocuments: [{ label: '', value: '' }],
+      addressLines: [{ label: '', value: '', sortOrder: 0 }],
+    })
+    expect(result.success).toBe(true)
+  })
 })
