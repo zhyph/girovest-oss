@@ -10,6 +10,7 @@ export interface StaffMe {
   role: 'owner' | 'staff'
   locationId: string
   locationName: string
+  locale: string
 }
 
 export function useAuth() {

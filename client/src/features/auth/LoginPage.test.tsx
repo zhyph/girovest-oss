@@ -55,7 +55,7 @@ describe('LoginPage', () => {
 
   it('redirects to / once already logged in', () => {
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
-      staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste' },
+      staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' },
       isLoadingStaff: false,
       login: vi.fn(),
       logout: vi.fn(),

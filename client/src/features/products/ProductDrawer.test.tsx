@@ -27,7 +27,7 @@ function mockProductHooks(
   vi.spyOn(useProductsModule, 'useUpdateProduct').mockReturnValue({ mutateAsync: updateImpl } as never)
   vi.spyOn(useProductsModule, 'useDeleteProduct').mockReturnValue({ mutateAsync: deleteImpl } as never)
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
-    staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste' },
+    staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' },
     isLoadingStaff: false, login: vi.fn(), logout: vi.fn(), isLoggedIn: true,
   })
 }

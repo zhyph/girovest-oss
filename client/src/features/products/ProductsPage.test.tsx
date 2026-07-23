@@ -27,7 +27,7 @@ function renderWithQueryClient(ui: React.ReactElement) {
 describe('ProductsPage', () => {
   it('lists products with their status', () => {
     vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [product], isLoading: false } as never)
-    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste' }, isLoadingStaff: false, login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' }, isLoadingStaff: false, login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
 
     renderWithQueryClient(<ProductsPage />)
 
@@ -37,7 +37,7 @@ describe('ProductsPage', () => {
 
   it('opens the drawer in edit mode when a row is clicked', async () => {
     vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [product], isLoading: false } as never)
-    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste' }, isLoadingStaff: false, login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' }, isLoadingStaff: false, login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
 
     renderWithQueryClient(<ProductsPage />)
     await userEvent.click(screen.getByText('Vestido Azul'))
@@ -47,7 +47,7 @@ describe('ProductsPage', () => {
   it('badges a rented product as Alugado instead of the always-Disponível status field', () => {
     const rented = { ...product, id: 'p2', name: 'Vestido Rosa', availability: 'rented' as const }
     vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [rented], isLoading: false } as never)
-    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste' }, isLoadingStaff: false, login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' }, isLoadingStaff: false, login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
 
     renderWithQueryClient(<ProductsPage />)
 
@@ -58,7 +58,7 @@ describe('ProductsPage', () => {
   it('remounts the drawer with fresh values when switching rows without closing it', async () => {
     const other = { ...product, id: 'p2', name: 'Vestido Rosa' }
     vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [product, other], isLoading: false } as never)
-    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste' }, isLoadingStaff: false, login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' }, isLoadingStaff: false, login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
 
     renderWithQueryClient(<ProductsPage />)
     await userEvent.click(screen.getByText('Vestido Azul'))
@@ -71,7 +71,7 @@ describe('ProductsPage', () => {
   it('filters the list by name, category, or color as the search box is typed into', async () => {
     const other = { ...product, id: 'p2', name: 'Vestido Rosa', category: 'festa', color: 'rosa' }
     vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [product, other], isLoading: false } as never)
-    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste' }, isLoadingStaff: false, login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' }, isLoadingStaff: false, login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
 
     renderWithQueryClient(<ProductsPage />)
     expect(screen.getByText('Vestido Azul')).toBeInTheDocument()
@@ -85,7 +85,7 @@ describe('ProductsPage', () => {
 
   it('shows a no-results message when the search matches nothing', async () => {
     vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [product], isLoading: false } as never)
-    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste' }, isLoadingStaff: false, login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' }, isLoadingStaff: false, login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
 
     renderWithQueryClient(<ProductsPage />)
     await userEvent.type(screen.getByPlaceholderText('Buscar por nome, categoria ou cor...'), 'zzz')

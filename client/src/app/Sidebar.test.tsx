@@ -8,7 +8,7 @@ import * as useAuthModule from '../lib/useAuth.ts'
 describe('Sidebar', () => {
   it('shows the nav links and the logged-in staff name', () => {
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
-      staff: { id: '1', name: 'Ana Owner', role: 'owner', locationId: 'l1', locationName: 'Loja Teste' },
+      staff: { id: '1', name: 'Ana Owner', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' },
       isLoadingStaff: false,
       login: vi.fn(),
       logout: vi.fn(),
@@ -32,7 +32,7 @@ describe('Sidebar', () => {
 
   it('hides nav labels and the staff name behind a hidden/group-hover span, not just overflow clipping', () => {
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
-      staff: { id: '1', name: 'Ana Owner', role: 'owner', locationId: 'l1', locationName: 'Loja Teste' },
+      staff: { id: '1', name: 'Ana Owner', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' },
       isLoadingStaff: false,
       login: vi.fn(),
       logout: vi.fn(),
