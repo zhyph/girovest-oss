@@ -8,7 +8,7 @@ import { Toaster } from '../../components/ui/sonner.tsx'
 
 const client = {
   id: 'c1', name: 'Maria Silva', phone: '119', email: 'm@x.com', notes: '', createdAt: '2026-01-01',
-  hasAllocationHistory: false,
+  hasAllocationHistory: false, identityDocuments: [], addressLines: [],
 }
 
 function renderWithToast(ui: React.ReactElement) {
