@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { prisma } from '../db/client.js'
 import { AppError } from '../errors/AppError.js'
-import { createContract } from './contractService.js'
+import { createContract, cancelContract, listContracts } from './contractService.js'
 
 let locationId: string
 let staffId: string
@@ -138,5 +138,47 @@ describe('createContract', () => {
         }),
       ),
     ).rejects.toThrow(AppError)
+  })
+})
+
+describe('cancelContract', () => {
+  it('cancels all reserved allocations under the contract', async () => {
+    const contract = await createContract(
+      baseInput({
+        items: [
+          { productId, checkoutDate: new Date('2026-10-02'), dueDate: new Date('2026-10-05'), priceCharged: 100 },
+          { productId: secondProductId, checkoutDate: new Date('2026-10-02'), dueDate: new Date('2026-10-05'), priceCharged: 150 },
+        ],
+      }),
+    )
+
+    const cancelled = await cancelContract(contract.id)
+
+    expect(cancelled.allocations.every((allocation) => allocation.status === 'cancelled')).toBe(true)
+  })
+
+  it('leaves already checked-out allocations untouched', async () => {
+    const contract = await createContract(baseInput())
+    await prisma.allocation.update({ where: { id: contract.allocations[0].id }, data: { status: 'checked_out' } })
+
+    const cancelled = await cancelContract(contract.id)
+
+    expect(cancelled.allocations[0].status).toBe('checked_out')
+  })
+
+  it('throws NOT_FOUND for a missing contract', async () => {
+    await expect(cancelContract('does-not-exist')).rejects.toThrow(AppError)
+  })
+})
+
+describe('listContracts', () => {
+  it('lists contracts with their allocations and installments', async () => {
+    await createContract(baseInput())
+
+    const contracts = await listContracts()
+
+    expect(contracts).toHaveLength(1)
+    expect(contracts[0].allocations).toHaveLength(1)
+    expect(contracts[0].installments).toHaveLength(1)
   })
 })

@@ -161,3 +161,27 @@ export async function createContract(input: CreateContractInput) {
     'Could not complete contract creation due to repeated write conflicts, please retry',
   )
 }
+
+export async function cancelContract(id: string) {
+  const contract = await prisma.contract.findUnique({ where: { id } })
+  if (!contract) {
+    throw new AppError(ErrorCodes.NOT_FOUND, 404, `Contract ${id} not found`)
+  }
+
+  await prisma.allocation.updateMany({
+    where: { contractId: id, status: 'reserved' },
+    data: { status: 'cancelled' },
+  })
+
+  return prisma.contract.findUniqueOrThrow({
+    where: { id },
+    include: { allocations: true, installments: true },
+  })
+}
+
+export async function listContracts() {
+  return prisma.contract.findMany({
+    orderBy: { createdAt: 'desc' },
+    include: { allocations: true, installments: true },
+  })
+}
