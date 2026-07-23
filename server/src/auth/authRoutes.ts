@@ -48,5 +48,6 @@ authRouter.get('/me', requireAuth, async (req, res) => {
     role: staff.role,
     locationId: staff.locationId,
     locationName: staff.location.name,
+    locale: staff.location.locale,
   })
 })
