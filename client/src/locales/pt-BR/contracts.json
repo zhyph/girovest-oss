@@ -1,0 +1,25 @@
+{
+  "newContract": "Novo Contrato",
+  "fields": {
+    "client": "Cliente",
+    "eventDate": "Data do Evento",
+    "product": "Produto",
+    "checkoutDate": "Retirada",
+    "dueDate": "Devolução",
+    "priceCharged": "Valor"
+  },
+  "items": {
+    "title": "Peças",
+    "add": "Adicionar peça",
+    "remove": "Remover peça"
+  },
+  "clientReadiness": {
+    "missing": "Faltam campos obrigatórios: {{fields}}",
+    "complete": "Completar cadastro"
+  },
+  "validation": {
+    "clientRequired": "Cliente é obrigatório",
+    "eventDateRequired": "Data do evento é obrigatória"
+  },
+  "unavailableProduct": "Este produto não está disponível para essas datas."
+}
