@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { prisma } from '../db/client.js'
 import { AppError } from '../errors/AppError.js'
-import { createContract, cancelContract, listContracts } from './contractService.js'
+import { createContract, cancelContract, listContracts, getContract } from './contractService.js'
 
 let locationId: string
 let staffId: string
@@ -216,5 +216,37 @@ describe('listContracts', () => {
     expect(contracts).toHaveLength(1)
     expect(contracts[0].allocations).toHaveLength(1)
     expect(contracts[0].installments).toHaveLength(1)
+  })
+})
+
+describe('getContract', () => {
+  it('returns the contract with nested client, location, and product details', async () => {
+    await prisma.location.update({ where: { id: locationId }, data: { phone: '1199999999' } })
+    await prisma.locationContractClause.createMany({
+      data: [
+        { locationId, sortOrder: 1, text: 'Clause two' },
+        { locationId, sortOrder: 0, text: 'Clause one' },
+      ],
+    })
+    await prisma.clientIdentityDocument.create({ data: { clientId, label: 'CPF', value: '123.456.789-00' } })
+    await prisma.clientAddressLine.createMany({
+      data: [
+        { clientId, label: 'Cidade', value: 'São Paulo', sortOrder: 1 },
+        { clientId, label: 'Endereço', value: 'Rua A, 100', sortOrder: 0 },
+      ],
+    })
+    const created = await createContract(baseInput())
+
+    const detail = await getContract(created.id)
+
+    expect(detail.location.contractClauses.map((clause) => clause.text)).toEqual(['Clause one', 'Clause two'])
+    expect(detail.client.addressLines.map((line) => line.label)).toEqual(['Endereço', 'Cidade'])
+    expect(detail.client.identityDocuments[0]).toMatchObject({ label: 'CPF', value: '123.456.789-00' })
+    expect(detail.allocations[0].product.name).toBe('Vestido')
+    expect(detail.location.phone).toBe('1199999999')
+  })
+
+  it('throws NOT_FOUND for a missing contract', async () => {
+    await expect(getContract('missing-id')).rejects.toThrow(AppError)
   })
 })

@@ -185,3 +185,29 @@ export async function listContracts() {
     include: { allocations: true, installments: true },
   })
 }
+
+export async function getContract(id: string) {
+  const contract = await prisma.contract.findUnique({
+    where: { id },
+    include: {
+      allocations: { include: { product: true } },
+      installments: true,
+      client: { include: { identityDocuments: true, addressLines: true } },
+      location: { include: { contractClauses: true } },
+    },
+  })
+  if (!contract) {
+    throw new AppError(ErrorCodes.NOT_FOUND, 404, `Contract ${id} not found`)
+  }
+  return {
+    ...contract,
+    client: {
+      ...contract.client,
+      addressLines: [...contract.client.addressLines].sort((a, b) => a.sortOrder - b.sortOrder),
+    },
+    location: {
+      ...contract.location,
+      contractClauses: [...contract.location.contractClauses].sort((a, b) => a.sortOrder - b.sortOrder),
+    },
+  }
+}

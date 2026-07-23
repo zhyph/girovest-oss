@@ -81,6 +81,12 @@ describe('happy path: register client -> register dress -> allocate -> check out
     expect(contractResponse.status).toBe(201)
     const allocationId = contractResponse.body.allocations[0].id
 
+    const contractDetailResponse = await auth(request(app).get(`/api/contracts/${contractResponse.body.id}`))
+    expect(contractDetailResponse.status).toBe(200)
+    expect(contractDetailResponse.body.client.name).toBe('Camila Souza')
+    expect(contractDetailResponse.body.location.name).toBe('Loja Feliz')
+    expect(contractDetailResponse.body.allocations[0].product.name).toBe('Vestido de Festa Dourado')
+
     const availabilityReserved = await auth(
       request(app).get(`/api/allocations/products/${productId}/availability?asOf=2020-01-03`),
     )

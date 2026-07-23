@@ -4,7 +4,7 @@ import { requireAuth } from '../auth/authMiddleware.js'
 import { AppError } from '../errors/AppError.js'
 import { ErrorCodes } from '../errors/errorCodes.js'
 import { prisma } from '../db/client.js'
-import { createContract, cancelContract, listContracts } from '../services/contractService.js'
+import { createContract, cancelContract, listContracts, getContract } from '../services/contractService.js'
 
 export const contractsRouter = Router()
 contractsRouter.use(requireAuth)
@@ -20,6 +20,10 @@ async function resolveLocationId(staffId: string): Promise<string> {
 
 contractsRouter.get('/', async (_req, res) => {
   res.json(await listContracts())
+})
+
+contractsRouter.get('/:id', async (req, res) => {
+  res.json(await getContract(req.params.id))
 })
 
 const itemSchema = z.object({
