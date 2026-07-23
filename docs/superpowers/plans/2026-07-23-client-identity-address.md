@@ -866,6 +866,17 @@ Add to `client/src/features/clients/clientSchemas.test.ts`, inside the existing 
     })
     expect(result.success).toBe(false)
   })
+
+  it('accepts an identity document or address line with an empty value (a template row staff has not filled in yet)', () => {
+    const result = clientSchema.safeParse({
+      name: 'Maria Silva',
+      phone: '11999999999',
+      email: 'maria@example.com',
+      identityDocuments: [{ label: 'CPF', value: '' }],
+      addressLines: [{ label: 'Cidade', value: '', sortOrder: 0 }],
+    })
+    expect(result.success).toBe(true)
+  })
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -882,13 +893,13 @@ import { z } from 'zod'
 
 export const identityDocumentSchema = z.object({
   label: z.string().min(1),
-  value: z.string().min(1),
+  value: z.string(),
   maskKey: z.string().nullable().optional(),
 })
 
 export const addressLineSchema = z.object({
   label: z.string().min(1),
-  value: z.string().min(1),
+  value: z.string(),
   sortOrder: z.number().int(),
   maskKey: z.string().nullable().optional(),
 })
@@ -904,27 +915,29 @@ export const clientSchema = z.object({
 
 export type ClientFormValues = z.infer<typeof clientSchema>
 
-export interface IdentityDocument {
-  id?: string
-  label: string
-  value: string
-  maskKey?: string | null
-}
+export type IdentityDocumentFormValue = z.infer<typeof identityDocumentSchema>
+export type AddressLineFormValue = z.infer<typeof addressLineSchema>
 
-export interface AddressLine {
-  id?: string
-  label: string
-  value: string
-  sortOrder: number
-  maskKey?: string | null
-}
-
-export interface Client extends ClientFormValues {
+export interface IdentityDocument extends IdentityDocumentFormValue {
   id: string
+}
+
+export interface AddressLine extends AddressLineFormValue {
+  id: string
+}
+
+export interface Client extends Omit<ClientFormValues, 'identityDocuments' | 'addressLines'> {
+  id: string
+  identityDocuments: IdentityDocument[]
+  addressLines: AddressLine[]
   hasAllocationHistory: boolean
   createdAt: string
 }
 ```
+
+**Why `value` has no `.min(1)`:** this plan's own Global Constraints state identity documents and address lines are never required to create or update a Client. `ClientDrawer` (Tasks 7–8) pre-seeds a *new* client's form with template rows (e.g. CPF, RG) whose `value` starts empty, so staff sees what to fill in — if `value` required a minimum length, submitting a brand-new client without touching those fields would fail validation, directly contradicting "lightweight to create a casual contact." `label` keeps `.min(1)` because a row's label is never machine-generated as blank — every row, template-seeded or staff-added, always has a real label string as soon as it exists.
+
+**Why `Client`'s arrays aren't just `ClientFormValues`'s arrays:** a persisted row (fetched from the API, per `ClientDTO` in Task 2) always has a real database `id`; a row still being typed into the form (not yet saved, from `useFieldArray().append(...)`) does not. Reusing `ClientFormValues`'s zod-inferred array type for `Client` would make `id` invisible to TypeScript even though the real API response always includes it — `IdentityDocument`/`AddressLine` extend the form-value shape with the one field only a saved row has.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
@@ -1131,6 +1144,29 @@ Add the Identity Documents section to the JSX, immediately after the existing `n
         </div>
 ```
 
+Because `identityDocuments` (and, from Task 8, `addressLines`) can now legitimately contain rows with an empty `value` — a template row staff never filled in — those blank rows must not be persisted as real documents. Change the `onSubmit` function to strip them before calling the mutation:
+
+```tsx
+  async function onSubmit(values: ClientFormValues) {
+    const normalized: ClientFormValues = {
+      ...values,
+      identityDocuments: values.identityDocuments.filter((doc) => doc.value.trim() !== ''),
+    }
+    try {
+      if (client) {
+        await updateClient.mutateAsync({ id: client.id, values: normalized })
+      } else {
+        await createClient.mutateAsync(normalized)
+      }
+      onClose()
+    } catch (error) {
+      showError(error)
+    }
+  }
+```
+
+(Task 8 extends this same function to also filter `addressLines` and renumber `sortOrder` — it replaces this version of `onSubmit` wholesale rather than layering a second wrapper.)
+
 Add the translation keys to `client/src/locales/pt-BR/clients.json` (merge into the existing object — add a new top-level `identityDocuments` key alongside `title`/`fields`/`validation`/`errors`/`empty`/`noResults`):
 
 ```json
@@ -1172,12 +1208,13 @@ git commit -m "feat: add identity documents section to ClientDrawer"
 
 - [ ] **Step 1: Write the failing tests**
 
-Add to `client/src/features/clients/ClientDrawer.test.tsx`:
+Add to `client/src/features/clients/ClientDrawer.test.tsx`. By the time this task runs, Task 7's fix pass has established the file's real conventions — check the actual current file first (it uses a `mockClientHooks()` helper to stub `useCreateClient`/`useUpdateClient`/`useDeleteClient`, and a `renderWithToast()` helper instead of bare `render()`) and match them exactly rather than the illustrative snippet below:
 
 ```tsx
 describe('ClientDrawer address lines', () => {
   it('pre-seeds the four pt-BR address line rows for a new client', () => {
-    render(<ClientDrawer client={null} onClose={vi.fn()} />)
+    mockClientHooks()
+    renderWithToast(<ClientDrawer client={null} onClose={vi.fn()} />)
     expect(screen.getByDisplayValue('Endereço')).toBeInTheDocument()
     expect(screen.getByDisplayValue('Bairro')).toBeInTheDocument()
     expect(screen.getByDisplayValue('Cidade')).toBeInTheDocument()
@@ -1185,7 +1222,8 @@ describe('ClientDrawer address lines', () => {
   })
 
   it('lets staff add a custom address line row', async () => {
-    render(<ClientDrawer client={null} onClose={vi.fn()} />)
+    mockClientHooks()
+    renderWithToast(<ClientDrawer client={null} onClose={vi.fn()} />)
     const addButton = screen.getByRole('button', { name: /adicionar linha de endereço/i })
     await userEvent.click(addButton)
     const labelInputs = screen.getAllByLabelText(/rótulo da linha de endereço/i)
@@ -1193,15 +1231,17 @@ describe('ClientDrawer address lines', () => {
   })
 
   it('lets staff remove an address line row', async () => {
-    render(<ClientDrawer client={null} onClose={vi.fn()} />)
+    mockClientHooks()
+    renderWithToast(<ClientDrawer client={null} onClose={vi.fn()} />)
     const removeButtons = screen.getAllByRole('button', { name: /remover linha de endereço/i })
     await userEvent.click(removeButtons[0])
     expect(screen.queryByDisplayValue('Endereço')).not.toBeInTheDocument()
     expect(screen.getByDisplayValue('Bairro')).toBeInTheDocument()
   })
 
-  it('shows an existing client\'s stored address lines, not the template defaults', () => {
-    const client: Client = {
+  it("shows an existing client's stored address lines, not the template defaults", () => {
+    mockClientHooks()
+    const existingClient: Client = {
       id: 'c1',
       name: 'Maria',
       phone: '1',
@@ -1212,9 +1252,23 @@ describe('ClientDrawer address lines', () => {
       hasAllocationHistory: false,
       createdAt: '2026-01-01',
     }
-    render(<ClientDrawer client={client} onClose={vi.fn()} />)
+    renderWithToast(<ClientDrawer client={existingClient} onClose={vi.fn()} />)
     expect(screen.getByDisplayValue('Zip Code')).toBeInTheDocument()
     expect(screen.queryByDisplayValue('Endereço')).not.toBeInTheDocument()
+  })
+
+  it('does not send blank template rows when creating a client without filling them in', async () => {
+    const createImpl = vi.fn().mockResolvedValue(undefined)
+    mockClientHooks(vi.fn(), createImpl)
+    renderWithToast(<ClientDrawer client={null} onClose={vi.fn()} />)
+
+    await userEvent.type(screen.getByLabelText('Nome'), 'Nova Cliente')
+    await userEvent.type(screen.getByLabelText('Telefone'), '11999999999')
+    await userEvent.type(screen.getByLabelText('E-mail'), 'nova@example.com')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+
+    expect(createImpl).toHaveBeenCalledOnce()
+    expect(createImpl.mock.calls[0][0].addressLines).toEqual([])
   })
 })
 ```
@@ -1284,13 +1338,16 @@ Add the Address section to the JSX, immediately after the Identity Documents sec
         </div>
 ```
 
-Since `sortOrder` must reflect display order after removals too (e.g. removing row 0 of 3 should leave the remaining two rows numbered 0 and 1, not 1 and 2), add a `handleSubmit` wrapper that renumbers `addressLines` by its current array position right before submission. Change the `onSubmit` function:
+Task 7 already changed `onSubmit` to filter out blank-value `identityDocuments` rows before submission (a template row staff never filled in must not be persisted as a real document — see Task 7's Step 3). This task extends that same reasoning to `addressLines`, and additionally must renumber `sortOrder` after filtering: removing a blank row (or any row) must leave the remaining rows numbered contiguously from 0, not with gaps (e.g. dropping row 0 of 3 must leave the remaining two numbered 0 and 1, not 1 and 2). Replace `onSubmit` wholesale — this supersedes Task 7's version rather than layering a second wrapper around it:
 
 ```tsx
   async function onSubmit(values: ClientFormValues) {
     const normalized: ClientFormValues = {
       ...values,
-      addressLines: values.addressLines.map((line, index) => ({ ...line, sortOrder: index })),
+      identityDocuments: values.identityDocuments.filter((doc) => doc.value.trim() !== ''),
+      addressLines: values.addressLines
+        .filter((line) => line.value.trim() !== '')
+        .map((line, index) => ({ ...line, sortOrder: index })),
     }
     try {
       if (client) {
@@ -1322,7 +1379,7 @@ Add the translation keys to `client/src/locales/pt-BR/clients.json`, merged alon
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `cd client && npx vitest run src/features/clients/ClientDrawer.test.tsx`
-Expected: PASS — all tests, including the 4 new ones from this task and the 5 from Task 7.
+Expected: PASS — all tests, including the 5 new ones from this task and Task 7's (5 original + 1 from Task 7's follow-up fix for the blank-template-row bug).
 
 Then run the full client and server suites as this is the last task in the plan:
 
