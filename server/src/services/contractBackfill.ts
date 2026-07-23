@@ -24,7 +24,7 @@ async function backfillOrphanAllocations(): Promise<void> {
     let nextNumber = (lastContract?.number ?? 0) + 1
 
     for (const orphan of locationOrphans) {
-      const contract = await prisma.contract.create({
+      await prisma.contract.create({
         data: {
           number: nextNumber,
           locationId,
@@ -32,9 +32,9 @@ async function backfillOrphanAllocations(): Promise<void> {
           staffId: orphan.staffId,
           eventDate: orphan.checkoutDate,
           paymentMethod: '(não informado)',
+          allocations: { connect: { id: orphan.id } },
         },
       })
-      await prisma.allocation.update({ where: { id: orphan.id }, data: { contractId: contract.id } })
       nextNumber += 1
     }
   }
