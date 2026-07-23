@@ -103,6 +103,8 @@ model Contract {
   staff        Staff         @relation(fields: [staffId], references: [id])
   allocations  Allocation[]
   installments Installment[]
+
+  @@unique([locationId, number])
 }
 
 model Installment {
@@ -138,6 +140,60 @@ Nothing here encodes what "CPF" or "Bairro" mean, or what PIX is — those are
 labels and configured options, never schema or backend logic. Required-ness
 of specific documents/address lines/payment methods lives entirely in a
 per-locale UI template (below), not in the database.
+
+`signatureImage` is a captured drawing, not an uploaded photo: the signing
+canvas itself is fixed-size and downsampled before submit (target: a few
+tens of KB as a base64 PNG), so storing it inline as a `String` in SQLite
+stays a deliberate, bounded size budget rather than an open-ended blob.
+
+## Data migration
+
+This app auto-updates live installs (per the in-progress v0.2.3→v0.2.4
+rollout), so existing production databases already have `Allocation` rows
+with no `Contract` to attach to. `Allocation.contractId` can't simply be
+added as required — the migration needs a backfill step first.
+
+**Decision: one synthetic Contract per existing Allocation (1:1), not
+grouping by client/date.** Grouping heuristically (e.g. same client within
+a date window) risks silently bundling unrelated rentals under one
+contract number; a 1:1 mapping is safe, reversible, and doesn't need to
+guess intent.
+
+Migration steps, run once as part of the standard startup migration path
+(`runMigrations` in `client/electron/main.ts`, same as every other schema
+change), for both the SQLite and PostgreSQL schema directories:
+
+1. Add `Allocation.contractId` as **nullable** first — a required column
+   can't be added directly to a non-empty table with no static default that
+   fits every row.
+2. For every existing `Allocation`, create one `Contract` row:
+   - `locationId` — derived via `allocation.product.locationId` (already
+     reliable; `Product` has always had a location).
+   - `clientId`, `staffId` — copied directly from the `Allocation`.
+   - `eventDate` — defaulted to the `Allocation`'s `checkoutDate` (the best
+     available proxy; nothing better exists pre-migration).
+   - `paymentMethod` — defaulted to a clearly-labeled placeholder (e.g.
+     `"(não informado)"`), never left blank, since the column stays
+     required and there's no historical record of how these were paid.
+   - `signatureStatus` — `unsigned` (accurate: no digital signature ever
+     existed for these).
+   - `number` — assigned sequentially per `locationId`, ordered by the
+     original `Allocation.createdAt`, so historical ordering is preserved
+     and the sequence continues contiguously for new contracts created
+     after the migration.
+   - Set the new `Allocation.contractId` to point at the Contract just
+     created for it.
+3. Alter `Allocation.contractId` to **required**, now that every row has
+   one.
+4. Seed `LocationContractClause` with the six paper clauses (translated,
+   pt-BR) for every existing `Location`, so printing works immediately
+   after upgrade instead of producing a contract with a blank legal
+   section until a human retypes them.
+
+Covered by a dedicated migration test: seed a pre-migration-shaped
+database (Allocations with no Contract), run the migration, assert every
+Allocation now has exactly one Contract, numbering is unique and
+sequential per location, and every existing Location has clause text.
 
 ## Locale template
 
@@ -236,7 +292,11 @@ the one process, so a submission on `signingApp` is immediately visible to
 Flow:
 
 1. Staff clicks "Sign remotely" → the authenticated, localhost API creates a
-   single-use token for that Contract, expiring in ~15 minutes.
+   single-use token for that Contract, expiring in ~15 minutes. The token is
+   the *only* access control on an unauthenticated, LAN-exposed endpoint, so
+   it's generated with `crypto.randomBytes(32).toString('base64url')` (256
+   bits of entropy from Node's built-in `crypto` module, no new dependency)
+   — never a sequential ID or anything guessable.
 2. Desktop renders a QR code for `http://<lan-ip>:<lan-port>/sign/<token>`,
    using the machine's detected LAN IPv4, and starts watching that Contract's
    status live (SSE/poll against the *main* localhost API — the desktop
@@ -244,6 +304,19 @@ Flow:
 3. The client's phone scans the code, loads the signing page, signs.
 4. On submit, `signingApp` validates and stores; the desktop's live view
    updates automatically and staff can print the completed document.
+
+**LAN IP selection.** `os.networkInterfaces()` commonly returns more than
+one candidate (VPN adapters, Docker/virtualization bridges, etc.), and
+silently picking the wrong one produces a QR code the phone can never
+reach. Selection rule: filter to non-internal IPv4 addresses in RFC1918
+private ranges (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), and
+exclude interface names matching known virtual-adapter patterns (`docker`,
+`veth`, `vmnet`, `vboxnet`, `utun`/`tun`/`tap`, common VPN naming). If
+exactly one candidate survives, use it automatically. If more than one
+survives, show a small picker in the "Sign remotely" dialog (interface
+name + IP) instead of guessing — this is a real, distinct failure mode
+from "no interface found" and needs its own affordance, not just a silent
+default to the first match.
 
 Edge cases: an expired or already-used token shows a clear
 "ask staff for a new code" message on the phone; staff can generate a fresh
@@ -301,8 +374,14 @@ the heaviest new consumer of this exact hardcoding:
 Following the existing per-layer pattern (`*Service.test.ts`,
 `*Schemas.test.ts`, route tests, component tests):
 
+- **Migration test** (see Data migration above) — pre-migration-shaped
+  fixture in, assert every Allocation gets exactly one Contract, numbering
+  is unique/sequential per location, every Location gets seeded clause
+  text.
 - `contractService.test.ts` / `installmentService.test.ts` — creation,
-  numbering race, locking after signature, cancel cascade.
+  numbering race (including the DB-level `@@unique([locationId, number])`
+  constraint catching what the transaction retry logic misses), locking
+  after signature, cancel cascade.
 - `signingService.test.ts` — token issuance/expiry/single-use, and that
   `signingApp` truly exposes nothing beyond the sign/submit routes.
 - `clientSchemas.test.ts` updates — identity document / address line
