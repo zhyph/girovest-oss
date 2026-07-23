@@ -10,3 +10,7 @@ export function parseDateOnly(value: string): Date {
   const [year, month, day] = value.slice(0, 10).split('-').map(Number)
   return new Date(year, month - 1, day)
 }
+
+export function formatDate(date: Date, locale: string, options: Intl.DateTimeFormatOptions): string {
+  return new Intl.DateTimeFormat(locale, options).format(date)
+}
