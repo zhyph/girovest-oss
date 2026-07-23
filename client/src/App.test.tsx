@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router'
-import '../src/i18n.ts'
+import i18n from '../src/i18n.ts'
 import { App, LocaleSync } from './App.tsx'
 import { useLocale } from './lib/LocaleContext.tsx'
 import * as api from './lib/api.ts'
@@ -40,6 +40,10 @@ describe('LocaleSync', () => {
   beforeEach(() => {
     clearToken()
     vi.restoreAllMocks()
+  })
+
+  afterEach(() => {
+    i18n.changeLanguage('pt-BR')
   })
 
   it('defaults to pt-BR before a staff is loaded', () => {

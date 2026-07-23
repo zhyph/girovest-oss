@@ -15,6 +15,14 @@ export interface LocaleConfig {
   phone: PhoneMaskConfig
 }
 
+/**
+ * pt-BR locale date formatting: displays DD/MM/AAAA regardless of the
+ * browser/OS locale — unlike a native <input type="date">, whose displayed
+ * text follows the OS locale even when the app's own locale is pt-BR.
+ * The emitted value stays a plain YYYY-MM-DD string, matching what a native
+ * date input already produces. Other locales would implement their own
+ * formatDigits, digitsToIso, and isoToDigits equivalents alongside this one.
+ */
 function formatDateDigitsBR(digits: string): string {
   const dd = digits.slice(0, 2)
   const mm = digits.slice(2, 4)
@@ -40,6 +48,12 @@ function isoToDigitsBR(iso: string): string {
   return `${dd}${mm}${yyyy}`
 }
 
+/**
+ * pt-BR phone mask: (DDD) NNNNN-NNNN for a 9-digit mobile local number,
+ * or (DDD) NNNN-NNNN for an 8-digit landline. A future non-pt-BR locale
+ * would implement its own format function alongside this one rather than
+ * swapping the entire phone-input component.
+ */
 function formatPhoneBR(raw: string): string {
   const digits = raw.replace(/\D/g, '').slice(0, 11)
   if (digits.length === 0) return ''
