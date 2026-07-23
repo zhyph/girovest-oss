@@ -15,10 +15,13 @@ model Location {
   name      String
   address   String
   locale    String   @default("pt-BR")
+  phone     String?
   createdAt DateTime @default(now())
 
-  staff    Staff[]
-  products Product[]
+  staff           Staff[]
+  products        Product[]
+  contracts       Contract[]
+  contractClauses LocationContractClause[]
 }
 
 model Staff {
@@ -32,6 +35,7 @@ model Staff {
 
   location    Location     @relation(fields: [locationId], references: [id])
   allocations Allocation[]
+  contracts   Contract[]
 }
 
 model Client {
@@ -45,6 +49,7 @@ model Client {
   allocations       Allocation[]
   identityDocuments ClientIdentityDocument[]
   addressLines      ClientAddressLine[]
+  contracts         Contract[]
 }
 
 model Product {
@@ -70,6 +75,7 @@ model Allocation {
   productId         String
   clientId          String
   staffId           String
+  contractId        String?
   checkoutDate      DateTime
   dueDate           DateTime
   actualReturnDate  DateTime?
@@ -81,9 +87,52 @@ model Allocation {
   conditionNotesIn  String?
   createdAt         DateTime  @default(now())
 
-  product Product @relation(fields: [productId], references: [id])
-  client  Client  @relation(fields: [clientId], references: [id])
-  staff   Staff   @relation(fields: [staffId], references: [id])
+  product  Product   @relation(fields: [productId], references: [id])
+  client   Client    @relation(fields: [clientId], references: [id])
+  staff    Staff     @relation(fields: [staffId], references: [id])
+  contract Contract? @relation(fields: [contractId], references: [id])
+}
+
+model Contract {
+  id              String    @id @default(uuid())
+  number          Int
+  locationId      String
+  clientId        String
+  staffId         String
+  eventDate       DateTime
+  paymentMethod   String
+  signatureStatus String    @default("unsigned")
+  signatureImage  String?
+  signedAt        DateTime?
+  createdAt       DateTime  @default(now())
+
+  location     Location      @relation(fields: [locationId], references: [id])
+  client       Client        @relation(fields: [clientId], references: [id])
+  staff        Staff         @relation(fields: [staffId], references: [id])
+  allocations  Allocation[]
+  installments Installment[]
+
+  @@unique([locationId, number])
+}
+
+model Installment {
+  id         String    @id @default(uuid())
+  contractId String
+  dueDate    DateTime
+  amount     Float
+  paid       Boolean   @default(false)
+  paidAt     DateTime?
+
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+}
+
+model LocationContractClause {
+  id         String @id @default(uuid())
+  locationId String
+  sortOrder  Int
+  text       String
+
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
 }
 
 model ClientIdentityDocument {
