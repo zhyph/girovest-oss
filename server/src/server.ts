@@ -1,5 +1,7 @@
 import 'dotenv/config'
 import { app } from './app.js'
+import { signingApp } from './signingApp.js'
+import { detectLanCandidates } from './network/lanNetwork.js'
 import { runContractBackfill } from './services/contractBackfill.js'
 
 const port = Number(process.env.PORT ?? 3000)
@@ -22,3 +24,19 @@ server.on('error', (error) => {
   console.error('Failed to start server:', error)
   process.exit(1)
 })
+
+// signingApp binds to each detected LAN candidate individually (never
+// 0.0.0.0 — see the design's security boundary). A bind failure on one
+// candidate (e.g. the interface disappeared between detection and bind)
+// is logged, not fatal — remote signing on that address just won't work,
+// but the rest of the app (including print, and signing on any other
+// detected candidate) keeps running.
+for (const candidate of detectLanCandidates()) {
+  signingApp
+    .listen(port, candidate.address, () => {
+      console.log(`Signing app listening on ${candidate.address}:${port}`)
+    })
+    .on('error', (error) => {
+      console.error(`Failed to start signing app on ${candidate.address}:${port}:`, error)
+    })
+}

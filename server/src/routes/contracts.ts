@@ -5,6 +5,8 @@ import { AppError } from '../errors/AppError.js'
 import { ErrorCodes } from '../errors/errorCodes.js'
 import { prisma } from '../db/client.js'
 import { createContract, cancelContract, listContracts, getContract } from '../services/contractService.js'
+import { issueSigningToken } from '../services/signingService.js'
+import { detectLanCandidates } from '../network/lanNetwork.js'
 
 export const contractsRouter = Router()
 contractsRouter.use(requireAuth)
@@ -58,4 +60,14 @@ contractsRouter.post('/', async (req, res) => {
 
 contractsRouter.post('/:id/cancel', async (req, res) => {
   res.json(await cancelContract(req.params.id))
+})
+
+contractsRouter.post('/:id/sign-token', async (req, res) => {
+  const { token, expiresAt } = await issueSigningToken(req.params.id)
+  res.status(201).json({
+    token,
+    expiresAt,
+    port: Number(process.env.PORT ?? 3000),
+    candidates: detectLanCandidates(),
+  })
 })

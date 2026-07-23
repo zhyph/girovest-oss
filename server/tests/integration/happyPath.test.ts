@@ -27,6 +27,7 @@ describe('happy path: register client -> register dress -> allocate -> check out
   })
 
   afterAll(async () => {
+    await prisma.signingToken.deleteMany()
     await prisma.installment.deleteMany()
     await prisma.allocation.deleteMany()
     await prisma.contract.deleteMany()
@@ -86,6 +87,11 @@ describe('happy path: register client -> register dress -> allocate -> check out
     expect(contractDetailResponse.body.client.name).toBe('Camila Souza')
     expect(contractDetailResponse.body.location.name).toBe('Loja Feliz')
     expect(contractDetailResponse.body.allocations[0].product.name).toBe('Vestido de Festa Dourado')
+
+    const signTokenResponse = await auth(request(app).post(`/api/contracts/${contractResponse.body.id}/sign-token`))
+    expect(signTokenResponse.status).toBe(201)
+    expect(typeof signTokenResponse.body.token).toBe('string')
+    expect(Array.isArray(signTokenResponse.body.candidates)).toBe(true)
 
     const availabilityReserved = await auth(
       request(app).get(`/api/allocations/products/${productId}/availability?asOf=2020-01-03`),
