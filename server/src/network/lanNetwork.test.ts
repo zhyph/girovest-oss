@@ -60,4 +60,16 @@ describe('detectLanCandidates', () => {
   it('returns an empty array when nothing qualifies', () => {
     expect(detectLanCandidates({})).toEqual([])
   })
+
+  it('respects the exact 172.16.0.0/12 boundary', () => {
+    const belowRange = detectLanCandidates({ eth0: iface('172.15.255.255') })
+    const lowerEdge = detectLanCandidates({ eth0: iface('172.16.0.0') })
+    const upperEdge = detectLanCandidates({ eth0: iface('172.31.255.255') })
+    const aboveRange = detectLanCandidates({ eth0: iface('172.32.0.0') })
+
+    expect(belowRange).toEqual([])
+    expect(lowerEdge).toEqual([{ interfaceName: 'eth0', address: '172.16.0.0' }])
+    expect(upperEdge).toEqual([{ interfaceName: 'eth0', address: '172.31.255.255' }])
+    expect(aboveRange).toEqual([])
+  })
 })
