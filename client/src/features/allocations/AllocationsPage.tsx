@@ -6,7 +6,8 @@ import { CurrencyInput } from '../../components/ui/currency-input.tsx'
 import { Modal } from '../../components/ui/modal.tsx'
 import { Badge } from '../../components/ui/badge.tsx'
 import { showErrorToast } from '../../lib/toast.ts'
-import { parseDateOnly } from '../../lib/date.ts'
+import { parseDateOnly, formatDate } from '../../lib/date.ts'
+import { useLocale } from '../../lib/LocaleContext.tsx'
 import { useClients } from '../clients/useClients.ts'
 import { useProducts } from '../products/useProducts.ts'
 import {
@@ -17,8 +18,6 @@ import {
 } from './useAllocations.ts'
 import { NewAllocationForm } from './NewAllocationForm.tsx'
 import type { Allocation } from './allocationSchemas.ts'
-
-const dateFormatter = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
 
 const STATUS_TONE: Record<Allocation['status'], 'neutral' | 'success' | 'warning' | 'danger'> = {
   reserved: 'neutral',
@@ -159,6 +158,7 @@ function RowActions({ allocation }: { allocation: Allocation }) {
 
 export function AllocationsPage() {
   const { t } = useTranslation('allocations')
+  const { locale } = useLocale()
   const { data: allocations, isLoading } = useAllocationsList()
   const { data: products } = useProducts()
   const { data: clients } = useClients()
@@ -192,8 +192,8 @@ export function AllocationsPage() {
               <span className="truncate font-medium">{productNames.get(allocation.productId) ?? allocation.productId}</span>
               <span className="truncate text-muted-text">{clientNames.get(allocation.clientId) ?? allocation.clientId}</span>
               <span className="text-xs text-muted-text">
-                {dateFormatter.format(parseDateOnly(allocation.checkoutDate))} –{' '}
-                {dateFormatter.format(parseDateOnly(allocation.dueDate))}
+                {formatDate(parseDateOnly(allocation.checkoutDate), locale, { day: '2-digit', month: '2-digit', year: 'numeric' })} –{' '}
+                {formatDate(parseDateOnly(allocation.dueDate), locale, { day: '2-digit', month: '2-digit', year: 'numeric' })}
               </span>
               <Badge className="self-start" tone={STATUS_TONE[allocation.status]}>{t(`status.${allocation.status}`)}</Badge>
             </div>
