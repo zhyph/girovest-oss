@@ -192,22 +192,12 @@ export async function getContract(id: string) {
     include: {
       allocations: { include: { product: true } },
       installments: true,
-      client: { include: { identityDocuments: true, addressLines: true } },
-      location: { include: { contractClauses: true } },
+      client: { include: { identityDocuments: true, addressLines: { orderBy: { sortOrder: 'asc' } } } },
+      location: { include: { contractClauses: { orderBy: { sortOrder: 'asc' } } } },
     },
   })
   if (!contract) {
     throw new AppError(ErrorCodes.NOT_FOUND, 404, `Contract ${id} not found`)
   }
-  return {
-    ...contract,
-    client: {
-      ...contract.client,
-      addressLines: [...contract.client.addressLines].sort((a, b) => a.sortOrder - b.sortOrder),
-    },
-    location: {
-      ...contract.location,
-      contractClauses: [...contract.location.contractClauses].sort((a, b) => a.sortOrder - b.sortOrder),
-    },
-  }
+  return contract
 }
