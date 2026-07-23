@@ -60,11 +60,15 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
   }
 
   async function onSubmit(values: ClientFormValues) {
+    const normalized: ClientFormValues = {
+      ...values,
+      identityDocuments: values.identityDocuments.filter((doc) => doc.value.trim() !== ''),
+    }
     try {
       if (client) {
-        await updateClient.mutateAsync({ id: client.id, values })
+        await updateClient.mutateAsync({ id: client.id, values: normalized })
       } else {
-        await createClient.mutateAsync(values)
+        await createClient.mutateAsync(normalized)
       }
       onClose()
     } catch (error) {

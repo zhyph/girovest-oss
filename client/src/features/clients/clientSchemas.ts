@@ -2,13 +2,13 @@ import { z } from 'zod'
 
 export const identityDocumentSchema = z.object({
   label: z.string().min(1),
-  value: z.string().min(1),
+  value: z.string(),
   maskKey: z.string().nullable().optional(),
 })
 
 export const addressLineSchema = z.object({
   label: z.string().min(1),
-  value: z.string().min(1),
+  value: z.string(),
   sortOrder: z.number().int(),
   maskKey: z.string().nullable().optional(),
 })
@@ -24,23 +24,21 @@ export const clientSchema = z.object({
 
 export type ClientFormValues = z.infer<typeof clientSchema>
 
-export interface IdentityDocument {
-  id?: string
-  label: string
-  value: string
-  maskKey?: string | null
-}
+export type IdentityDocumentFormValue = z.infer<typeof identityDocumentSchema>
+export type AddressLineFormValue = z.infer<typeof addressLineSchema>
 
-export interface AddressLine {
-  id?: string
-  label: string
-  value: string
-  sortOrder: number
-  maskKey?: string | null
-}
-
-export interface Client extends ClientFormValues {
+export interface IdentityDocument extends IdentityDocumentFormValue {
   id: string
+}
+
+export interface AddressLine extends AddressLineFormValue {
+  id: string
+}
+
+export interface Client extends Omit<ClientFormValues, 'identityDocuments' | 'addressLines'> {
+  id: string
+  identityDocuments: IdentityDocument[]
+  addressLines: AddressLine[]
   hasAllocationHistory: boolean
   createdAt: string
 }

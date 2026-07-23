@@ -65,4 +65,15 @@ describe('clientSchema', () => {
     })
     expect(result.success).toBe(false)
   })
+
+  it('accepts an identity document or address line with an empty value (a template row staff has not filled in yet)', () => {
+    const result = clientSchema.safeParse({
+      name: 'Maria Silva',
+      phone: '11999999999',
+      email: 'maria@example.com',
+      identityDocuments: [{ label: 'CPF', value: '' }],
+      addressLines: [{ label: 'Cidade', value: '', sortOrder: 0 }],
+    })
+    expect(result.success).toBe(true)
+  })
 })

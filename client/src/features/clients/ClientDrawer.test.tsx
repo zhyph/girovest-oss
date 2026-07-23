@@ -167,7 +167,7 @@ describe('ClientDrawer identity documents', () => {
       phone: '1',
       email: 'a@example.com',
       notes: '',
-      identityDocuments: [{ label: 'Passaporte', value: 'AB123456', maskKey: null }],
+      identityDocuments: [{ id: 'd1', label: 'Passaporte', value: 'AB123456', maskKey: null }],
       addressLines: [],
       hasAllocationHistory: false,
       createdAt: '2026-01-01',
@@ -175,5 +175,19 @@ describe('ClientDrawer identity documents', () => {
     renderWithToast(<ClientDrawer client={existingClient} onClose={vi.fn()} />)
     expect(screen.getByDisplayValue('Passaporte')).toBeInTheDocument()
     expect(screen.queryByDisplayValue('CPF')).not.toBeInTheDocument()
+  })
+
+  it('does not send blank template rows when creating a client without filling them in', async () => {
+    const createImpl = vi.fn().mockResolvedValue(undefined)
+    mockClientHooks(vi.fn(), createImpl)
+    renderWithToast(<ClientDrawer client={null} onClose={vi.fn()} />)
+
+    await userEvent.type(screen.getByLabelText('Nome'), 'Nova Cliente')
+    await userEvent.type(screen.getByLabelText('Telefone'), '11999999999')
+    await userEvent.type(screen.getByLabelText('E-mail'), 'nova@example.com')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+
+    expect(createImpl).toHaveBeenCalledOnce()
+    expect(createImpl.mock.calls[0][0].identityDocuments).toEqual([])
   })
 })
