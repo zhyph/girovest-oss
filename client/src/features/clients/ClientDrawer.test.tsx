@@ -3,6 +3,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '../../i18n.ts'
 import { ClientDrawer } from './ClientDrawer.tsx'
+import type { Client } from './clientSchemas.ts'
 import * as useClientsModule from './useClients.ts'
 import { Toaster } from '../../components/ui/sonner.tsx'
 
@@ -121,5 +122,58 @@ describe('ClientDrawer', () => {
     mockClientHooks(vi.fn())
     renderWithToast(<ClientDrawer client={{ ...client, hasAllocationHistory: true }} onClose={vi.fn()} />)
     expect(screen.queryByRole('button', { name: 'Excluir' })).not.toBeInTheDocument()
+  })
+})
+
+describe('ClientDrawer identity documents', () => {
+  it('pre-seeds CPF and RG rows for a new client', () => {
+    mockClientHooks()
+    renderWithToast(<ClientDrawer client={null} onClose={vi.fn()} />)
+    expect(screen.getByDisplayValue('CPF')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('RG')).toBeInTheDocument()
+  })
+
+  it('lets staff add a custom identity document row', async () => {
+    mockClientHooks()
+    renderWithToast(<ClientDrawer client={null} onClose={vi.fn()} />)
+    const addButton = screen.getByRole('button', { name: /adicionar documento/i })
+    await userEvent.click(addButton)
+    const labelInputs = screen.getAllByLabelText(/rótulo do documento/i)
+    expect(labelInputs).toHaveLength(3)
+  })
+
+  it('lets staff remove an identity document row', async () => {
+    mockClientHooks()
+    renderWithToast(<ClientDrawer client={null} onClose={vi.fn()} />)
+    const removeButtons = screen.getAllByRole('button', { name: /remover documento/i })
+    await userEvent.click(removeButtons[0])
+    expect(screen.queryByDisplayValue('CPF')).not.toBeInTheDocument()
+    expect(screen.getByDisplayValue('RG')).toBeInTheDocument()
+  })
+
+  it('applies the CPF mask as staff types into a CPF row value', async () => {
+    mockClientHooks()
+    renderWithToast(<ClientDrawer client={null} onClose={vi.fn()} />)
+    const valueInputs = screen.getAllByLabelText(/valor do documento/i)
+    await userEvent.type(valueInputs[0], '12345678900')
+    expect(valueInputs[0]).toHaveValue('123.456.789-00')
+  })
+
+  it("shows an existing client's stored identity documents, not the template defaults", () => {
+    mockClientHooks()
+    const existingClient: Client = {
+      id: 'c1',
+      name: 'Maria',
+      phone: '1',
+      email: 'a@example.com',
+      notes: '',
+      identityDocuments: [{ label: 'Passaporte', value: 'AB123456', maskKey: null }],
+      addressLines: [],
+      hasAllocationHistory: false,
+      createdAt: '2026-01-01',
+    }
+    renderWithToast(<ClientDrawer client={existingClient} onClose={vi.fn()} />)
+    expect(screen.getByDisplayValue('Passaporte')).toBeInTheDocument()
+    expect(screen.queryByDisplayValue('CPF')).not.toBeInTheDocument()
   })
 })

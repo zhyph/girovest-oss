@@ -15,6 +15,15 @@
   "errors": {
     "CANNOT_DELETE_WITH_HISTORY": "Não é possível excluir um cliente com histórico de alocações."
   },
+  "identityDocuments": {
+    "title": "Documentos de Identificação",
+    "label": "Rótulo",
+    "value": "Valor",
+    "labelFieldAria": "Rótulo do documento",
+    "valueFieldAria": "Valor do documento",
+    "add": "Adicionar documento",
+    "remove": "Remover documento"
+  },
   "empty": "Nenhum cliente cadastrado ainda.",
   "noResults": "Nenhum cliente encontrado para essa busca."
 }

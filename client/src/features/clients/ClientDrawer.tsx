@@ -1,21 +1,40 @@
 import { useState } from 'react'
-import { useForm, Controller } from 'react-hook-form'
+import { useForm, Controller, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../../components/ui/button.tsx'
 import { Input } from '../../components/ui/input.tsx'
 import { PhoneInput } from '../../components/ui/phone-input.tsx'
+import { MaskedTextInput } from '../../components/ui/masked-text-input.tsx'
 import { Modal } from '../../components/ui/modal.tsx'
 import { showErrorToast } from '../../lib/toast.ts'
+import { useLocale } from '../../lib/LocaleContext.tsx'
+import { getClientFieldTemplate } from '../../lib/clientFieldTemplates.ts'
+import { getFieldMask } from '../../lib/clientFieldMasks.ts'
 import { clientSchema, type Client, type ClientFormValues } from './clientSchemas.ts'
 import { useCreateClient, useUpdateClient, useDeleteClient } from './useClients.ts'
 
 export function ClientDrawer({ client, onClose }: { client: Client | null; onClose: () => void }) {
   const { t } = useTranslation('clients')
+  const { locale } = useLocale()
   const createClient = useCreateClient()
   const updateClient = useUpdateClient()
   const deleteClient = useDeleteClient()
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+
+  const template = getClientFieldTemplate(locale)
+  const defaultIdentityDocuments = client
+    ? client.identityDocuments
+    : template.identityDocuments.map((entry) => ({ label: entry.label, value: '', maskKey: entry.maskKey ?? null }))
+  const defaultAddressLines = client
+    ? client.addressLines
+    : template.addressLines.map((entry, index) => ({
+        label: entry.label,
+        value: '',
+        sortOrder: index,
+        maskKey: entry.maskKey ?? null,
+      }))
+
   const {
     register,
     handleSubmit,
@@ -23,8 +42,17 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
     formState: { errors },
   } = useForm<ClientFormValues>({
     resolver: zodResolver(clientSchema),
-    defaultValues: client ?? { name: '', phone: '', email: '', notes: '' },
+    defaultValues: client ?? {
+      name: '',
+      phone: '',
+      email: '',
+      notes: '',
+      identityDocuments: defaultIdentityDocuments,
+      addressLines: defaultAddressLines,
+    },
   })
+
+  const identityDocuments = useFieldArray({ control, name: 'identityDocuments' })
 
   function showError(error: unknown) {
     const code = (error as { code?: string }).code ?? 'UNKNOWN'
@@ -86,6 +114,50 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
           {t('fields.notes')}
           <Input {...register('notes')} />
         </label>
+        <div className="flex flex-col gap-2">
+          <span className="text-sm font-medium">{t('identityDocuments.title')}</span>
+          {identityDocuments.fields.map((field, index) => (
+            <div key={field.id} className="flex items-end gap-2">
+              <label className="flex flex-1 flex-col gap-1 text-sm">
+                {t('identityDocuments.label')}
+                <Input
+                  {...register(`identityDocuments.${index}.label`)}
+                  aria-label={t('identityDocuments.labelFieldAria')}
+                />
+              </label>
+              <label className="flex flex-1 flex-col gap-1 text-sm">
+                {t('identityDocuments.value')}
+                <Controller
+                  name={`identityDocuments.${index}.value`}
+                  control={control}
+                  render={({ field: valueField }) => (
+                    <MaskedTextInput
+                      value={valueField.value}
+                      onChange={valueField.onChange}
+                      mask={getFieldMask(identityDocuments.fields[index].maskKey)}
+                      aria-label={t('identityDocuments.valueFieldAria')}
+                    />
+                  )}
+                />
+              </label>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => identityDocuments.remove(index)}
+                aria-label={t('identityDocuments.remove')}
+              >
+                {t('identityDocuments.remove')}
+              </Button>
+            </div>
+          ))}
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => identityDocuments.append({ label: '', value: '', maskKey: null })}
+          >
+            {t('identityDocuments.add')}
+          </Button>
+        </div>
         <div className="mt-2 flex justify-between gap-2">
           {client && !client.hasAllocationHistory && (
             <Button
