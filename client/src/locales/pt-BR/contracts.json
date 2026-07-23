@@ -27,6 +27,12 @@
     "missing": "Faltam campos obrigatórios: {{fields}}",
     "complete": "Completar cadastro"
   },
+  "cancelContract": {
+    "action": "Cancelar contrato",
+    "confirmTitle": "Cancelar este contrato?",
+    "confirmMessage": "Isso cancela todas as peças ainda reservadas neste contrato. Peças já retiradas ou devolvidas não são afetadas.",
+    "confirm": "Cancelar contrato"
+  },
   "validation": {
     "clientRequired": "Cliente é obrigatório",
     "eventDateRequired": "Data do evento é obrigatória",

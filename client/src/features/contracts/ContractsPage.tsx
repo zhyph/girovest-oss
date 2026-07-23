@@ -15,7 +15,8 @@ import {
   useCancelAllocation,
 } from '../allocations/useAllocations.ts'
 import type { Allocation } from '../allocations/allocationSchemas.ts'
-import { useContractsList } from './useContracts.ts'
+import { useContractsList, useCancelContract } from './useContracts.ts'
+import type { Contract } from './contractSchemas.ts'
 import { NewContractForm } from './NewContractForm.tsx'
 
 function resolveErrorCode(error: unknown): string {
@@ -148,6 +149,48 @@ export function RowActions({ allocation }: { allocation: Allocation }) {
   return null
 }
 
+function ContractCancelAction({ contract }: { contract: Contract }) {
+  const { t } = useTranslation('contracts')
+  const cancelContract = useCancelContract()
+  const [showConfirm, setShowConfirm] = useState(false)
+
+  const hasReservedAllocation = contract.allocations.some((allocation) => allocation.status === 'reserved')
+  if (!hasReservedAllocation) return null
+
+  async function handleCancel() {
+    try {
+      await cancelContract.mutateAsync(contract.id)
+      setShowConfirm(false)
+    } catch (error) {
+      showErrorToast(t(`errors.${resolveErrorCode(error)}`, { defaultValue: t('common:errors.UNKNOWN', { ns: 'common' }) }))
+    }
+  }
+
+  return (
+    <>
+      <Button
+        size="sm"
+        variant="secondary"
+        onClick={() => setShowConfirm(true)}
+        disabled={cancelContract.isPending}
+      >
+        {t('cancelContract.action')}
+      </Button>
+      <Modal open={showConfirm} onClose={() => setShowConfirm(false)} title={t('cancelContract.confirmTitle')}>
+        <p className="mb-4 text-sm text-ink">{t('cancelContract.confirmMessage')}</p>
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="secondary" onClick={() => setShowConfirm(false)}>
+            {t('common:actions.cancel', { ns: 'common' })}
+          </Button>
+          <Button type="button" onClick={handleCancel} disabled={cancelContract.isPending}>
+            {t('cancelContract.confirm')}
+          </Button>
+        </div>
+      </Modal>
+    </>
+  )
+}
+
 export function ContractsPage() {
   const { t } = useTranslation('contracts')
   const { locale } = useLocale()
@@ -186,6 +229,7 @@ export function ContractsPage() {
                   {formatDate(parseDateOnly(contract.eventDate), locale, { day: '2-digit', month: '2-digit', year: 'numeric' })}
                 </span>
               </div>
+              <ContractCancelAction contract={contract} />
             </div>
             <div className="flex flex-col gap-1">
               {contract.allocations.map((allocation) => (
