@@ -1,8 +1,11 @@
 import 'dotenv/config'
 import { app } from './app.js'
+import { runContractBackfill } from './services/contractBackfill.js'
 
 const port = Number(process.env.PORT ?? 3000)
 const host = process.env.HOST ?? '0.0.0.0'
+
+await runContractBackfill()
 
 const server = app.listen(port, host, () => {
   console.log(`Server listening on ${host}:${port}`)
