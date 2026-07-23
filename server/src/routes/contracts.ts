@@ -3,10 +3,20 @@ import { z } from 'zod'
 import { requireAuth } from '../auth/authMiddleware.js'
 import { AppError } from '../errors/AppError.js'
 import { ErrorCodes } from '../errors/errorCodes.js'
+import { prisma } from '../db/client.js'
 import { createContract, cancelContract, listContracts } from '../services/contractService.js'
 
 export const contractsRouter = Router()
 contractsRouter.use(requireAuth)
+
+// A Contract's locationId drives its per-location sequential number and the
+// @@unique([locationId, number]) constraint — it must come from the
+// authenticated staff's own location, never from client-supplied input,
+// the same way locationSettings.ts's resolveLocationId already does.
+async function resolveLocationId(staffId: string): Promise<string> {
+  const staff = await prisma.staff.findUniqueOrThrow({ where: { id: staffId } })
+  return staff.locationId
+}
 
 contractsRouter.get('/', async (_req, res) => {
   res.json(await listContracts())
@@ -25,7 +35,6 @@ const installmentSchema = z.object({
 })
 
 const createSchema = z.object({
-  locationId: z.string().min(1),
   clientId: z.string().min(1),
   eventDate: z.coerce.date(),
   paymentMethod: z.string().min(1),
@@ -38,7 +47,8 @@ contractsRouter.post('/', async (req, res) => {
   if (!parsed.success || !req.staff) {
     throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'Invalid contract payload')
   }
-  const contract = await createContract({ ...parsed.data, staffId: req.staff.staffId })
+  const locationId = await resolveLocationId(req.staff.staffId)
+  const contract = await createContract({ ...parsed.data, locationId, staffId: req.staff.staffId })
   res.status(201).json(contract)
 })
 
