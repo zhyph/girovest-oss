@@ -33,6 +33,20 @@
     "confirmMessage": "Isso cancela todas as peças ainda reservadas neste contrato. Peças já retiradas ou devolvidas não são afetadas.",
     "confirm": "Cancelar contrato"
   },
+  "print": {
+    "action": "Imprimir",
+    "back": "Voltar",
+    "contractNumber": "Contrato Nº {{number}}",
+    "clientSection": "Cliente",
+    "itemsSection": "Peças",
+    "total": "Valor Total",
+    "installmentsSection": "Parcelas",
+    "installmentPaid": "Pago",
+    "installmentPending": "Pendente",
+    "clausesSection": "Termos e Condições",
+    "signatureLabel": "Assinatura do Cliente",
+    "signedAt": "Assinado em {{date}}"
+  },
   "validation": {
     "clientRequired": "Cliente é obrigatório",
     "eventDateRequired": "Data do evento é obrigatória",
