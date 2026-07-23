@@ -8,6 +8,7 @@ import * as useClientsModule from '../clients/useClients.ts'
 import * as useProductsModule from '../products/useProducts.ts'
 import * as useAllocationsModule from '../allocations/useAllocations.ts'
 import * as useContractsModule from './useContracts.ts'
+import * as useAuthModule from '../../lib/useAuth.ts'
 import { Toaster } from '../../components/ui/sonner.tsx'
 import type { Client } from '../clients/clientSchemas.ts'
 
@@ -51,6 +52,13 @@ function mockHooks() {
   vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [product] } as never)
   vi.spyOn(useAllocationsModule, 'useProductAvailability').mockReturnValue({ data: { available: true } } as never)
   vi.spyOn(useContractsModule, 'useCreateContract').mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
+  vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+    staff: { id: 's1', name: 'Staff', role: 'staff', locationId: 'l1', locationName: 'Loja' },
+    isLoadingStaff: false,
+    login: vi.fn(),
+    logout: vi.fn(),
+    isLoggedIn: true,
+  } as never)
 }
 
 describe('NewContractForm', () => {
@@ -121,6 +129,7 @@ describe('NewContractForm', () => {
     expect(createImpl).toHaveBeenCalledOnce()
     expect(createImpl.mock.calls[0][0].paymentMethod).toBe('PIX')
     expect(createImpl.mock.calls[0][0].clientId).toBe('c1')
+    expect(createImpl.mock.calls[0][0].locationId).toBe('l1')
     expect(onClose).toHaveBeenCalledOnce()
   })
 })

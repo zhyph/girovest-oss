@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useForm, Controller, useFieldArray, useWatch, type Path } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/button.tsx'
 import { CurrencyInput } from '../../components/ui/currency-input.tsx'
 import { DateInput } from '../../components/ui/date-input.tsx'
 import { showErrorToast } from '../../lib/toast.ts'
+import { useAuth } from '../../lib/useAuth.ts'
 import { useLocale } from '../../lib/LocaleContext.tsx'
 import { getMissingRequiredFields } from '../../lib/clientReadiness.ts'
 import { getPaymentMethods } from '../../lib/paymentMethodTemplate.ts'
@@ -110,6 +111,7 @@ function useWatchField(
 export function NewContractForm({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation('contracts')
   const { locale } = useLocale()
+  const { staff } = useAuth()
   const { data: clients } = useClients()
   const { data: products } = useProducts()
   const createContract = useCreateContract()
@@ -120,12 +122,11 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
     handleSubmit,
     control,
     watch,
-    setValue,
     formState: { errors },
   } = useForm<NewContractFormValues>({
     resolver: zodResolver(newContractSchema),
     defaultValues: {
-      locationId: '',
+      locationId: staff?.locationId ?? '',
       clientId: '',
       eventDate: '',
       paymentMethod: '',
@@ -139,17 +140,6 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
   const selectedClientId = watch('clientId')
   const selectedClient = clients?.find((client) => client.id === selectedClientId) ?? null
   const missingFields = selectedClient ? getMissingRequiredFields(selectedClient, locale) : []
-
-  // The form has no location selector of its own: a contract's locationId
-  // must still be sent to the API, so it's derived from whichever product
-  // the staff picked for the first item (products carry their own
-  // locationId — see ProductDrawer.tsx for the same source-of-truth).
-  const watchedItems = useWatch({ control, name: 'items' })
-  useEffect(() => {
-    const productId = watchedItems?.find((item) => item.productId)?.productId
-    const product = products?.find((candidate) => candidate.id === productId)
-    if (product) setValue('locationId', product.locationId)
-  }, [watchedItems, products, setValue])
 
   async function onSubmit(values: NewContractFormValues) {
     try {
