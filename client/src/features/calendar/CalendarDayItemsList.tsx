@@ -33,8 +33,8 @@ export function CalendarDayItemsList({
   )
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-col gap-2">
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
         {pageItems.map((allocation) => {
           const product = products.get(allocation.productId)
           const photo = product?.photos?.[0]
@@ -64,7 +64,7 @@ export function CalendarDayItemsList({
         })}
       </div>
       {totalPages > 1 && (
-        <div className="flex items-center justify-between text-sm">
+        <div className="flex flex-shrink-0 items-center justify-between text-sm">
           <Button
             type="button"
             variant="secondary"
