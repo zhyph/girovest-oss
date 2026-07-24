@@ -121,6 +121,15 @@ installments — the original reported print bug) and
 Requires `seed-e2e.ts` to have been run first.
 
 ```bash
+npx tsx seed-e2e-calendar-load.ts
+```
+
+Seeds 300 fixed-ID `Allocation` rows (`e2e-calendar-load-allocation-1..300`), all
+on the same day (tomorrow, relative to when the script runs), used by
+`client/e2e/calendar-load.spec.ts` to test Agenda/Month view behavior at
+volume. Requires `seed-e2e.ts` to have been run first.
+
+```bash
 npx tsx seed-staff.ts <login> <password> <name> <role: owner|staff> <locationId>
 ```
 
