@@ -26,7 +26,7 @@ async function resolveLocationId(staffId: string): Promise<string> {
 // app's specific host is skipped too. Reporting a candidate here that
 // signingApp didn't actually bind to would have the desktop generate a
 // working-looking QR code for an address nothing is listening on.
-function reachableSigningCandidates(): ReturnType<typeof detectLanCandidates> {
+export function reachableSigningCandidates(): ReturnType<typeof detectLanCandidates> {
   const host = process.env.HOST ?? '0.0.0.0'
   if (host === '0.0.0.0') return []
   return detectLanCandidates().filter((candidate) => candidate.address !== host)

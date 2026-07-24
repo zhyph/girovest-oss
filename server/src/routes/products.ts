@@ -1,8 +1,11 @@
+import fs from 'fs'
+import path from 'path'
 import { Router } from 'express'
 import { z } from 'zod'
 import { requireAuth } from '../auth/authMiddleware.js'
 import { AppError } from '../errors/AppError.js'
 import { ErrorCodes } from '../errors/errorCodes.js'
+import { prisma } from '../db/client.js'
 import {
   createProduct,
   listProducts,
@@ -10,6 +13,8 @@ import {
   updateProduct,
   deleteProduct,
 } from '../services/productService.js'
+import { issueProductPhotoToken } from '../services/productPhotoTokenService.js'
+import { reachableSigningCandidates } from './contracts.js'
 
 export const productsRouter = Router()
 productsRouter.use(requireAuth)
@@ -65,4 +70,34 @@ productsRouter.patch('/:id', async (req, res) => {
 productsRouter.delete('/:id', async (req, res) => {
   await deleteProduct(req.params.id)
   res.status(204).send()
+})
+
+productsRouter.post('/:id/photo-token', async (req, res) => {
+  if (!req.staff) throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Unauthorized')
+  const staff = await prisma.staff.findUniqueOrThrow({ where: { id: req.staff.staffId } })
+  const { token, expiresAt } = await issueProductPhotoToken(req.params.id, staff.locationId)
+  res.status(201).json({
+    token,
+    expiresAt,
+    port: Number(process.env.PORT ?? 3000),
+    candidates: reachableSigningCandidates(),
+  })
+})
+
+// Filenames are always crypto.randomUUID() + '.jpg', generated only by
+// productPhotoTokenService — this pattern rejects anything else (including
+// path traversal) before it ever reaches the filesystem.
+const PHOTO_FILENAME_PATTERN = /^[0-9a-f-]+\.jpg$/
+
+productsRouter.get('/:id/photos/:filename', async (req, res) => {
+  if (!PHOTO_FILENAME_PATTERN.test(req.params.filename)) {
+    throw new AppError(ErrorCodes.NOT_FOUND, 404, 'Photo not found')
+  }
+  const dir = process.env.PRODUCT_PHOTOS_DIR ?? './product-photos'
+  const filePath = path.join(dir, req.params.filename)
+  if (!fs.existsSync(filePath)) {
+    throw new AppError(ErrorCodes.NOT_FOUND, 404, 'Photo not found')
+  }
+  res.set('Content-Type', 'image/jpeg')
+  res.sendFile(path.resolve(filePath))
 })
