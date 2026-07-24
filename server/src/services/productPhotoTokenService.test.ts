@@ -118,6 +118,12 @@ describe('submitPhotos', () => {
     const photos = JSON.parse(product.photos) as string[]
     expect(photos).toHaveLength(2)
     for (const relativePath of photos) {
+      // Must be the authenticated API path (GET /:id/photos/:filename), not a
+      // bare filename — the client only treats a path starting with '/api/'
+      // (PhotoThumbnail's isRemotePath check) as one needing an authenticated
+      // fetch via useAuthenticatedImageUrl; anything else renders as a literal
+      // <img src>, which a bare filename can never resolve correctly.
+      expect(relativePath).toMatch(new RegExp(`^/api/products/${productId}/photos/[0-9a-f-]+\\.jpg$`))
       expect(fs.existsSync(path.join(photosDir, path.basename(relativePath)))).toBe(true)
     }
   })

@@ -78,7 +78,12 @@ export async function submitPhotos(token: string, photos: string[]): Promise<voi
     }
     const filename = `${crypto.randomUUID()}.jpg`
     fs.writeFileSync(path.join(dir, filename), Buffer.from(match[1], 'base64'))
-    writtenPaths.push(filename)
+    // Stored as the authenticated API path (matching the GET /:id/photos/:filename
+    // route below and client/src/lib/useAuthenticatedImageUrl.ts's contract), not a
+    // bare filename — the client's PhotoThumbnail only treats a path starting with
+    // '/api/' as one that needs an authenticated fetch; anything else is rendered as
+    // a literal <img src>, which a bare filename is not.
+    writtenPaths.push(`/api/products/${photoToken.productId}/photos/${filename}`)
   }
 
   const product = await prisma.product.findUniqueOrThrow({ where: { id: photoToken.productId } })

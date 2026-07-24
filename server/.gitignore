@@ -6,3 +6,4 @@ generated/
 *.db-journal
 .env
 .env.test.local
+product-photos/

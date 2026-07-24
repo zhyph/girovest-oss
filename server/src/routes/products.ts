@@ -94,10 +94,19 @@ productsRouter.get('/:id/photos/:filename', async (req, res) => {
     throw new AppError(ErrorCodes.NOT_FOUND, 404, 'Photo not found')
   }
   const dir = process.env.PRODUCT_PHOTOS_DIR ?? './product-photos'
-  const filePath = path.join(dir, req.params.filename)
+  const root = path.resolve(dir)
+  const filePath = path.join(root, req.params.filename)
   if (!fs.existsSync(filePath)) {
     throw new AppError(ErrorCodes.NOT_FOUND, 404, 'Photo not found')
   }
   res.set('Content-Type', 'image/jpeg')
-  res.sendFile(path.resolve(filePath))
+  // Must pass `root` explicitly: without it, the `send` library (which
+  // res.sendFile delegates to) dotfile-checks every segment of the *absolute*
+  // path, including ancestor directories that have nothing to do with the
+  // served content (e.g. this repo's own `.claude/worktrees/...` layout) —
+  // that falsely 404s (masked as a generic 500 by errorMiddleware) any time
+  // the app happens to run from inside a dot-prefixed directory. Passing
+  // `root` makes `send` dotfile-check only the path relative to it, matching
+  // the intent of PHOTO_FILENAME_PATTERN's own traversal guard above.
+  res.sendFile(req.params.filename, { root })
 })
