@@ -42,6 +42,10 @@ export function resolveDatabaseUrl(userDataPath: string): string {
   return `file:${path.join(userDataPath, 'dev.db')}`
 }
 
+export function resolveProductPhotosDir(userDataPath: string): string {
+  return path.join(userDataPath, 'product-photos')
+}
+
 // The packaged server directory lives inside the app's read-only mounted
 // resources (e.g. an AppImage's squashfs mount, or an ASAR-adjacent
 // directory on Windows/NSIS installs users don't have write access to).
@@ -158,6 +162,7 @@ async function startServer(): Promise<boolean> {
     DB_PROVIDER: 'sqlite',
     DATABASE_URL: resolveDatabaseUrl(userDataPath),
     JWT_SECRET: resolveJwtSecret(userDataPath),
+    PRODUCT_PHOTOS_DIR: resolveProductPhotosDir(userDataPath),
     HOST: '127.0.0.1',
     PORT: '3000',
   }

@@ -9,6 +9,7 @@ import {
   resolveServerEntry,
   resolveJwtSecret,
   resolveDatabaseUrl,
+  resolveProductPhotosDir,
   ensureWritableServerRuntime,
   waitForPortFree,
 } from './main.ts'
@@ -75,6 +76,13 @@ describe('resolveDatabaseUrl', () => {
   it('builds a file: URL pointing at dev.db inside the given directory', () => {
     const userDataPath = '/home/user/.config/girovest'
     expect(resolveDatabaseUrl(userDataPath)).toBe(`file:${path.join(userDataPath, 'dev.db')}`)
+  })
+})
+
+describe('resolveProductPhotosDir', () => {
+  it('builds a path to a product-photos directory inside the given directory', () => {
+    const userDataPath = '/home/user/.config/girovest'
+    expect(resolveProductPhotosDir(userDataPath)).toBe(path.join(userDataPath, 'product-photos'))
   })
 })
 
