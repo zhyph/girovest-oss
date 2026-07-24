@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
@@ -21,7 +21,17 @@ function PhotoThumbnail({ url }: { url: string }) {
   return <img src={isRemotePath ? (authenticatedUrl ?? '') : url} alt="" className="h-8 w-8 rounded object-cover" />
 }
 
-export function ProductDrawer({ product, onClose }: { product: Product | null; onClose: () => void }) {
+export function ProductDrawer({
+  product,
+  onClose,
+  duplicateDefaults,
+  onCreated,
+}: {
+  product: Product | null
+  onClose: () => void
+  duplicateDefaults?: Partial<ProductFormValues>
+  onCreated?: (values: ProductFormValues) => void
+}) {
   const { t } = useTranslation('products')
   const { staff } = useAuth()
   const createProduct = useCreateProduct()
@@ -32,16 +42,26 @@ export function ProductDrawer({ product, onClose }: { product: Product | null; o
   const [photos, setPhotos] = useState<string[]>(product?.photos ?? [])
   const [newPhotoUrl, setNewPhotoUrl] = useState('')
   const [addingPhotosRemotely, setAddingPhotosRemotely] = useState(false)
+  // Ref (not state) so the value set by the button's onClick is read synchronously
+  // by the form's onSubmit handler in the same event dispatch, without waiting on a re-render.
+  const keepOpenAfterSaveRef = useRef(false)
   const {
     register,
     handleSubmit,
     control,
+    reset,
     formState: { errors },
   } = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
     defaultValues: product ?? {
       locationId: staff?.locationId ?? '',
-      name: '', category: '', size: '', color: '', rentalPrice: 0, depositAmount: 0,
+      name: '',
+      category: duplicateDefaults?.category ?? '',
+      size: duplicateDefaults?.size ?? '',
+      color: duplicateDefaults?.color ?? '',
+      rentalPrice: duplicateDefaults?.rentalPrice ?? 0,
+      depositAmount: duplicateDefaults?.depositAmount ?? 0,
+      description: duplicateDefaults?.description,
     },
   })
 
@@ -65,10 +85,26 @@ export function ProductDrawer({ product, onClose }: { product: Product | null; o
     try {
       if (product) {
         await updateProduct.mutateAsync({ id: product.id, values: { ...values, status, photos } })
+        onClose()
       } else {
         await createProduct.mutateAsync({ ...values, photos })
+        onCreated?.(values)
+        if (keepOpenAfterSaveRef.current) {
+          setPhotos([])
+          reset({
+            locationId: staff?.locationId ?? '',
+            name: '',
+            category: values.category,
+            size: values.size,
+            color: values.color,
+            rentalPrice: values.rentalPrice,
+            depositAmount: values.depositAmount,
+            description: values.description,
+          })
+        } else {
+          onClose()
+        }
       }
-      onClose()
     } catch (error) {
       showError(error)
     }
@@ -200,7 +236,25 @@ export function ProductDrawer({ product, onClose }: { product: Product | null; o
             <Button type="button" variant="secondary" onClick={onClose}>
               {t('common:actions.cancel', { ns: 'common' })}
             </Button>
-            <Button type="submit" disabled={createProduct.isPending || updateProduct.isPending}>
+            {!product && (
+              <Button
+                type="submit"
+                variant="secondary"
+                onClick={() => {
+                  keepOpenAfterSaveRef.current = true
+                }}
+                disabled={createProduct.isPending}
+              >
+                {t('common:actions.saveAndAddAnother', { ns: 'common' })}
+              </Button>
+            )}
+            <Button
+              type="submit"
+              onClick={() => {
+                keepOpenAfterSaveRef.current = false
+              }}
+              disabled={createProduct.isPending || updateProduct.isPending}
+            >
               {t('common:actions.save', { ns: 'common' })}
             </Button>
           </div>

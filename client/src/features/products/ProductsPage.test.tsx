@@ -92,4 +92,59 @@ describe('ProductsPage', () => {
 
     expect(screen.getByText('Nenhum produto encontrado para essa busca.')).toBeInTheDocument()
   })
+
+  it('remembers the last created product\'s category/size/color and prefills a fresh Novo later in the session', async () => {
+    vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [product], isLoading: false } as never)
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' }, isLoadingStaff: false, login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
+    vi.spyOn(useProductsModule, 'useCreateProduct').mockReturnValue({ mutateAsync: vi.fn().mockResolvedValue(undefined), isPending: false } as never)
+    vi.spyOn(useProductsModule, 'useUpdateProduct').mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
+    vi.spyOn(useProductsModule, 'useDeleteProduct').mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
+
+    renderWithQueryClient(<ProductsPage />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Novo' }))
+    await userEvent.type(screen.getByLabelText('Nome'), 'Vestido Verde')
+    await userEvent.type(screen.getByLabelText('Categoria'), 'festa')
+    await userEvent.type(screen.getByLabelText('Tamanho'), 'M')
+    await userEvent.type(screen.getByLabelText('Cor'), 'verde')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar e adicionar outro' }))
+
+    expect(screen.getByLabelText('Nome')).toHaveValue('')
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+    expect(screen.queryByLabelText('Nome')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Novo' }))
+
+    expect(screen.getByLabelText('Nome')).toHaveValue('')
+    expect(screen.getByLabelText('Categoria')).toHaveValue('festa')
+    expect(screen.getByLabelText('Tamanho')).toHaveValue('M')
+    expect(screen.getByLabelText('Cor')).toHaveValue('verde')
+  })
+
+  it('does not update the remembered defaults when the drawer is closed without saving', async () => {
+    vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [product], isLoading: false } as never)
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' }, isLoadingStaff: false, login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
+    vi.spyOn(useProductsModule, 'useCreateProduct').mockReturnValue({ mutateAsync: vi.fn().mockResolvedValue(undefined), isPending: false } as never)
+    vi.spyOn(useProductsModule, 'useUpdateProduct').mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
+    vi.spyOn(useProductsModule, 'useDeleteProduct').mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
+
+    renderWithQueryClient(<ProductsPage />)
+
+    // First, successfully create-and-add-another so lastCreatedDefaults is populated.
+    await userEvent.click(screen.getByRole('button', { name: 'Novo' }))
+    await userEvent.type(screen.getByLabelText('Nome'), 'Vestido Verde')
+    await userEvent.type(screen.getByLabelText('Categoria'), 'festa')
+    await userEvent.type(screen.getByLabelText('Tamanho'), 'M')
+    await userEvent.type(screen.getByLabelText('Cor'), 'verde')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar e adicionar outro' }))
+
+    // Now type unsaved edits into the still-open drawer and cancel instead of saving.
+    await userEvent.type(screen.getByLabelText('Categoria'), 'unsaved')
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+    // The remembered defaults must still be the last *saved* values, not the unsaved edit.
+    await userEvent.click(screen.getByRole('button', { name: 'Novo' }))
+    expect(screen.getByLabelText('Categoria')).toHaveValue('festa')
+    expect(screen.getByLabelText('Cor')).toHaveValue('verde')
+  })
 })

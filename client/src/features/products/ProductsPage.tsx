@@ -6,7 +6,7 @@ import { Badge } from '../../components/ui/badge.tsx'
 import { cn } from '../../lib/cn.ts'
 import { useProducts } from './useProducts.ts'
 import { ProductDrawer } from './ProductDrawer.tsx'
-import type { Product, ProductAvailability, ProductStatus } from './productSchemas.ts'
+import type { Product, ProductAvailability, ProductFormValues, ProductStatus } from './productSchemas.ts'
 
 const AVAILABILITY_TONE: Record<ProductAvailability, 'neutral' | 'success' | 'warning' | 'danger'> = {
   available: 'success',
@@ -25,6 +25,8 @@ export function ProductsPage() {
   const { data: products, isLoading } = useProducts()
   const [editing, setEditing] = useState<Product | null | undefined>(undefined)
   const [search, setSearch] = useState('')
+  // In-memory only, never persisted: cleared on page reload, updated only by a successful create.
+  const [lastCreatedDefaults, setLastCreatedDefaults] = useState<Partial<ProductFormValues> | null>(null)
 
   const filteredProducts = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -92,7 +94,22 @@ export function ProductsPage() {
         </div>
       )}
       {editing !== undefined && (
-        <ProductDrawer key={editing?.id ?? 'new'} product={editing} onClose={() => setEditing(undefined)} />
+        <ProductDrawer
+          key={editing?.id ?? 'new'}
+          product={editing}
+          onClose={() => setEditing(undefined)}
+          duplicateDefaults={editing === null ? (lastCreatedDefaults ?? undefined) : undefined}
+          onCreated={(values) =>
+            setLastCreatedDefaults({
+              category: values.category,
+              size: values.size,
+              color: values.color,
+              rentalPrice: values.rentalPrice,
+              depositAmount: values.depositAmount,
+              description: values.description,
+            })
+          }
+        />
       )}
     </div>
   )

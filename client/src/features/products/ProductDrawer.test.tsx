@@ -163,4 +163,45 @@ describe('ProductDrawer', () => {
       expect.objectContaining({ values: expect.objectContaining({ status: 'maintenance' }) }),
     )
   })
+
+  it('prefills category/size/color/price/deposit from duplicateDefaults, leaving name and photos blank', () => {
+    mockProductHooks(vi.fn())
+    renderWithToast(
+      <ProductDrawer
+        product={null}
+        onClose={vi.fn()}
+        duplicateDefaults={{ category: 'festa', size: 'M', color: 'azul', rentalPrice: 200, depositAmount: 100 }}
+      />,
+    )
+
+    expect(screen.getByLabelText('Categoria')).toHaveValue('festa')
+    expect(screen.getByLabelText('Tamanho')).toHaveValue('M')
+    expect(screen.getByLabelText('Cor')).toHaveValue('azul')
+    expect(screen.getByLabelText('Nome')).toHaveValue('')
+  })
+
+  it('calls onCreated with the saved values and stays open when "Salvar e adicionar outro" is used', async () => {
+    const onClose = vi.fn()
+    const onCreated = vi.fn()
+    const createImpl = vi.fn().mockResolvedValue(undefined)
+    mockProductHooks(vi.fn(), createImpl)
+    renderWithToast(<ProductDrawer product={null} onClose={onClose} onCreated={onCreated} />)
+
+    await userEvent.type(screen.getByLabelText('Nome'), 'Vestido Verde')
+    await userEvent.type(screen.getByLabelText('Categoria'), 'festa')
+    await userEvent.type(screen.getByLabelText('Tamanho'), 'M')
+    await userEvent.type(screen.getByLabelText('Cor'), 'verde')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar e adicionar outro' }))
+
+    expect(createImpl).toHaveBeenCalled()
+    expect(onCreated).toHaveBeenCalledWith(expect.objectContaining({ category: 'festa', size: 'M', color: 'verde' }))
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByLabelText('Nome')).toHaveValue('')
+  })
+
+  it('does not show "Salvar e adicionar outro" in edit mode', () => {
+    mockProductHooks(vi.fn())
+    renderWithToast(<ProductDrawer product={product} onClose={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: 'Salvar e adicionar outro' })).not.toBeInTheDocument()
+  })
 })
