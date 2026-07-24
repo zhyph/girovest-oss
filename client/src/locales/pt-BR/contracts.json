@@ -65,5 +65,12 @@
     "eventDateRequired": "Data do evento é obrigatória",
     "paymentMethodRequired": "Forma de pagamento é obrigatória"
   },
-  "unavailableProduct": "Este produto não está disponível para essas datas."
+  "unavailableProduct": "Este produto não está disponível para essas datas.",
+  "errors": {
+    "VALIDATION_ERROR": "Verifique os dados do contrato e tente novamente.",
+    "NOT_FOUND": "Contrato não encontrado.",
+    "DUE_DATE_BEFORE_CHECKOUT": "A data de devolução deve ser após a data de retirada.",
+    "PRODUCT_UNAVAILABLE": "Produto não disponível para as datas escolhidas.",
+    "PRODUCT_NOT_IN_CIRCULATION": "Este produto não está disponível para aluguel."
+  }
 }

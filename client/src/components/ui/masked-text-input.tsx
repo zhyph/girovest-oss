@@ -7,9 +7,17 @@ type MaskedTextInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'value' 
   mask?: (raw: string) => string
 }
 
+// Module-level so its reference is stable across renders — inlining this
+// as a fallback (mask ?? ((raw) => raw)) would create a new function every
+// render whenever no mask is provided, making the effect below re-run on
+// every render instead of only when `value` actually changes.
+function identityFormat(raw: string): string {
+  return raw
+}
+
 export const MaskedTextInput = forwardRef<HTMLInputElement, MaskedTextInputProps>(
   function MaskedTextInput({ className, value, onChange, mask, ...props }, ref) {
-    const format = mask ?? ((raw: string) => raw)
+    const format = mask ?? identityFormat
     const [display, setDisplay] = useState(() => format(value))
 
     useEffect(() => {

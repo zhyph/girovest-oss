@@ -57,7 +57,17 @@ export function SignRemotelyModal({ contractId, open, onClose }: SignRemotelyMod
       setQrDataUrl('')
       return
     }
-    void QRCode.toDataURL(buildSigningUrl(tokenResponse, selectedAddress)).then(setQrDataUrl)
+    // toDataURL calls for different addresses can resolve out of order
+    // (e.g. the network picker changes quickly) — without this guard, a
+    // stale, slower call could resolve after a newer one and overwrite
+    // the QR code with one for an address that's no longer selected.
+    let cancelled = false
+    void QRCode.toDataURL(buildSigningUrl(tokenResponse, selectedAddress)).then((dataUrl) => {
+      if (!cancelled) setQrDataUrl(dataUrl)
+    })
+    return () => {
+      cancelled = true
+    }
   }, [tokenResponse, selectedAddress])
 
   const isExpired = tokenResponse ? new Date(tokenResponse.expiresAt).getTime() < Date.now() : false
