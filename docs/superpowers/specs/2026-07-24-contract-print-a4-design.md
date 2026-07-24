@@ -39,11 +39,24 @@ enough that one page genuinely isn't achievable.
 - **No data/schema changes.** This is styling-only; `ContractPrintPage.tsx`
   and `ContractPrintView.tsx`'s structure/content stay the same.
 
+## Root Cause (found during implementation)
+
+Reproducing the reported overflow with a synthetic one-item, zero-installment,
+placeholder-clause contract did not fail under realistic print margins (12mm)
+or with default browser header/footer overhead — it fit comfortably. Adding
+the **real** production clause text (`DEFAULT_CONTRACT_CLAUSES`, six
+substantial legal paragraphs) still fit on one page. Only adding a **typical
+3-installment payment plan** on top of the real clause text reproduced the
+exact reported failure (2 pages, page 2 containing only the signature). A
+one-item contract with zero installments understates real usage — most real
+contracts have at least one payment installment — so the e2e fixture (Task 1)
+models a short contract with 3 installments, not zero.
+
 ## Testing
 
-- Render a representative short contract (one product, a few clauses, no
-  installments — the reported failure case) through print preview and
-  confirm it fits one A4 page with no orphaned content.
+- Render a representative short contract (one product, the real clause set,
+  a 3-installment payment plan — the reported failure case) through print
+  preview and confirm it fits one A4 page with no orphaned content.
 - Render a stress-test contract (many rental items, many clauses, several
   installments — generated via seed/fixture data) through print preview and
   confirm the layout still fits one page where reasonably possible, and

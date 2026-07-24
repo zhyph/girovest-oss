@@ -1,6 +1,7 @@
 import 'dotenv/config'
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
 import { PrismaClient } from './src/generated/prisma/client.js'
+import { DEFAULT_CONTRACT_CLAUSES } from './src/constants/defaultContractClauses.js'
 
 const adapter = new PrismaBetterSqlite3({ url: process.env.DATABASE_URL ?? 'file:./dev.db' })
 const prisma = new PrismaClient({ adapter })
@@ -10,19 +11,15 @@ if (!staff) {
   throw new Error('e2e-staff not found — run `npx tsx seed-e2e.ts` first.')
 }
 
+// Use the real production clause text (not shorter placeholders) — this is
+// what actually reproduces the reported print overflow; see
+// docs/superpowers/specs/2026-07-24-contract-print-a4-design.md.
 // SQLite doesn't support `skipDuplicates` on createMany, so upsert one at a time.
-const clauses = [
-  { id: 'e2e-print-clause-1', sortOrder: 0, text: 'O item alugado deve ser devolvido limpo e na data combinada.' },
-  { id: 'e2e-print-clause-2', sortOrder: 1, text: 'Danos ao item serão descontados do valor do depósito.' },
-  { id: 'e2e-print-clause-3', sortOrder: 2, text: 'O atraso na devolução gera multa diária de 10% do valor da diária.' },
-  { id: 'e2e-print-clause-4', sortOrder: 3, text: 'Não é permitido repasse do item alugado a terceiros.' },
-  { id: 'e2e-print-clause-5', sortOrder: 4, text: 'O cancelamento deve ser feito com no mínimo 7 dias de antecedência.' },
-]
-for (const clause of clauses) {
+for (let i = 0; i < DEFAULT_CONTRACT_CLAUSES.length; i += 1) {
   await prisma.locationContractClause.upsert({
-    where: { id: clause.id },
+    where: { id: `e2e-print-clause-${i + 1}` },
     update: {},
-    create: { ...clause, locationId: staff.locationId },
+    create: { id: `e2e-print-clause-${i + 1}`, locationId: staff.locationId, sortOrder: i, text: DEFAULT_CONTRACT_CLAUSES[i] },
   })
 }
 
@@ -37,7 +34,10 @@ const client = await prisma.client.upsert({
   },
 })
 
-// Short contract: the originally reported bug — one item, no installments.
+// Short contract: the originally reported bug — one item, a typical 3-installment
+// payment plan. Zero installments does NOT reproduce the overflow (verified
+// directly): a modest installment table is part of what tips a one-item
+// contract onto a 2nd page, alongside the real clause text above.
 const shortProduct = await prisma.product.upsert({
   where: { id: 'e2e-print-short-product' },
   update: {},
@@ -82,6 +82,19 @@ await prisma.allocation.upsert({
     priceCharged: 250,
   },
 })
+
+const shortInstallments = [
+  { dueDate: new Date('2027-01-15'), amount: 100, paid: true },
+  { dueDate: new Date('2027-02-01'), amount: 100, paid: false },
+  { dueDate: new Date('2027-02-27'), amount: 50, paid: false },
+]
+for (let i = 0; i < shortInstallments.length; i += 1) {
+  await prisma.installment.upsert({
+    where: { id: `e2e-print-short-installment-${i + 1}` },
+    update: {},
+    create: { id: `e2e-print-short-installment-${i + 1}`, contractId: shortContract.id, ...shortInstallments[i] },
+  })
+}
 
 // Stress contract: worst case for the print layout — 15 items, 8 installments.
 const stressContract = await prisma.contract.upsert({
@@ -144,5 +157,5 @@ for (let i = 1; i <= 8; i += 1) {
   })
 }
 
-console.log('Seeded e2e-print-short-contract (1 item) and e2e-print-stress-contract (15 items, 8 installments).')
+console.log('Seeded e2e-print-short-contract (1 item, 3 installments) and e2e-print-stress-contract (15 items, 8 installments).')
 await prisma.$disconnect()
