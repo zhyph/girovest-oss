@@ -265,10 +265,12 @@ test('short contract (one rental item) prints on exactly one A4 page', async ({ 
 
   await page.emulateMedia({ media: 'print' })
   const pdfPath = join(mkdtempSync(join(tmpdir(), 'contract-print-')), 'short.pdf')
-  // preferCSSPageSize makes Chromium honor our own `@page { size: A4; margin: ... }`
-  // rule (added in Task 3) instead of Playwright's default Letter/zero-margin
-  // output — without this, the test could pass even if that CSS rule were broken.
-  await page.pdf({ path: pdfPath, preferCSSPageSize: true })
+  // Explicit format + margin, matching the `@page { size: A4; margin: 12mm; }`
+  // rule Task 3 adds to index.css. Playwright's page.pdf() defaults to 0mm
+  // margins when none are given, which is far more forgiving than any real
+  // print dialog (or our own @page rule) — that gap is exactly why the
+  // client's real-world bug doesn't reproduce without setting this explicitly.
+  await page.pdf({ path: pdfPath, format: 'A4', margin: { top: '12mm', right: '12mm', bottom: '12mm', left: '12mm' } })
   await testInfo.attach('short-contract.pdf', { path: pdfPath, contentType: 'application/pdf' })
 
   expect(pdfPageCount(pdfPath)).toBe(1)
@@ -281,7 +283,7 @@ test('stress contract (15 items, 8 installments) print page count is captured fo
 
   await page.emulateMedia({ media: 'print' })
   const pdfPath = join(mkdtempSync(join(tmpdir(), 'contract-print-')), 'stress.pdf')
-  await page.pdf({ path: pdfPath, preferCSSPageSize: true })
+  await page.pdf({ path: pdfPath, format: 'A4', margin: { top: '12mm', right: '12mm', bottom: '12mm', left: '12mm' } })
   await testInfo.attach('stress-contract.pdf', { path: pdfPath, contentType: 'application/pdf' })
 
   const pageCount = pdfPageCount(pdfPath)
