@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api.ts'
-import type { Contract, ContractDetail, NewContractFormValues } from './contractSchemas.ts'
+import type { Contract, ContractDetail, NewContractFormValues, SigningTokenResponse } from './contractSchemas.ts'
 
 const CONTRACTS_KEY = ['contracts']
 
@@ -11,11 +11,12 @@ export function useContractsList() {
   })
 }
 
-export function useContract(id: string | undefined) {
+export function useContract(id: string | undefined, options: { refetchInterval?: number | false } = {}) {
   return useQuery({
     queryKey: [...CONTRACTS_KEY, id],
     queryFn: () => apiFetch<ContractDetail>(`/api/contracts/${id}`),
     enabled: id !== undefined,
+    refetchInterval: options.refetchInterval,
   })
 }
 
@@ -39,5 +40,12 @@ export function useCancelContract() {
   return useMutation({
     mutationFn: (id: string) => apiFetch<Contract>(`/api/contracts/${id}/cancel`, { method: 'POST' }),
     onSuccess: () => invalidateAfterMutation(queryClient),
+  })
+}
+
+export function useIssueSigningToken() {
+  return useMutation({
+    mutationFn: (contractId: string) =>
+      apiFetch<SigningTokenResponse>(`/api/contracts/${contractId}/sign-token`, { method: 'POST' }),
   })
 }

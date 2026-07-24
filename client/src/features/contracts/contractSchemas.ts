@@ -115,3 +115,15 @@ export interface ContractDetail extends Omit<Contract, 'allocations'> {
   client: ContractDetailClient
   location: ContractDetailLocation
 }
+
+export interface LanCandidate {
+  interfaceName: string
+  address: string
+}
+
+export interface SigningTokenResponse {
+  token: string
+  expiresAt: string
+  port: number
+  candidates: LanCandidate[]
+}
