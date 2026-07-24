@@ -73,6 +73,8 @@ export function CalendarPage() {
           allocations={allocations ?? []}
           dateField={tabDateField[tab]}
           productNames={productNames}
+          products={productsById}
+          clientNames={clientNames}
           date={anchor}
           onNavigate={setAnchor}
           onSelectDay={(date) => {
