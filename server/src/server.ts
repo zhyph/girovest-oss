@@ -1,4 +1,5 @@
 import 'dotenv/config'
+import type { Server } from 'http'
 import { app } from './app.js'
 import { signingApp } from './signingApp.js'
 import { detectLanCandidates } from './network/lanNetwork.js'
@@ -9,9 +10,12 @@ const host = process.env.HOST ?? '0.0.0.0'
 
 await runContractBackfill()
 
+const servers: Server[] = []
+
 const server = app.listen(port, host, () => {
   console.log(`Server listening on ${host}:${port}`)
 })
+servers.push(server)
 
 // Node's http.Server fires 'listening' optimistically even when the
 // underlying bind will shortly fail (e.g. EADDRINUSE from a leftover
@@ -49,12 +53,29 @@ if (host === '0.0.0.0') {
     // between detection and bind) is logged, not fatal — remote signing on
     // that address just won't work, but the rest of the app (including
     // print, and signing on any other detected candidate) keeps running.
-    signingApp
+    const signingServer = signingApp
       .listen(port, candidate.address, () => {
         console.log(`Signing app listening on ${candidate.address}:${port}`)
       })
       .on('error', (error) => {
         console.error(`Failed to start signing app on ${candidate.address}:${port}:`, error)
       })
+    servers.push(signingServer)
   }
 }
+
+// With no handler, Node's default SIGINT/SIGTERM disposition terminates
+// the process immediately regardless of open listeners — but `tsx watch`
+// (the dev-mode supervisor) doesn't rely on that default: it relays the
+// signal to this process and polls for it to report itself exited within
+// a short grace period before escalating to SIGKILL, printing "Previous
+// process hasn't exited yet. Force killing...". Two listening sockets
+// instead of one made this process cross that grace period more often
+// than it used to. Closing everything and exiting explicitly here removes
+// the guesswork tsx would otherwise have to do.
+function shutdown() {
+  for (const s of servers) s.close()
+  process.exit(0)
+}
+process.on('SIGINT', shutdown)
+process.on('SIGTERM', shutdown)
