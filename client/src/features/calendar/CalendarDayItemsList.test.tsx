@@ -95,4 +95,92 @@ describe('CalendarDayItemsList', () => {
     await userEvent.click(screen.getByText('Vestido Azul'))
     expect(screen.getByText('festa')).toBeInTheDocument()
   })
+
+  it('renders without crashing and hides pagination controls when there are no allocations', () => {
+    render(
+      <CalendarDayItemsList
+        allocations={[]}
+        products={products}
+        clientNames={clientNames}
+        dateField="checkoutDate"
+        pageSize={10}
+      />,
+    )
+    expect(screen.queryByRole('button', { name: 'Próximo' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Anterior' })).not.toBeInTheDocument()
+  })
+
+  it('does not show a phantom empty page when allocations are an exact multiple of pageSize', async () => {
+    const allocations = Array.from({ length: 20 }, (_, i) =>
+      makeAllocation({ id: `a${i}`, checkoutDate: `2026-07-${String((i % 27) + 1).padStart(2, '0')}` }),
+    )
+    render(
+      <CalendarDayItemsList
+        allocations={allocations}
+        products={products}
+        clientNames={clientNames}
+        dateField="checkoutDate"
+        pageSize={10}
+      />,
+    )
+
+    expect(screen.getByText('1 / 2')).toBeInTheDocument()
+    const nextButton = screen.getByRole('button', { name: 'Próximo' })
+    expect(nextButton).not.toBeDisabled()
+
+    await userEvent.click(nextButton)
+    expect(screen.getByText('2 / 2')).toBeInTheDocument()
+    expect(screen.getAllByText('Vestido Azul')).toHaveLength(10)
+    expect(screen.getByRole('button', { name: 'Próximo' })).toBeDisabled()
+  })
+
+  it('falls back to the raw productId and does not open the modal when the product is missing from the map', async () => {
+    const emptyProducts = new Map<string, Product>()
+    render(
+      <CalendarDayItemsList
+        allocations={[makeAllocation({ productId: 'missing-product' })]}
+        products={emptyProducts}
+        clientNames={clientNames}
+        dateField="checkoutDate"
+      />,
+    )
+    expect(screen.getByText('missing-product')).toBeInTheDocument()
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByText('missing-product'))
+    expect(screen.queryByText('festa')).not.toBeInTheDocument()
+  })
+
+  it('clamps to a valid page when a shorter allocations array is passed to the same instance', async () => {
+    const manyAllocations = Array.from({ length: 25 }, (_, i) =>
+      makeAllocation({ id: `a${i}`, checkoutDate: `2026-07-${String((i % 27) + 1).padStart(2, '0')}` }),
+    )
+    const { rerender } = render(
+      <CalendarDayItemsList
+        allocations={manyAllocations}
+        products={products}
+        clientNames={clientNames}
+        dateField="checkoutDate"
+        pageSize={10}
+      />,
+    )
+
+    await userEvent.click(screen.getByRole('button', { name: 'Próximo' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Próximo' }))
+    expect(screen.getByText('3 / 3')).toBeInTheDocument()
+
+    const fewAllocations = [makeAllocation({ id: 'only', checkoutDate: '2026-07-10' })]
+    rerender(
+      <CalendarDayItemsList
+        allocations={fewAllocations}
+        products={products}
+        clientNames={clientNames}
+        dateField="checkoutDate"
+        pageSize={10}
+      />,
+    )
+
+    expect(screen.getAllByText('Vestido Azul')).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: 'Próximo' })).not.toBeInTheDocument()
+  })
 })

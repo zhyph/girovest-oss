@@ -26,9 +26,10 @@ export function CalendarDayItemsList({
   const [detailProduct, setDetailProduct] = useState<Product | null>(null)
 
   const totalPages = Math.max(1, Math.ceil(allocations.length / pageSize))
+  const currentPage = Math.min(page, Math.max(0, totalPages - 1))
   const pageItems = useMemo(
-    () => allocations.slice(page * pageSize, page * pageSize + pageSize),
-    [allocations, page, pageSize],
+    () => allocations.slice(currentPage * pageSize, currentPage * pageSize + pageSize),
+    [allocations, currentPage, pageSize],
   )
 
   return (
@@ -68,17 +69,19 @@ export function CalendarDayItemsList({
             type="button"
             variant="secondary"
             size="sm"
-            disabled={page === 0}
+            disabled={currentPage === 0}
             onClick={() => setPage((p) => p - 1)}
           >
             {t('pagination.previous')}
           </Button>
-          <span className="text-muted-text">{t('pagination.pageOf', { page: page + 1, total: totalPages })}</span>
+          <span className="text-muted-text">
+            {t('pagination.pageOf', { page: currentPage + 1, total: totalPages })}
+          </span>
           <Button
             type="button"
             variant="secondary"
             size="sm"
-            disabled={page >= totalPages - 1}
+            disabled={currentPage >= totalPages - 1}
             onClick={() => setPage((p) => p + 1)}
           >
             {t('pagination.next')}
