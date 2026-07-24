@@ -24,3 +24,10 @@ export interface Product extends ProductFormValues {
   hasAllocationHistory: boolean
   createdAt: string
 }
+
+export interface PhotoTokenResponse {
+  token: string
+  expiresAt: string
+  port: number
+  candidates: { interfaceName: string; address: string }[]
+}

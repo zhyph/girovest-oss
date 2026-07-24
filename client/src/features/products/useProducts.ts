@@ -1,13 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api.ts'
-import type { Product, ProductFormValues, ProductStatus } from './productSchemas.ts'
+import type { PhotoTokenResponse, Product, ProductFormValues, ProductStatus } from './productSchemas.ts'
 
 const PRODUCTS_KEY = ['products']
 
-export function useProducts() {
+export function useProducts(options: { refetchInterval?: number | false } = {}) {
   return useQuery({
     queryKey: PRODUCTS_KEY,
     queryFn: () => apiFetch<Product[]>('/api/products'),
+    refetchInterval: options.refetchInterval,
   })
 }
 
@@ -34,5 +35,12 @@ export function useDeleteProduct() {
   return useMutation({
     mutationFn: (id: string) => apiFetch<void>(`/api/products/${id}`, { method: 'DELETE' }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: PRODUCTS_KEY }),
+  })
+}
+
+export function useIssueProductPhotoToken() {
+  return useMutation({
+    mutationFn: (productId: string) =>
+      apiFetch<PhotoTokenResponse>(`/api/products/${productId}/photo-token`, { method: 'POST' }),
   })
 }

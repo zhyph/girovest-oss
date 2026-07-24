@@ -26,6 +26,11 @@ function mockProductHooks(
   vi.spyOn(useProductsModule, 'useCreateProduct').mockReturnValue({ mutateAsync: createImpl } as never)
   vi.spyOn(useProductsModule, 'useUpdateProduct').mockReturnValue({ mutateAsync: updateImpl } as never)
   vi.spyOn(useProductsModule, 'useDeleteProduct').mockReturnValue({ mutateAsync: deleteImpl } as never)
+  vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [product] } as never)
+  vi.spyOn(useProductsModule, 'useIssueProductPhotoToken').mockReturnValue({
+    mutateAsync: vi.fn().mockResolvedValue({ token: 't', expiresAt: new Date().toISOString(), port: 3000, candidates: [] }),
+    isPending: false,
+  } as never)
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' },
     isLoadingStaff: false, login: vi.fn(), logout: vi.fn(), isLoggedIn: true,

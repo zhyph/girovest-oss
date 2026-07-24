@@ -39,5 +39,17 @@
   "noResults": "Nenhum produto encontrado para essa busca.",
   "errors": {
     "CANNOT_DELETE_WITH_HISTORY": "Não é possível excluir um produto com histórico de alocações."
+  },
+  "photoIntake": {
+    "action": "Adicionar fotos remotamente",
+    "modalTitle": "Fotos remotas",
+    "instructions": "Peça para escanear o código com o celular para enviar fotos.",
+    "regenerate": "Gerar novo código",
+    "qrAlt": "Código QR para envio de fotos",
+    "noLan": "Nenhuma rede local detectada. Não é possível enviar fotos remotamente neste momento.",
+    "pickNetwork": "Rede",
+    "waiting": "Aguardando fotos...",
+    "expired": "Código expirado.",
+    "close": "Fechar"
   }
 }

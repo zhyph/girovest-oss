@@ -8,10 +8,18 @@ import { CurrencyInput } from '../../components/ui/currency-input.tsx'
 import { Modal } from '../../components/ui/modal.tsx'
 import { showErrorToast } from '../../lib/toast.ts'
 import { useAuth } from '../../lib/useAuth.ts'
+import { useAuthenticatedImageUrl } from '../../lib/useAuthenticatedImageUrl.ts'
 import { productSchema, type Product, type ProductFormValues, type ProductStatus } from './productSchemas.ts'
 import { useCreateProduct, useUpdateProduct, useDeleteProduct } from './useProducts.ts'
+import { AddPhotosRemotelyModal } from './AddPhotosRemotelyModal.tsx'
 
 const STATUS_OPTIONS: ProductStatus[] = ['active', 'maintenance', 'retired']
+
+function PhotoThumbnail({ url }: { url: string }) {
+  const isRemotePath = url.startsWith('/api/')
+  const authenticatedUrl = useAuthenticatedImageUrl(isRemotePath ? url : null)
+  return <img src={isRemotePath ? (authenticatedUrl ?? '') : url} alt="" className="h-8 w-8 rounded object-cover" />
+}
 
 export function ProductDrawer({ product, onClose }: { product: Product | null; onClose: () => void }) {
   const { t } = useTranslation('products')
@@ -23,6 +31,7 @@ export function ProductDrawer({ product, onClose }: { product: Product | null; o
   const [status, setStatus] = useState<ProductStatus>(product?.status ?? 'active')
   const [photos, setPhotos] = useState<string[]>(product?.photos ?? [])
   const [newPhotoUrl, setNewPhotoUrl] = useState('')
+  const [addingPhotosRemotely, setAddingPhotosRemotely] = useState(false)
   const {
     register,
     handleSubmit,
@@ -161,7 +170,7 @@ export function ProductDrawer({ product, onClose }: { product: Product | null; o
             <ul className="mt-1 flex flex-col gap-1">
               {photos.map((url, index) => (
                 <li key={url + index} className="flex items-center gap-2 text-xs">
-                  <img src={url} alt="" className="h-8 w-8 rounded object-cover" />
+                  <PhotoThumbnail url={url} />
                   <span className="flex-1 truncate text-muted-text">{url}</span>
                   <Button type="button" variant="ghost" size="sm" onClick={() => removePhoto(index)}>
                     {t('photos.remove')}
@@ -169,6 +178,11 @@ export function ProductDrawer({ product, onClose }: { product: Product | null; o
                 </li>
               ))}
             </ul>
+          )}
+          {product && (
+            <Button type="button" variant="secondary" onClick={() => setAddingPhotosRemotely(true)}>
+              {t('photoIntake.action')}
+            </Button>
           )}
         </div>
         <div className="mt-2 flex justify-between gap-2">
@@ -208,6 +222,13 @@ export function ProductDrawer({ product, onClose }: { product: Product | null; o
             </Button>
           </div>
         </Modal>
+      )}
+      {product && (
+        <AddPhotosRemotelyModal
+          productId={product.id}
+          open={addingPhotosRemotely}
+          onClose={() => setAddingPhotosRemotely(false)}
+        />
       )}
       </div>
     </>
