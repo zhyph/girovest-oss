@@ -221,7 +221,7 @@ export function ProductDrawer({
             </Button>
           )}
         </div>
-        <div className="mt-2 flex flex-wrap justify-between gap-2">
+        <div className="mt-2 flex justify-between gap-2">
           {product && !product.hasAllocationHistory && (
             <Button
               type="button"
@@ -232,7 +232,7 @@ export function ProductDrawer({
               {t('common:actions.delete', { ns: 'common' })}
             </Button>
           )}
-          <div className="flex flex-1 flex-wrap justify-end gap-2">
+          <div className="flex flex-1 flex-col items-end gap-2">
             <Button type="button" variant="secondary" onClick={onClose}>
               {t('common:actions.cancel', { ns: 'common' })}
             </Button>
