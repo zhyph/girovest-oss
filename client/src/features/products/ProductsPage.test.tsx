@@ -107,7 +107,8 @@ describe('ProductsPage', () => {
     await userEvent.type(screen.getByLabelText('Categoria'), 'festa')
     await userEvent.type(screen.getByLabelText('Tamanho'), 'M')
     await userEvent.type(screen.getByLabelText('Cor'), 'verde')
-    await userEvent.click(screen.getByRole('button', { name: 'Salvar e adicionar outro' }))
+    await userEvent.click(screen.getByLabelText('Salvar e adicionar outro'))
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
 
     expect(screen.getByLabelText('Nome')).toHaveValue('')
     await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
@@ -136,7 +137,8 @@ describe('ProductsPage', () => {
     await userEvent.type(screen.getByLabelText('Categoria'), 'festa')
     await userEvent.type(screen.getByLabelText('Tamanho'), 'M')
     await userEvent.type(screen.getByLabelText('Cor'), 'verde')
-    await userEvent.click(screen.getByRole('button', { name: 'Salvar e adicionar outro' }))
+    await userEvent.click(screen.getByLabelText('Salvar e adicionar outro'))
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
 
     // Now type unsaved edits into the still-open drawer and cancel instead of saving.
     await userEvent.type(screen.getByLabelText('Categoria'), 'unsaved')

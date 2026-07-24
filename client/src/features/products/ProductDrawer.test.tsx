@@ -180,7 +180,7 @@ describe('ProductDrawer', () => {
     expect(screen.getByLabelText('Nome')).toHaveValue('')
   })
 
-  it('calls onCreated with the saved values and stays open when "Salvar e adicionar outro" is used', async () => {
+  it('calls onCreated with the saved values and stays open when "Salvar e adicionar outro" is checked', async () => {
     const onClose = vi.fn()
     const onCreated = vi.fn()
     const createImpl = vi.fn().mockResolvedValue(undefined)
@@ -191,7 +191,8 @@ describe('ProductDrawer', () => {
     await userEvent.type(screen.getByLabelText('Categoria'), 'festa')
     await userEvent.type(screen.getByLabelText('Tamanho'), 'M')
     await userEvent.type(screen.getByLabelText('Cor'), 'verde')
-    await userEvent.click(screen.getByRole('button', { name: 'Salvar e adicionar outro' }))
+    await userEvent.click(screen.getByLabelText('Salvar e adicionar outro'))
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
 
     expect(createImpl).toHaveBeenCalled()
     expect(onCreated).toHaveBeenCalledWith(expect.objectContaining({ category: 'festa', size: 'M', color: 'verde' }))
@@ -199,9 +200,25 @@ describe('ProductDrawer', () => {
     expect(screen.getByLabelText('Nome')).toHaveValue('')
   })
 
+  it('closes normally when "Salvar e adicionar outro" is left unchecked', async () => {
+    const onClose = vi.fn()
+    const createImpl = vi.fn().mockResolvedValue(undefined)
+    mockProductHooks(vi.fn(), createImpl)
+    renderWithToast(<ProductDrawer product={null} onClose={onClose} />)
+
+    await userEvent.type(screen.getByLabelText('Nome'), 'Vestido Verde')
+    await userEvent.type(screen.getByLabelText('Categoria'), 'festa')
+    await userEvent.type(screen.getByLabelText('Tamanho'), 'M')
+    await userEvent.type(screen.getByLabelText('Cor'), 'verde')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+
+    expect(createImpl).toHaveBeenCalled()
+    expect(onClose).toHaveBeenCalled()
+  })
+
   it('does not show "Salvar e adicionar outro" in edit mode', () => {
     mockProductHooks(vi.fn())
     renderWithToast(<ProductDrawer product={product} onClose={vi.fn()} />)
-    expect(screen.queryByRole('button', { name: 'Salvar e adicionar outro' })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Salvar e adicionar outro')).not.toBeInTheDocument()
   })
 })

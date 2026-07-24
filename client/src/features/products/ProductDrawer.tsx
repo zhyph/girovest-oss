@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
@@ -42,9 +42,7 @@ export function ProductDrawer({
   const [photos, setPhotos] = useState<string[]>(product?.photos ?? [])
   const [newPhotoUrl, setNewPhotoUrl] = useState('')
   const [addingPhotosRemotely, setAddingPhotosRemotely] = useState(false)
-  // Ref (not state) so the value set by the button's onClick is read synchronously
-  // by the form's onSubmit handler in the same event dispatch, without waiting on a re-render.
-  const keepOpenAfterSaveRef = useRef(false)
+  const [addAnotherAfterSave, setAddAnotherAfterSave] = useState(false)
   const {
     register,
     handleSubmit,
@@ -89,7 +87,7 @@ export function ProductDrawer({
       } else {
         await createProduct.mutateAsync({ ...values, photos })
         onCreated?.(values)
-        if (keepOpenAfterSaveRef.current) {
+        if (addAnotherAfterSave) {
           setPhotos([])
           reset({
             locationId: staff?.locationId ?? '',
@@ -221,6 +219,16 @@ export function ProductDrawer({
             </Button>
           )}
         </div>
+        {!product && (
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={addAnotherAfterSave}
+              onChange={(event) => setAddAnotherAfterSave(event.target.checked)}
+            />
+            {t('common:actions.saveAndAddAnother', { ns: 'common' })}
+          </label>
+        )}
         <div className="mt-2 flex justify-between gap-2">
           {product && !product.hasAllocationHistory && (
             <Button
@@ -232,29 +240,11 @@ export function ProductDrawer({
               {t('common:actions.delete', { ns: 'common' })}
             </Button>
           )}
-          <div className="flex flex-1 flex-col items-end gap-2">
+          <div className="flex flex-1 justify-end gap-2">
             <Button type="button" variant="secondary" onClick={onClose}>
               {t('common:actions.cancel', { ns: 'common' })}
             </Button>
-            {!product && (
-              <Button
-                type="submit"
-                variant="secondary"
-                onClick={() => {
-                  keepOpenAfterSaveRef.current = true
-                }}
-                disabled={createProduct.isPending}
-              >
-                {t('common:actions.saveAndAddAnother', { ns: 'common' })}
-              </Button>
-            )}
-            <Button
-              type="submit"
-              onClick={() => {
-                keepOpenAfterSaveRef.current = false
-              }}
-              disabled={createProduct.isPending || updateProduct.isPending}
-            >
+            <Button type="submit" disabled={createProduct.isPending || updateProduct.isPending}>
               {t('common:actions.save', { ns: 'common' })}
             </Button>
           </div>
