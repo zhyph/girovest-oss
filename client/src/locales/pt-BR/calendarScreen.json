@@ -8,6 +8,11 @@
   "viewMonth": "Ver mês",
   "viewAgenda": "Ver agenda",
   "empty": "Nada para mostrar neste período.",
+  "pagination": {
+    "previous": "Anterior",
+    "next": "Próximo",
+    "pageOf": "{{page}} / {{total}}"
+  },
   "groups": {
     "overdue": "Atrasado",
     "today": "Hoje",
