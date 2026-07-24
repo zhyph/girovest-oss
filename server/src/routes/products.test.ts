@@ -114,4 +114,42 @@ describe('GET /:id/photos/:filename', () => {
     const response = await request(app).get(`/api/products/${productId}/photos/abc123.jpg`)
     expect(response.status).toBe(401)
   })
+
+  it('serves a photo even when PRODUCT_PHOTOS_DIR sits under a dot-prefixed ancestor directory', async () => {
+    // Regression test: res.sendFile(filename, { root }) must be called WITH
+    // the `root` option. Without it, the underlying `send` package
+    // dotfile-checks every segment of the resolved *absolute* path — so any
+    // dot-prefixed ancestor (e.g. this repo's own `.claude/worktrees/...`
+    // layout) causes a false 404, even though the served file itself isn't a
+    // dotfile. A plain os.tmpdir() dir never has a dot-prefixed ancestor, so
+    // it can't catch this; we manufacture one here.
+    const dotPrefixedRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'product-photos-dot-test-'))
+    const hiddenDir = path.join(dotPrefixedRoot, '.hidden-test-dir', 'product-photos')
+    fs.mkdirSync(hiddenDir, { recursive: true })
+
+    const previousPhotosDir = process.env.PRODUCT_PHOTOS_DIR
+    process.env.PRODUCT_PHOTOS_DIR = hiddenDir
+
+    try {
+      const filename = 'dead123beef.jpg'
+      const contents = Buffer.from([0xff, 0xd8, 0xff, 0xd9])
+      fs.writeFileSync(path.join(hiddenDir, filename), contents)
+
+      await prisma.product.update({
+        where: { id: productId },
+        data: { photos: JSON.stringify([filename]) },
+      })
+
+      const response = await request(app)
+        .get(`/api/products/${productId}/photos/${filename}`)
+        .set('Authorization', `Bearer ${staffToken}`)
+
+      expect(response.status).toBe(200)
+      expect(response.headers['content-type']).toContain('image/jpeg')
+      expect(Buffer.compare(response.body, contents)).toBe(0)
+    } finally {
+      process.env.PRODUCT_PHOTOS_DIR = previousPhotosDir
+      fs.rmSync(dotPrefixedRoot, { recursive: true, force: true })
+    }
+  })
 })
