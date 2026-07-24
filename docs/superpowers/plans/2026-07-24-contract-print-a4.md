@@ -50,9 +50,12 @@ if (!staff) {
 // during Task 2 (see the design spec for the root-cause note).
 // SQLite doesn't support `skipDuplicates` on createMany, so upsert one at a time.
 for (let i = 0; i < DEFAULT_CONTRACT_CLAUSES.length; i += 1) {
+  // `update` syncs text/sortOrder on every run, not just `{}` — a dev.db seeded
+  // by an older version of this script (shorter placeholder clause text) would
+  // otherwise keep the stale text forever, since the id already exists.
   await prisma.locationContractClause.upsert({
     where: { id: `e2e-print-clause-${i + 1}` },
-    update: {},
+    update: { locationId: staff.locationId, sortOrder: i, text: DEFAULT_CONTRACT_CLAUSES[i] },
     create: { id: `e2e-print-clause-${i + 1}`, locationId: staff.locationId, sortOrder: i, text: DEFAULT_CONTRACT_CLAUSES[i] },
   })
 }
@@ -125,7 +128,7 @@ const shortInstallments = [
 for (let i = 0; i < shortInstallments.length; i += 1) {
   await prisma.installment.upsert({
     where: { id: `e2e-print-short-installment-${i + 1}` },
-    update: {},
+    update: shortInstallments[i],
     create: { id: `e2e-print-short-installment-${i + 1}`, contractId: shortContract.id, ...shortInstallments[i] },
   })
 }
