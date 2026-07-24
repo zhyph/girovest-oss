@@ -18,9 +18,15 @@ export async function issueSigningToken(
   }
 
   // "Staff can generate a fresh token at any time, invalidating the
-  // previous one" — a Contract only ever has one live token, so reissuing
-  // fully replaces whatever was there before, used or not.
-  await prisma.signingToken.deleteMany({ where: { contractId } })
+  // previous one" — a Contract only ever has one live unclaimed token, so
+  // reissuing replaces whatever unclaimed one was there before. Scoped to
+  // usedAt: null deliberately: submitSignature claims a token (sets
+  // usedAt) and only afterward reads it back by contractId to update the
+  // Contract — deleting an already-claimed row out from under that second
+  // read would throw a raw (non-AppError) Prisma error and leave the
+  // Contract permanently unsigned despite the phone's submission having
+  // already been accepted.
+  await prisma.signingToken.deleteMany({ where: { contractId, usedAt: null } })
 
   const token = crypto.randomBytes(32).toString('base64url')
   const expiresAt = new Date(Date.now() + TOKEN_TTL_MS)

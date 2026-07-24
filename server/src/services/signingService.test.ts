@@ -63,6 +63,17 @@ describe('issueSigningToken', () => {
 
     await expect(issueSigningToken(contractId, otherLocation.id)).rejects.toThrow(AppError)
   })
+
+  it('does not delete an already-claimed token when reissuing', async () => {
+    const { token } = await issueSigningToken(contractId, locationId)
+    await submitSignature(token, 'data:image/png;base64,abc')
+
+    await issueSigningToken(contractId, locationId)
+
+    const claimed = await prisma.signingToken.findUnique({ where: { token } })
+    expect(claimed).not.toBeNull()
+    expect(claimed?.usedAt).not.toBeNull()
+  })
 })
 
 describe('checkTokenValidity', () => {
