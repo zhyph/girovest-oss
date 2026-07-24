@@ -70,7 +70,7 @@ export function CalendarDayItemsList({
             variant="secondary"
             size="sm"
             disabled={currentPage === 0}
-            onClick={() => setPage((p) => p - 1)}
+            onClick={() => setPage(currentPage - 1)}
           >
             {t('pagination.previous')}
           </Button>
@@ -82,7 +82,7 @@ export function CalendarDayItemsList({
             variant="secondary"
             size="sm"
             disabled={currentPage >= totalPages - 1}
-            onClick={() => setPage((p) => p + 1)}
+            onClick={() => setPage(currentPage + 1)}
           >
             {t('pagination.next')}
           </Button>

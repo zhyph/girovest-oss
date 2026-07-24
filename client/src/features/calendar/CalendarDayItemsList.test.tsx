@@ -183,4 +183,40 @@ describe('CalendarDayItemsList', () => {
     expect(screen.getAllByText('Vestido Azul')).toHaveLength(1)
     expect(screen.queryByRole('button', { name: 'Próximo' })).not.toBeInTheDocument()
   })
+
+  it('moves back immediately on the first click when totalPages shrinks while parked on the last page', async () => {
+    const manyAllocations = Array.from({ length: 25 }, (_, i) =>
+      makeAllocation({ id: `a${i}`, checkoutDate: `2026-07-${String((i % 27) + 1).padStart(2, '0')}` }),
+    )
+    const { rerender } = render(
+      <CalendarDayItemsList
+        allocations={manyAllocations}
+        products={products}
+        clientNames={clientNames}
+        dateField="checkoutDate"
+        pageSize={10}
+      />,
+    )
+
+    await userEvent.click(screen.getByRole('button', { name: 'Próximo' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Próximo' }))
+    expect(screen.getByText('3 / 3')).toBeInTheDocument()
+
+    const fewerAllocations = Array.from({ length: 15 }, (_, i) =>
+      makeAllocation({ id: `b${i}`, checkoutDate: `2026-07-${String((i % 27) + 1).padStart(2, '0')}` }),
+    )
+    rerender(
+      <CalendarDayItemsList
+        allocations={fewerAllocations}
+        products={products}
+        clientNames={clientNames}
+        dateField="checkoutDate"
+        pageSize={10}
+      />,
+    )
+    expect(screen.getByText('2 / 2')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Anterior' }))
+    expect(screen.getByText('1 / 2')).toBeInTheDocument()
+  })
 })
