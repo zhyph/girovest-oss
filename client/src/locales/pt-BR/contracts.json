@@ -47,6 +47,18 @@
     "signatureLabel": "Assinatura do Cliente",
     "signedAt": "Assinado em {{date}}"
   },
+  "sign": {
+    "action": "Assinar remotamente",
+    "modalTitle": "Assinatura remota",
+    "instructions": "Peça ao cliente para escanear o código com o celular.",
+    "regenerate": "Gerar novo código",
+    "noLan": "Nenhuma rede local detectada. Não é possível assinar remotamente neste momento.",
+    "pickNetwork": "Rede",
+    "waiting": "Aguardando assinatura...",
+    "signed": "Assinado com sucesso!",
+    "expired": "Código expirado.",
+    "close": "Fechar"
+  },
   "validation": {
     "clientRequired": "Cliente é obrigatório",
     "eventDateRequired": "Data do evento é obrigatória",
