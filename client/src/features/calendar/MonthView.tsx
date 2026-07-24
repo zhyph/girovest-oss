@@ -77,7 +77,7 @@ export function MonthView({
         messages={messages}
       />
       <Dialog open={showMoreDay !== null} onOpenChange={(open) => !open && setShowMoreDay(null)}>
-        <DialogContent showCloseButton={true} className="max-w-2xl">
+        <DialogContent showCloseButton={true} className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogTitle className="mb-3 text-base font-semibold text-ink">
             {showMoreDay && formatDate(showMoreDay.date, locale, { day: '2-digit', month: '2-digit', year: 'numeric' })}
           </DialogTitle>
