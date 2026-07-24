@@ -45,6 +45,11 @@ function mockHooks(overrides: { contracts?: Contract[]; cancelImpl?: (...args: n
     mutateAsync: overrides.cancelImpl ?? vi.fn(),
     isPending: false,
   } as never)
+  vi.spyOn(useContractsModule, 'useContract').mockReturnValue({ data: overrides.contracts?.[0] ?? contract } as never)
+  vi.spyOn(useContractsModule, 'useIssueSigningToken').mockReturnValue({
+    mutateAsync: vi.fn().mockResolvedValue({ token: 't', expiresAt: new Date().toISOString(), port: 3000, candidates: [] }),
+    isPending: false,
+  } as never)
 }
 
 describe('ContractsPage', () => {
@@ -90,5 +95,18 @@ describe('ContractsPage', () => {
     mockHooks({ contracts: [returnedContract] })
     renderWithProviders(<ContractsPage />)
     expect(screen.queryByRole('button', { name: 'Cancelar contrato' })).not.toBeInTheDocument()
+  })
+
+  it('shows a sign-remotely action for an unsigned contract', () => {
+    mockHooks()
+    renderWithProviders(<ContractsPage />)
+    expect(screen.getByRole('button', { name: 'Assinar remotamente' })).toBeInTheDocument()
+  })
+
+  it('hides the sign-remotely action once the contract is signed', () => {
+    const signedContract: Contract = { ...contract, signatureStatus: 'signed' }
+    mockHooks({ contracts: [signedContract] })
+    renderWithProviders(<ContractsPage />)
+    expect(screen.queryByRole('button', { name: 'Assinar remotamente' })).not.toBeInTheDocument()
   })
 })

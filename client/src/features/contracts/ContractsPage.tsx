@@ -19,6 +19,7 @@ import type { Allocation } from '../allocations/allocationSchemas.ts'
 import { useContractsList, useCancelContract } from './useContracts.ts'
 import type { Contract } from './contractSchemas.ts'
 import { NewContractForm } from './NewContractForm.tsx'
+import { SignRemotelyModal } from './SignRemotelyModal.tsx'
 
 function resolveErrorCode(error: unknown): string {
   return (error as { code?: string })?.code ?? 'UNKNOWN'
@@ -192,6 +193,22 @@ function ContractCancelAction({ contract }: { contract: Contract }) {
   )
 }
 
+function ContractSignAction({ contract }: { contract: Contract }) {
+  const { t } = useTranslation('contracts')
+  const [showModal, setShowModal] = useState(false)
+
+  if (contract.signatureStatus === 'signed') return null
+
+  return (
+    <>
+      <Button size="sm" variant="secondary" onClick={() => setShowModal(true)}>
+        {t('sign.action')}
+      </Button>
+      <SignRemotelyModal contractId={contract.id} open={showModal} onClose={() => setShowModal(false)} />
+    </>
+  )
+}
+
 export function ContractsPage() {
   const { t } = useTranslation('contracts')
   const { locale } = useLocale()
@@ -237,6 +254,7 @@ export function ContractsPage() {
                 >
                   {t('print.action')}
                 </Link>
+                <ContractSignAction contract={contract} />
                 <ContractCancelAction contract={contract} />
               </div>
             </div>
