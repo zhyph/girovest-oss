@@ -69,6 +69,7 @@ export function MonthView({
         onShowMore={(dayEvents, day) =>
           setShowMoreDay({ date: day, allocations: dayEvents.map((event) => event.resource as Allocation) })
         }
+        doShowMoreDrillDown={false}
         selectable
         culture="pt-BR"
         messages={messages}

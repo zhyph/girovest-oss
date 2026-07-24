@@ -46,8 +46,10 @@ test('Month view "+N more" opens the populated day-items panel, not Agenda', asy
   await expect(showMoreLink).toBeVisible()
   await showMoreLink.click()
 
-  // Must NOT have bounced to Agenda (that toggle button would read "Ver mês" again if it had)
-  await expect(page.getByRole('button', { name: 'Ver agenda' })).not.toBeVisible()
+  // Must NOT have bounced to Agenda: the month grid must still be mounted underneath the dialog.
+  await expect(page.locator('.rbc-month-view')).toBeVisible()
+  // Dialog itself must reflect the clicked day, not some agenda fallback.
+  await expect(page.getByRole('dialog').getByText(/^\d{2}\/\d{2}\/\d{4}$/)).toBeVisible()
   await expect(page.getByText('Vestido Carga E2E').first()).toBeVisible()
 })
 
