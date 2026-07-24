@@ -20,6 +20,29 @@ npm test        # run the full test suite (uses .env.test, SQLite)
 npm run test:postgres   # run the full suite against a throwaway Postgres container (requires Docker)
 ```
 
+### `HOST` binding and remote signing
+
+`npm run dev` binds to `HOST=127.0.0.1` by default (loopback only), matching
+how the packaged Electron app always runs the server — this is also what
+lets the QR-code remote-signing feature work locally, since it needs a real
+LAN address free to bind to (loopback-only leaves the whole LAN free; see
+`server/src/server.ts` for the binding logic).
+
+**Hosted-website deployments must NOT inherit this default.** That mode
+(see the root [`README.md`](../README.md)) needs the server reachable from
+outside the host machine, which requires binding to all interfaces:
+
+```bash
+HOST=0.0.0.0 npm run start   # or omit HOST entirely — 0.0.0.0 is the
+                              # fallback in src/server.ts for any run that
+                              # doesn't go through `npm run dev`'s override
+```
+
+If you ever see `Failed to start signing app on <ip>:<port>: ... EADDRINUSE`
+while running `npm run dev`, something set `HOST=0.0.0.0` for that run (or
+another process already holds the port) — the main API still starts fine
+either way, only the signing app's bind is affected.
+
 ## Switching database provider
 
 Set `DB_PROVIDER=sqlite` (default) or `DB_PROVIDER=postgresql` in your env
