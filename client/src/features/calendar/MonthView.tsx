@@ -4,7 +4,8 @@ import { format, parse, startOfWeek, getDay } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
 import { Dialog, DialogContent, DialogTitle } from '../../components/ui/dialog.tsx'
-import { parseDateOnly } from '../../lib/date.ts'
+import { parseDateOnly, formatDate } from '../../lib/date.ts'
+import { useLocale } from '../../lib/LocaleContext.tsx'
 import { CalendarDayItemsList } from './CalendarDayItemsList.tsx'
 import type { Allocation } from '../allocations/allocationSchemas.ts'
 import type { Product } from '../products/productSchemas.ts'
@@ -43,6 +44,7 @@ export function MonthView({
   date: Date
   onNavigate: (date: Date) => void
 }) {
+  const { locale } = useLocale()
   const [showMoreDay, setShowMoreDay] = useState<{ date: Date; allocations: Allocation[] } | null>(null)
 
   const events = allocations.map((allocation) => ({
@@ -77,7 +79,7 @@ export function MonthView({
       <Dialog open={showMoreDay !== null} onOpenChange={(open) => !open && setShowMoreDay(null)}>
         <DialogContent showCloseButton={true} className="max-w-2xl">
           <DialogTitle className="mb-3 text-base font-semibold text-ink">
-            {showMoreDay && new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(showMoreDay.date)}
+            {showMoreDay && formatDate(showMoreDay.date, locale, { day: '2-digit', month: '2-digit', year: 'numeric' })}
           </DialogTitle>
           {showMoreDay && (
             <CalendarDayItemsList

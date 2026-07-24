@@ -58,7 +58,7 @@ export function ProductDetailModal({
         )}
         <div className="mt-4 flex justify-end">
           <Button type="button" variant="secondary" onClick={onClose}>
-            {t('common:actions.close', { ns: 'common' })}
+            {t('common:actions.close')}
           </Button>
         </div>
       </DialogContent>
