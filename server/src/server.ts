@@ -64,18 +64,25 @@ if (host === '0.0.0.0') {
   }
 }
 
-// With no handler, Node's default SIGINT/SIGTERM disposition terminates
-// the process immediately regardless of open listeners — but `tsx watch`
-// (the dev-mode supervisor) doesn't rely on that default: it relays the
-// signal to this process and polls for it to report itself exited within
-// a short grace period before escalating to SIGKILL, printing "Previous
-// process hasn't exited yet. Force killing...". Two listening sockets
-// instead of one made this process cross that grace period more often
-// than it used to. Closing everything and exiting explicitly here removes
-// the guesswork tsx would otherwise have to do.
-function shutdown() {
-  for (const s of servers) s.close()
+function closeServer(target: Server): Promise<void> {
+  return new Promise((resolve) => target.close(() => resolve()))
+}
+
+// Actually waits for in-flight requests/connections to finish before
+// exiting — closing a server stops it accepting new connections but
+// doesn't itself terminate the process, and calling process.exit()
+// immediately after (without waiting for the close callback) would drop
+// whatever was still in flight, which defeats the point of a "graceful"
+// shutdown. Bounded by SHUTDOWN_TIMEOUT_MS so a stuck connection can't
+// hang the process forever.
+const SHUTDOWN_TIMEOUT_MS = 5_000
+
+async function shutdown() {
+  await Promise.race([
+    Promise.all(servers.map(closeServer)),
+    new Promise((resolve) => setTimeout(resolve, SHUTDOWN_TIMEOUT_MS)),
+  ])
   process.exit(0)
 }
-process.on('SIGINT', shutdown)
-process.on('SIGTERM', shutdown)
+process.on('SIGINT', () => void shutdown())
+process.on('SIGTERM', () => void shutdown())

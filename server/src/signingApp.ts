@@ -16,7 +16,18 @@ signingApp.get('/sign/:token', async (req, res) => {
   res.send(getSigningPageHtml(status))
 })
 
-const submitSchema = z.object({ signatureImage: z.string().min(1) })
+// Constrained to exactly what canvas.toDataURL('image/png') produces in
+// signingPage.ts's own script — this is an unauthenticated endpoint (the
+// token is the only access control), so the payload shape can't be trusted
+// beyond "some string": a well-formed PNG data URL rules out other MIME
+// types (e.g. an SVG data URL, which can carry a <script>) ending up stored
+// and later rendered via <img src=...> in the print view. The length cap is
+// generous relative to the fixed 600x200 canvas's expected output (a few
+// tens of KB) while still bounding worst-case storage.
+const SIGNATURE_IMAGE_PATTERN = /^data:image\/png;base64,[A-Za-z0-9+/]+=*$/
+const submitSchema = z.object({
+  signatureImage: z.string().min(1).max(500_000).regex(SIGNATURE_IMAGE_PATTERN),
+})
 
 signingApp.post('/sign/:token/submit', async (req, res) => {
   const parsed = submitSchema.safeParse(req.body)
