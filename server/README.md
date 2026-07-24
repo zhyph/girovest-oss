@@ -115,7 +115,7 @@ npx tsx seed-e2e-contract-print.ts
 ```
 
 Seeds two fixed-ID contracts on top of `seed-e2e.ts`'s Location/Staff, used by
-`client/e2e/contract-print.spec.ts`: `e2e-print-short-contract` (one item, no
+`client/e2e/contract-print.spec.ts`: `e2e-print-short-contract` (one item, 3
 installments — the original reported print bug) and
 `e2e-print-stress-contract` (15 items, 8 installments — a print worst case).
 Requires `seed-e2e.ts` to have been run first.
