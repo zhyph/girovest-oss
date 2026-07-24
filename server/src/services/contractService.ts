@@ -76,7 +76,11 @@ export async function createContract(input: CreateContractInput) {
   const productsById = new Map(products.map((product) => [product.id, product]))
   for (const item of input.items) {
     const product = productsById.get(item.productId)
-    if (!product) {
+    // A product from another location is treated identically to a missing
+    // one — never a distinct error — so this can't be used to probe
+    // whether a given product ID exists somewhere outside the caller's
+    // own location.
+    if (!product || product.locationId !== input.locationId) {
       throw new AppError(ErrorCodes.NOT_FOUND, 404, `Product ${item.productId} not found`)
     }
     if (product.status !== 'active') {
@@ -162,9 +166,11 @@ export async function createContract(input: CreateContractInput) {
   )
 }
 
-export async function cancelContract(id: string) {
+export async function cancelContract(id: string, locationId: string) {
   const contract = await prisma.contract.findUnique({ where: { id } })
-  if (!contract) {
+  // A contract belonging to another location is treated identically to a
+  // missing one, matching getContract/issueSigningToken's same rule.
+  if (!contract || contract.locationId !== locationId) {
     throw new AppError(ErrorCodes.NOT_FOUND, 404, `Contract ${id} not found`)
   }
 
@@ -179,14 +185,15 @@ export async function cancelContract(id: string) {
   })
 }
 
-export async function listContracts() {
+export async function listContracts(locationId: string) {
   return prisma.contract.findMany({
+    where: { locationId },
     orderBy: { createdAt: 'desc' },
     include: { allocations: true, installments: true },
   })
 }
 
-export async function getContract(id: string) {
+export async function getContract(id: string, locationId: string) {
   const contract = await prisma.contract.findUnique({
     where: { id },
     include: {
@@ -196,7 +203,10 @@ export async function getContract(id: string) {
       location: { include: { contractClauses: { orderBy: { sortOrder: 'asc' } } } },
     },
   })
-  if (!contract) {
+  // A contract belonging to another location reads as NOT_FOUND, not a
+  // separate "forbidden" error — never confirm to the caller that a
+  // contract ID exists somewhere outside their own location.
+  if (!contract || contract.locationId !== locationId) {
     throw new AppError(ErrorCodes.NOT_FOUND, 404, `Contract ${id} not found`)
   }
   return contract

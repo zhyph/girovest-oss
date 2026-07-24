@@ -5,15 +5,17 @@ import { prisma } from './db/client.js'
 import { issueSigningToken } from './services/signingService.js'
 
 let contractId: string
+let locationId: string
 
 beforeEach(async () => {
   const location = await prisma.location.create({ data: { name: 'L', address: 'A' } })
+  locationId = location.id
   const staff = await prisma.staff.create({
-    data: { name: 'S', login: `staff-${Date.now()}-${Math.random()}`, passwordHash: 'x', role: 'staff', locationId: location.id },
+    data: { name: 'S', login: `staff-${Date.now()}-${Math.random()}`, passwordHash: 'x', role: 'staff', locationId },
   })
   const client = await prisma.client.create({ data: { name: 'C', phone: '1', email: 'c@example.com' } })
   const contract = await prisma.contract.create({
-    data: { number: 1, locationId: location.id, clientId: client.id, staffId: staff.id, eventDate: new Date('2026-10-03'), paymentMethod: 'PIX' },
+    data: { number: 1, locationId, clientId: client.id, staffId: staff.id, eventDate: new Date('2026-10-03'), paymentMethod: 'PIX' },
   })
   contractId = contract.id
 })
@@ -28,7 +30,7 @@ afterEach(async () => {
 
 describe('GET /sign/:token', () => {
   it('serves the signing page for a valid token', async () => {
-    const { token } = await issueSigningToken(contractId)
+    const { token } = await issueSigningToken(contractId, locationId)
 
     const response = await request(signingApp).get(`/sign/${token}`)
 
@@ -47,7 +49,7 @@ describe('GET /sign/:token', () => {
 
 describe('POST /sign/:token/submit', () => {
   it('accepts a valid signature submission', async () => {
-    const { token } = await issueSigningToken(contractId)
+    const { token } = await issueSigningToken(contractId, locationId)
 
     const response = await request(signingApp)
       .post(`/sign/${token}/submit`)
@@ -59,9 +61,19 @@ describe('POST /sign/:token/submit', () => {
   })
 
   it('rejects a missing signatureImage with 400', async () => {
-    const { token } = await issueSigningToken(contractId)
+    const { token } = await issueSigningToken(contractId, locationId)
 
     const response = await request(signingApp).post(`/sign/${token}/submit`).send({})
+
+    expect(response.status).toBe(400)
+  })
+
+  it('rejects a signatureImage that is not a PNG data URL with 400', async () => {
+    const { token } = await issueSigningToken(contractId, locationId)
+
+    const response = await request(signingApp)
+      .post(`/sign/${token}/submit`)
+      .send({ signatureImage: 'data:image/svg+xml;base64,PHNjcmlwdD4=' })
 
     expect(response.status).toBe(400)
   })

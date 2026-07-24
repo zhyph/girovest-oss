@@ -112,6 +112,17 @@ describe('createContract', () => {
     await expect(createContract(baseInput())).rejects.toThrow(AppError)
   })
 
+  it('rejects an item referencing a product from another location', async () => {
+    const otherLocation = await prisma.location.create({ data: { name: 'Other', address: 'B' } })
+    const otherProduct = await prisma.product.create({
+      data: { locationId: otherLocation.id, name: 'Vestido 3', category: 'festa', size: 'G', color: 'verde', rentalPrice: 200, depositAmount: 100 },
+    })
+
+    await expect(
+      createContract(baseInput({ items: [{ productId: otherProduct.id, checkoutDate: new Date('2026-10-02'), dueDate: new Date('2026-10-05'), priceCharged: 200 }] })),
+    ).rejects.toThrow(AppError)
+  })
+
   it('rejects an item whose product is already reserved for an overlapping range', async () => {
     await createContract(baseInput())
 
@@ -188,7 +199,7 @@ describe('cancelContract', () => {
       }),
     )
 
-    const cancelled = await cancelContract(contract.id)
+    const cancelled = await cancelContract(contract.id, locationId)
 
     expect(cancelled.allocations.every((allocation) => allocation.status === 'cancelled')).toBe(true)
   })
@@ -197,13 +208,20 @@ describe('cancelContract', () => {
     const contract = await createContract(baseInput())
     await prisma.allocation.update({ where: { id: contract.allocations[0].id }, data: { status: 'checked_out' } })
 
-    const cancelled = await cancelContract(contract.id)
+    const cancelled = await cancelContract(contract.id, locationId)
 
     expect(cancelled.allocations[0].status).toBe('checked_out')
   })
 
   it('throws NOT_FOUND for a missing contract', async () => {
-    await expect(cancelContract('does-not-exist')).rejects.toThrow(AppError)
+    await expect(cancelContract('does-not-exist', locationId)).rejects.toThrow(AppError)
+  })
+
+  it('throws NOT_FOUND for a contract belonging to another location', async () => {
+    const contract = await createContract(baseInput())
+    const otherLocation = await prisma.location.create({ data: { name: 'Other', address: 'B' } })
+
+    await expect(cancelContract(contract.id, otherLocation.id)).rejects.toThrow(AppError)
   })
 })
 
@@ -211,11 +229,20 @@ describe('listContracts', () => {
   it('lists contracts with their allocations and installments', async () => {
     await createContract(baseInput())
 
-    const contracts = await listContracts()
+    const contracts = await listContracts(locationId)
 
     expect(contracts).toHaveLength(1)
     expect(contracts[0].allocations).toHaveLength(1)
     expect(contracts[0].installments).toHaveLength(1)
+  })
+
+  it('does not list contracts belonging to another location', async () => {
+    await createContract(baseInput())
+    const otherLocation = await prisma.location.create({ data: { name: 'Other', address: 'B' } })
+
+    const contracts = await listContracts(otherLocation.id)
+
+    expect(contracts).toHaveLength(0)
   })
 })
 
@@ -237,7 +264,7 @@ describe('getContract', () => {
     })
     const created = await createContract(baseInput())
 
-    const detail = await getContract(created.id)
+    const detail = await getContract(created.id, locationId)
 
     expect(detail.location.contractClauses.map((clause) => clause.text)).toEqual(['Clause one', 'Clause two'])
     expect(detail.client.addressLines.map((line) => line.label)).toEqual(['Endereço', 'Cidade'])
@@ -247,6 +274,13 @@ describe('getContract', () => {
   })
 
   it('throws NOT_FOUND for a missing contract', async () => {
-    await expect(getContract('missing-id')).rejects.toThrow(AppError)
+    await expect(getContract('missing-id', locationId)).rejects.toThrow(AppError)
+  })
+
+  it('throws NOT_FOUND for a contract belonging to another location', async () => {
+    const created = await createContract(baseInput())
+    const otherLocation = await prisma.location.create({ data: { name: 'Other', address: 'B' } })
+
+    await expect(getContract(created.id, otherLocation.id)).rejects.toThrow(AppError)
   })
 })

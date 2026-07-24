@@ -5,9 +5,15 @@ import { ErrorCodes } from '../errors/errorCodes.js'
 
 const TOKEN_TTL_MS = 15 * 60 * 1000
 
-export async function issueSigningToken(contractId: string): Promise<{ token: string; expiresAt: Date }> {
+export async function issueSigningToken(
+  contractId: string,
+  locationId: string,
+): Promise<{ token: string; expiresAt: Date }> {
   const contract = await prisma.contract.findUnique({ where: { id: contractId } })
-  if (!contract) {
+  // A contract belonging to another location reads as NOT_FOUND, matching
+  // getContract/cancelContract's same rule — never confirm existence of a
+  // contract ID outside the caller's own location.
+  if (!contract || contract.locationId !== locationId) {
     throw new AppError(ErrorCodes.NOT_FOUND, 404, `Contract ${contractId} not found`)
   }
 

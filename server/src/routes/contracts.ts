@@ -20,12 +20,16 @@ async function resolveLocationId(staffId: string): Promise<string> {
   return staff.locationId
 }
 
-contractsRouter.get('/', async (_req, res) => {
-  res.json(await listContracts())
+contractsRouter.get('/', async (req, res) => {
+  if (!req.staff) throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Unauthorized')
+  const locationId = await resolveLocationId(req.staff.staffId)
+  res.json(await listContracts(locationId))
 })
 
 contractsRouter.get('/:id', async (req, res) => {
-  res.json(await getContract(req.params.id))
+  if (!req.staff) throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Unauthorized')
+  const locationId = await resolveLocationId(req.staff.staffId)
+  res.json(await getContract(req.params.id, locationId))
 })
 
 const itemSchema = z.object({
@@ -59,11 +63,15 @@ contractsRouter.post('/', async (req, res) => {
 })
 
 contractsRouter.post('/:id/cancel', async (req, res) => {
-  res.json(await cancelContract(req.params.id))
+  if (!req.staff) throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Unauthorized')
+  const locationId = await resolveLocationId(req.staff.staffId)
+  res.json(await cancelContract(req.params.id, locationId))
 })
 
 contractsRouter.post('/:id/sign-token', async (req, res) => {
-  const { token, expiresAt } = await issueSigningToken(req.params.id)
+  if (!req.staff) throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Unauthorized')
+  const locationId = await resolveLocationId(req.staff.staffId)
+  const { token, expiresAt } = await issueSigningToken(req.params.id, locationId)
   res.status(201).json({
     token,
     expiresAt,
