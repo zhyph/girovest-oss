@@ -4,7 +4,6 @@ import { newContractSchema } from './contractSchemas.ts'
 describe('newContractSchema', () => {
   it('accepts a valid multi-item contract with installments', () => {
     const result = newContractSchema.safeParse({
-      locationId: 'loc1',
       clientId: 'client1',
       eventDate: '2026-10-03',
       paymentMethod: 'PIX',
@@ -19,7 +18,6 @@ describe('newContractSchema', () => {
 
   it('accepts zero installments', () => {
     const result = newContractSchema.safeParse({
-      locationId: 'loc1',
       clientId: 'client1',
       eventDate: '2026-10-03',
       paymentMethod: 'PIX',
@@ -31,7 +29,6 @@ describe('newContractSchema', () => {
 
   it('rejects a contract with no items', () => {
     const result = newContractSchema.safeParse({
-      locationId: 'loc1',
       clientId: 'client1',
       eventDate: '2026-10-03',
       paymentMethod: 'PIX',
@@ -43,7 +40,6 @@ describe('newContractSchema', () => {
 
   it('rejects a missing clientId', () => {
     const result = newContractSchema.safeParse({
-      locationId: 'loc1',
       clientId: '',
       eventDate: '2026-10-03',
       paymentMethod: 'PIX',

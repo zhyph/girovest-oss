@@ -7,7 +7,6 @@ import { Button } from '../../components/ui/button.tsx'
 import { CurrencyInput } from '../../components/ui/currency-input.tsx'
 import { DateInput } from '../../components/ui/date-input.tsx'
 import { showErrorToast } from '../../lib/toast.ts'
-import { useAuth } from '../../lib/useAuth.ts'
 import { useLocale } from '../../lib/LocaleContext.tsx'
 import { getMissingRequiredFields } from '../../lib/clientReadiness.ts'
 import { getPaymentMethods } from '../../lib/paymentMethodTemplate.ts'
@@ -111,7 +110,6 @@ function useWatchField(
 export function NewContractForm({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation('contracts')
   const { locale } = useLocale()
-  const { staff } = useAuth()
   const { data: clients } = useClients()
   const { data: products } = useProducts()
   const createContract = useCreateContract()
@@ -126,7 +124,6 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
   } = useForm<NewContractFormValues>({
     resolver: zodResolver(newContractSchema),
     defaultValues: {
-      locationId: staff?.locationId ?? '',
       clientId: '',
       eventDate: '',
       paymentMethod: '',

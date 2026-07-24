@@ -53,7 +53,7 @@ function mockHooks() {
   vi.spyOn(useAllocationsModule, 'useProductAvailability').mockReturnValue({ data: { available: true } } as never)
   vi.spyOn(useContractsModule, 'useCreateContract').mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
-    staff: { id: 's1', name: 'Staff', role: 'staff', locationId: 'l1', locationName: 'Loja' },
+    staff: { id: 's1', name: 'Staff', role: 'staff', locationId: 'l1', locationName: 'Loja', locale: 'pt-BR' },
     isLoadingStaff: false,
     login: vi.fn(),
     logout: vi.fn(),
@@ -129,7 +129,7 @@ describe('NewContractForm', () => {
     expect(createImpl).toHaveBeenCalledOnce()
     expect(createImpl.mock.calls[0][0].paymentMethod).toBe('PIX')
     expect(createImpl.mock.calls[0][0].clientId).toBe('c1')
-    expect(createImpl.mock.calls[0][0].locationId).toBe('l1')
+    expect(createImpl.mock.calls[0][0].locationId).toBeUndefined()
     expect(onClose).toHaveBeenCalledOnce()
   })
 })

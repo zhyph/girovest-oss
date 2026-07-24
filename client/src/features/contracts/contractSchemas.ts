@@ -13,7 +13,6 @@ export const contractInstallmentSchema = z.object({
 })
 
 export const newContractSchema = z.object({
-  locationId: z.string().min(1),
   clientId: z.string().min(1),
   eventDate: z.string().min(1),
   paymentMethod: z.string().min(1),
