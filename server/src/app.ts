@@ -7,6 +7,8 @@ import { clientsRouter } from './routes/clients.js'
 import { productsRouter } from './routes/products.js'
 import { allocationsRouter } from './routes/allocations.js'
 import { calendarRouter } from './routes/calendar.js'
+import { contractsRouter } from './routes/contracts.js'
+import { locationSettingsRouter } from './routes/locationSettings.js'
 
 export const app = express()
 app.disable('x-powered-by')
@@ -23,6 +25,8 @@ app.use('/api/clients', clientsRouter)
 app.use('/api/products', productsRouter)
 app.use('/api/allocations', allocationsRouter)
 app.use('/api/calendar', calendarRouter)
+app.use('/api/contracts', contractsRouter)
+app.use('/api/settings', locationSettingsRouter)
 
 // Always add new routers ABOVE this comment and BELOW it stays last:
 

@@ -8,11 +8,26 @@ import { createClient, listClients, getClient, updateClient, deleteClient } from
 export const clientsRouter = Router()
 clientsRouter.use(requireAuth)
 
+const identityDocumentSchema = z.object({
+  label: z.string().min(1),
+  value: z.string().min(1),
+  maskKey: z.string().nullable().optional(),
+})
+
+const addressLineSchema = z.object({
+  label: z.string().min(1),
+  value: z.string().min(1),
+  sortOrder: z.number().int(),
+  maskKey: z.string().nullable().optional(),
+})
+
 const createSchema = z.object({
   name: z.string().min(1),
   phone: z.string().min(1),
   email: z.email().or(z.literal('')),
   notes: z.string().optional(),
+  identityDocuments: z.array(identityDocumentSchema).optional(),
+  addressLines: z.array(addressLineSchema).optional(),
 })
 
 const updateSchema = createSchema.partial()

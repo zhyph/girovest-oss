@@ -11,6 +11,7 @@ export const ErrorCodes = {
   INTERNAL_ERROR: 'INTERNAL_ERROR',
   PRODUCT_NOT_IN_CIRCULATION: 'PRODUCT_NOT_IN_CIRCULATION',
   SETUP_ALREADY_COMPLETE: 'SETUP_ALREADY_COMPLETE',
+  SIGNING_TOKEN_INVALID: 'SIGNING_TOKEN_INVALID',
 } as const
 
 export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes]

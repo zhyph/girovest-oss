@@ -4,8 +4,9 @@
     "dashboard": "Painel",
     "clients": "Clientes",
     "products": "Produtos",
-    "allocations": "Alocações",
-    "calendar": "Calendário"
+    "contracts": "Contratos",
+    "calendar": "Calendário",
+    "settings": "Configurações"
   },
   "actions": {
     "save": "Salvar",

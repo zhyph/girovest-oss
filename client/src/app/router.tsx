@@ -6,8 +6,10 @@ import { AppLayout } from './AppLayout.tsx'
 import { DashboardPage } from '../features/dashboard/DashboardPage.tsx'
 import { ClientsPage } from '../features/clients/ClientsPage.tsx'
 import { ProductsPage } from '../features/products/ProductsPage.tsx'
-import { AllocationsPage } from '../features/allocations/AllocationsPage.tsx'
+import { ContractsPage } from '../features/contracts/ContractsPage.tsx'
 import { CalendarPage } from '../features/calendar/CalendarPage.tsx'
+import { SettingsPage } from '../features/settings/SettingsPage.tsx'
+import { ContractPrintPage } from '../features/contracts/ContractPrintPage.tsx'
 
 export function AppRouter() {
   return (
@@ -19,9 +21,11 @@ export function AppRouter() {
           <Route index element={<DashboardPage />} />
           <Route path="/clientes" element={<ClientsPage />} />
           <Route path="/produtos" element={<ProductsPage />} />
-          <Route path="/alocacoes" element={<AllocationsPage />} />
+          <Route path="/contratos" element={<ContractsPage />} />
           <Route path="/calendario" element={<CalendarPage />} />
+          <Route path="/configuracoes" element={<SettingsPage />} />
         </Route>
+        <Route path="/contratos/:id/imprimir" element={<ContractPrintPage />} />
       </Route>
     </Routes>
   )

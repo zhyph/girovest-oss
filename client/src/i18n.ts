@@ -8,6 +8,8 @@ import clients from './locales/pt-BR/clients.json'
 import products from './locales/pt-BR/products.json'
 import allocations from './locales/pt-BR/allocations.json'
 import calendarScreen from './locales/pt-BR/calendarScreen.json'
+import settings from './locales/pt-BR/settings.json'
+import contracts from './locales/pt-BR/contracts.json'
 
 i18n.use(initReactI18next).init({
   lng: 'pt-BR',
@@ -15,7 +17,7 @@ i18n.use(initReactI18next).init({
   defaultNS: 'common',
   interpolation: { escapeValue: false },
   resources: {
-    'pt-BR': { common, auth, setup, dashboard, clients, products, allocations, calendarScreen },
+    'pt-BR': { common, auth, setup, dashboard, clients, products, allocations, calendarScreen, settings, contracts },
   },
 })
 

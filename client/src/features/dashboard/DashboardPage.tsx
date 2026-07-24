@@ -2,12 +2,11 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Card, CardBody } from '../../components/ui/card.tsx'
 import CountUp from '../../components/CountUp.tsx'
-import { parseDateOnly } from '../../lib/date.ts'
+import { parseDateOnly, formatDate } from '../../lib/date.ts'
+import { useLocale } from '../../lib/LocaleContext.tsx'
 import { useClients } from '../clients/useClients.ts'
 import { useProducts } from '../products/useProducts.ts'
 import { useDashboard } from './useDashboard.ts'
-
-const dateFormatter = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit' })
 
 function StatTile({ label, value, danger }: { label: string; value: number; danger?: boolean }) {
   return (
@@ -24,6 +23,7 @@ function StatTile({ label, value, danger }: { label: string; value: number; dang
 
 export function DashboardPage() {
   const { t } = useTranslation('dashboard')
+  const { locale } = useLocale()
   const { goingOutToday, dueBackToday, overdue, upcoming, isLoading, isError } = useDashboard()
   const { data: products } = useProducts()
   const { data: clients } = useClients()
@@ -75,7 +75,7 @@ export function DashboardPage() {
                         {' — '}
                         {clientNames.get(allocation.clientId) ?? allocation.clientId}
                       </span>
-                      <span className="text-muted-text">{dateFormatter.format(parseDateOnly(allocation.checkoutDate))}</span>
+                      <span className="text-muted-text">{formatDate(parseDateOnly(allocation.checkoutDate), locale, { day: '2-digit', month: '2-digit' })}</span>
                     </li>
                   ))}
                 </ul>

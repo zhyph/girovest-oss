@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router'
 import { useTranslation } from 'react-i18next'
-import { LayoutDashboard, Users, Shirt, ClipboardList, Calendar } from 'lucide-react'
+import { LayoutDashboard, Users, Shirt, ClipboardList, Calendar, Settings } from 'lucide-react'
 import { useAuth } from '../lib/useAuth.ts'
 import { cn } from '../lib/cn.ts'
 import { Button } from '../components/ui/button.tsx'
@@ -9,8 +9,9 @@ const links = [
   { to: '/', labelKey: 'nav.dashboard', icon: LayoutDashboard },
   { to: '/clientes', labelKey: 'nav.clients', icon: Users },
   { to: '/produtos', labelKey: 'nav.products', icon: Shirt },
-  { to: '/alocacoes', labelKey: 'nav.allocations', icon: ClipboardList },
+  { to: '/contratos', labelKey: 'nav.contracts', icon: ClipboardList },
   { to: '/calendario', labelKey: 'nav.calendar', icon: Calendar },
+  { to: '/configuracoes', labelKey: 'nav.settings', icon: Settings },
 ]
 
 export function Sidebar() {

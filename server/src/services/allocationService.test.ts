@@ -1,8 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { prisma } from '../db/client.js'
-import { AppError } from '../errors/AppError.js'
 import {
-  createAllocation,
   checkOutAllocation,
   returnAllocation,
   cancelAllocation,
@@ -39,105 +37,35 @@ afterEach(async () => {
   await prisma.location.deleteMany()
 })
 
+// Allocations are only ever created via contractService.createContract now
+// (see contractService.test.ts for occupancy/retry/validation coverage of
+// allocation creation itself). This helper seeds a reserved Allocation
+// directly, bypassing the Contract layer, purely as test fixture setup for
+// the allocation-lifecycle functions below.
+function seedReservedAllocation(overrides: { checkoutDate: Date; dueDate: Date; priceCharged?: number }) {
+  return prisma.allocation.create({
+    data: {
+      productId,
+      clientId,
+      staffId,
+      checkoutDate: overrides.checkoutDate,
+      dueDate: overrides.dueDate,
+      status: 'reserved',
+      priceCharged: overrides.priceCharged ?? 100,
+    },
+  })
+}
+
 describe('allocationService', () => {
-  it('creates a reserved allocation for a free product', async () => {
-    const allocation = await createAllocation({
-      productId, clientId, staffId,
-      checkoutDate: new Date('2026-09-01'),
-      dueDate: new Date('2026-09-05'),
-      priceCharged: 100,
-    })
-    expect(allocation.status).toBe('reserved')
-    expect(await getProductAvailability(productId, new Date('2026-09-03'))).toBe('reserved')
-  })
-
-  it('rejects a due date before the checkout date', async () => {
-    await expect(
-      createAllocation({
-        productId, clientId, staffId,
-        checkoutDate: new Date('2026-09-05'),
-        dueDate: new Date('2026-09-01'),
-        priceCharged: 100,
-      }),
-    ).rejects.toMatchObject({ code: 'DUE_DATE_BEFORE_CHECKOUT' })
-  })
-
   it('reports a range as unavailable only when it overlaps an existing allocation', async () => {
-    await createAllocation({
-      productId, clientId, staffId,
-      checkoutDate: new Date('2026-09-01'),
-      dueDate: new Date('2026-09-10'),
-      priceCharged: 100,
-    })
+    await seedReservedAllocation({ checkoutDate: new Date('2026-09-01'), dueDate: new Date('2026-09-10') })
 
     expect(await isProductAvailableForRange(productId, new Date('2026-09-05'), new Date('2026-09-15'))).toBe(false)
     expect(await isProductAvailableForRange(productId, new Date('2026-09-11'), new Date('2026-09-20'))).toBe(true)
   })
 
-  it('rejects an overlapping allocation on the same product', async () => {
-    await createAllocation({
-      productId, clientId, staffId,
-      checkoutDate: new Date('2026-09-01'),
-      dueDate: new Date('2026-09-10'),
-      priceCharged: 100,
-    })
-
-    await expect(
-      createAllocation({
-        productId, clientId, staffId,
-        checkoutDate: new Date('2026-09-05'),
-        dueDate: new Date('2026-09-15'),
-        priceCharged: 100,
-      }),
-    ).rejects.toMatchObject({ code: 'PRODUCT_UNAVAILABLE' })
-  })
-
-  it('CRITICAL: rejects a new allocation after a checked_out one is overdue and not yet returned', async () => {
-    const first = await createAllocation({
-      productId, clientId, staffId,
-      checkoutDate: new Date('2026-09-01'),
-      dueDate: new Date('2026-09-05'),
-      priceCharged: 100,
-    })
-    await checkOutAllocation(first.id, {}, new Date('2026-09-01'))
-
-    // due_date (Sep 5) has passed; product is still physically out.
-    await expect(
-      createAllocation({
-        productId, clientId, staffId,
-        checkoutDate: new Date('2026-09-20'),
-        dueDate: new Date('2026-09-25'),
-        priceCharged: 100,
-      }),
-    ).rejects.toMatchObject({ code: 'PRODUCT_UNAVAILABLE' })
-  })
-
-  it('allows a new allocation once the previous one is returned', async () => {
-    const first = await createAllocation({
-      productId, clientId, staffId,
-      checkoutDate: new Date('2026-09-01'),
-      dueDate: new Date('2026-09-05'),
-      priceCharged: 100,
-    })
-    await checkOutAllocation(first.id, {}, new Date('2026-09-01'))
-    await returnAllocation(first.id, {})
-
-    const second = await createAllocation({
-      productId, clientId, staffId,
-      checkoutDate: new Date('2026-09-20'),
-      dueDate: new Date('2026-09-25'),
-      priceCharged: 100,
-    })
-    expect(second.status).toBe('reserved')
-  })
-
   it('rejects checking out an allocation that is not reserved', async () => {
-    const allocation = await createAllocation({
-      productId, clientId, staffId,
-      checkoutDate: new Date('2026-09-01'),
-      dueDate: new Date('2026-09-05'),
-      priceCharged: 100,
-    })
+    const allocation = await seedReservedAllocation({ checkoutDate: new Date('2026-09-01'), dueDate: new Date('2026-09-05') })
     await checkOutAllocation(allocation.id, {}, new Date('2026-09-01'))
 
     await expect(checkOutAllocation(allocation.id, {}, new Date('2026-09-01'))).rejects.toMatchObject({
@@ -146,12 +74,7 @@ describe('allocationService', () => {
   })
 
   it('rejects checking out an allocation before its checkout date arrives', async () => {
-    const allocation = await createAllocation({
-      productId, clientId, staffId,
-      checkoutDate: new Date('2026-09-01'),
-      dueDate: new Date('2026-09-05'),
-      priceCharged: 100,
-    })
+    const allocation = await seedReservedAllocation({ checkoutDate: new Date('2026-09-01'), dueDate: new Date('2026-09-05') })
 
     await expect(
       checkOutAllocation(allocation.id, {}, new Date('2026-08-31')),
@@ -159,85 +82,52 @@ describe('allocationService', () => {
   })
 
   it('allows checking out exactly on the checkout date', async () => {
-    const allocation = await createAllocation({
-      productId, clientId, staffId,
-      checkoutDate: new Date('2026-09-01'),
-      dueDate: new Date('2026-09-05'),
-      priceCharged: 100,
-    })
+    const allocation = await seedReservedAllocation({ checkoutDate: new Date('2026-09-01'), dueDate: new Date('2026-09-05') })
 
     const result = await checkOutAllocation(allocation.id, {}, new Date('2026-09-01'))
     expect(result.status).toBe('checked_out')
   })
 
-  it('cancels a reserved allocation and frees the product', async () => {
-    const allocation = await createAllocation({
-      productId, clientId, staffId,
-      checkoutDate: new Date('2026-09-01'),
-      dueDate: new Date('2026-09-05'),
-      priceCharged: 100,
+  it('rejects returning an allocation that is not checked out', async () => {
+    const allocation = await seedReservedAllocation({ checkoutDate: new Date('2026-09-01'), dueDate: new Date('2026-09-05') })
+
+    await expect(returnAllocation(allocation.id, {})).rejects.toMatchObject({
+      code: 'INVALID_ALLOCATION_TRANSITION',
     })
+  })
+
+  it('returns a checked-out allocation', async () => {
+    const allocation = await seedReservedAllocation({ checkoutDate: new Date('2026-09-01'), dueDate: new Date('2026-09-05') })
+    await checkOutAllocation(allocation.id, {}, new Date('2026-09-01'))
+
+    const result = await returnAllocation(allocation.id, { conditionNotesIn: 'ok', depositReturned: 50 })
+    expect(result.status).toBe('returned')
+  })
+
+  it('cancels a reserved allocation and frees the product', async () => {
+    const allocation = await seedReservedAllocation({ checkoutDate: new Date('2026-09-01'), dueDate: new Date('2026-09-05') })
     await cancelAllocation(allocation.id)
 
-    const again = await createAllocation({
-      productId, clientId, staffId,
-      checkoutDate: new Date('2026-09-01'),
-      dueDate: new Date('2026-09-05'),
-      priceCharged: 100,
+    expect(await isProductAvailableForRange(productId, new Date('2026-09-01'), new Date('2026-09-05'))).toBe(true)
+  })
+
+  it('rejects cancelling an allocation that is not reserved', async () => {
+    const allocation = await seedReservedAllocation({ checkoutDate: new Date('2026-09-01'), dueDate: new Date('2026-09-05') })
+    await checkOutAllocation(allocation.id, {}, new Date('2026-09-01'))
+
+    await expect(cancelAllocation(allocation.id)).rejects.toMatchObject({
+      code: 'INVALID_ALLOCATION_TRANSITION',
     })
-    expect(again.status).toBe('reserved')
   })
 
   it('is available when there is no allocation at all', async () => {
     expect(await getProductAvailability(productId, new Date('2026-09-01'))).toBe('available')
   })
 
-  it('rejects allocating a product that is not active', async () => {
-    const maintenanceProduct = await prisma.product.create({
-      data: { locationId, name: 'Vestido em manutenção', category: 'festa', size: 'M', color: 'azul', rentalPrice: 100, depositAmount: 50, status: 'maintenance' },
-    })
-
-    await expect(
-      createAllocation({
-        productId: maintenanceProduct.id, clientId, staffId,
-        checkoutDate: new Date('2026-09-01'),
-        dueDate: new Date('2026-09-05'),
-        priceCharged: 100,
-      }),
-    ).rejects.toMatchObject({ code: 'PRODUCT_NOT_IN_CIRCULATION' })
-  })
-
-  it('CRITICAL: only one of two concurrent overlapping allocation attempts succeeds', async () => {
-    const attempt = () =>
-      createAllocation({
-        productId, clientId, staffId,
-        checkoutDate: new Date('2026-10-01'),
-        dueDate: new Date('2026-10-05'),
-        priceCharged: 100,
-      })
-
-    const results = await Promise.allSettled([attempt(), attempt()])
-    const fulfilled = results.filter((r) => r.status === 'fulfilled')
-    const rejected = results.filter((r) => r.status === 'rejected')
-
-    expect(fulfilled).toHaveLength(1)
-    expect(rejected).toHaveLength(1)
-  })
-
   it('lists all allocations, newest first', async () => {
-    const first = await createAllocation({
-      productId, clientId, staffId,
-      checkoutDate: new Date('2026-09-01'),
-      dueDate: new Date('2026-09-05'),
-      priceCharged: 100,
-    })
+    const first = await seedReservedAllocation({ checkoutDate: new Date('2026-09-01'), dueDate: new Date('2026-09-05') })
     await cancelAllocation(first.id)
-    const second = await createAllocation({
-      productId, clientId, staffId,
-      checkoutDate: new Date('2026-10-01'),
-      dueDate: new Date('2026-10-05'),
-      priceCharged: 100,
-    })
+    const second = await seedReservedAllocation({ checkoutDate: new Date('2026-10-01'), dueDate: new Date('2026-10-05') })
 
     const all = await listAllocations()
     expect(all.map((a) => a.id)).toEqual([second.id, first.id])

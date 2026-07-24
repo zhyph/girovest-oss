@@ -1,0 +1,76 @@
+{
+  "title": "Contratos",
+  "newContract": "Novo Contrato",
+  "empty": "Nenhum contrato cadastrado ainda.",
+  "fields": {
+    "client": "Cliente",
+    "eventDate": "Data do Evento",
+    "product": "Produto",
+    "checkoutDate": "Retirada",
+    "dueDate": "Devolução",
+    "priceCharged": "Valor",
+    "paymentMethod": "Forma de Pagamento",
+    "installmentDueDate": "Vencimento da Parcela",
+    "installmentAmount": "Valor da Parcela"
+  },
+  "items": {
+    "title": "Peças",
+    "add": "Adicionar peça",
+    "remove": "Remover peça"
+  },
+  "installments": {
+    "title": "Parcelas",
+    "add": "Adicionar parcela",
+    "remove": "Remover parcela"
+  },
+  "clientReadiness": {
+    "missing": "Faltam campos obrigatórios: {{fields}}",
+    "complete": "Completar cadastro"
+  },
+  "cancelContract": {
+    "action": "Cancelar contrato",
+    "confirmTitle": "Cancelar este contrato?",
+    "confirmMessage": "Isso cancela todas as peças ainda reservadas neste contrato. Peças já retiradas ou devolvidas não são afetadas.",
+    "confirm": "Cancelar contrato"
+  },
+  "print": {
+    "action": "Imprimir",
+    "back": "Voltar",
+    "contractNumber": "Contrato Nº {{number}}",
+    "clientSection": "Cliente",
+    "itemsSection": "Peças",
+    "total": "Valor Total",
+    "installmentsSection": "Parcelas",
+    "installmentPaid": "Pago",
+    "installmentPending": "Pendente",
+    "clausesSection": "Termos e Condições",
+    "signatureLabel": "Assinatura do Cliente",
+    "signedAt": "Assinado em {{date}}"
+  },
+  "sign": {
+    "action": "Assinar remotamente",
+    "modalTitle": "Assinatura remota",
+    "instructions": "Peça ao cliente para escanear o código com o celular.",
+    "regenerate": "Gerar novo código",
+    "qrAlt": "Código QR para assinatura",
+    "noLan": "Nenhuma rede local detectada. Não é possível assinar remotamente neste momento.",
+    "pickNetwork": "Rede",
+    "waiting": "Aguardando assinatura...",
+    "signed": "Assinado com sucesso!",
+    "expired": "Código expirado.",
+    "close": "Fechar"
+  },
+  "validation": {
+    "clientRequired": "Cliente é obrigatório",
+    "eventDateRequired": "Data do evento é obrigatória",
+    "paymentMethodRequired": "Forma de pagamento é obrigatória"
+  },
+  "unavailableProduct": "Este produto não está disponível para essas datas.",
+  "errors": {
+    "VALIDATION_ERROR": "Verifique os dados do contrato e tente novamente.",
+    "NOT_FOUND": "Contrato não encontrado.",
+    "DUE_DATE_BEFORE_CHECKOUT": "A data de devolução deve ser após a data de retirada.",
+    "PRODUCT_UNAVAILABLE": "Produto não disponível para as datas escolhidas.",
+    "PRODUCT_NOT_IN_CIRCULATION": "Este produto não está disponível para aluguel."
+  }
+}

@@ -1,37 +1,31 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Link } from 'react-router'
 import { Button } from '../../components/ui/button.tsx'
 import { Input } from '../../components/ui/input.tsx'
 import { CurrencyInput } from '../../components/ui/currency-input.tsx'
 import { Modal } from '../../components/ui/modal.tsx'
-import { Badge } from '../../components/ui/badge.tsx'
+import { parseDateOnly, formatDate } from '../../lib/date.ts'
+import { useLocale } from '../../lib/LocaleContext.tsx'
 import { showErrorToast } from '../../lib/toast.ts'
-import { parseDateOnly } from '../../lib/date.ts'
 import { useClients } from '../clients/useClients.ts'
 import { useProducts } from '../products/useProducts.ts'
 import {
-  useAllocationsList,
   useCheckOutAllocation,
   useReturnAllocation,
   useCancelAllocation,
-} from './useAllocations.ts'
-import { NewAllocationForm } from './NewAllocationForm.tsx'
-import type { Allocation } from './allocationSchemas.ts'
-
-const dateFormatter = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-
-const STATUS_TONE: Record<Allocation['status'], 'neutral' | 'success' | 'warning' | 'danger'> = {
-  reserved: 'neutral',
-  checked_out: 'warning',
-  returned: 'success',
-  cancelled: 'neutral',
-}
+} from '../allocations/useAllocations.ts'
+import type { Allocation } from '../allocations/allocationSchemas.ts'
+import { useContractsList, useCancelContract } from './useContracts.ts'
+import type { Contract } from './contractSchemas.ts'
+import { NewContractForm } from './NewContractForm.tsx'
+import { SignRemotelyModal } from './SignRemotelyModal.tsx'
 
 function resolveErrorCode(error: unknown): string {
   return (error as { code?: string })?.code ?? 'UNKNOWN'
 }
 
-function RowActions({ allocation }: { allocation: Allocation }) {
+export function RowActions({ allocation }: { allocation: Allocation }) {
   const { t } = useTranslation('allocations')
   const checkOut = useCheckOutAllocation()
   const returnAllocation = useReturnAllocation()
@@ -157,9 +151,68 @@ function RowActions({ allocation }: { allocation: Allocation }) {
   return null
 }
 
-export function AllocationsPage() {
-  const { t } = useTranslation('allocations')
-  const { data: allocations, isLoading } = useAllocationsList()
+function ContractCancelAction({ contract }: { contract: Contract }) {
+  const { t } = useTranslation('contracts')
+  const cancelContract = useCancelContract()
+  const [showConfirm, setShowConfirm] = useState(false)
+
+  const hasReservedAllocation = contract.allocations.some((allocation) => allocation.status === 'reserved')
+  if (!hasReservedAllocation) return null
+
+  async function handleCancel() {
+    try {
+      await cancelContract.mutateAsync(contract.id)
+      setShowConfirm(false)
+    } catch (error) {
+      showErrorToast(t(`errors.${resolveErrorCode(error)}`, { defaultValue: t('common:errors.UNKNOWN', { ns: 'common' }) }))
+    }
+  }
+
+  return (
+    <>
+      <Button
+        size="sm"
+        variant="secondary"
+        onClick={() => setShowConfirm(true)}
+        disabled={cancelContract.isPending}
+      >
+        {t('cancelContract.action')}
+      </Button>
+      <Modal open={showConfirm} onClose={() => setShowConfirm(false)} title={t('cancelContract.confirmTitle')}>
+        <p className="mb-4 text-sm text-ink">{t('cancelContract.confirmMessage')}</p>
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="secondary" onClick={() => setShowConfirm(false)}>
+            {t('common:actions.cancel', { ns: 'common' })}
+          </Button>
+          <Button type="button" onClick={handleCancel} disabled={cancelContract.isPending}>
+            {t('cancelContract.confirm')}
+          </Button>
+        </div>
+      </Modal>
+    </>
+  )
+}
+
+function ContractSignAction({ contract }: { contract: Contract }) {
+  const { t } = useTranslation('contracts')
+  const [showModal, setShowModal] = useState(false)
+
+  if (contract.signatureStatus === 'signed') return null
+
+  return (
+    <>
+      <Button size="sm" variant="secondary" onClick={() => setShowModal(true)}>
+        {t('sign.action')}
+      </Button>
+      <SignRemotelyModal contractId={contract.id} open={showModal} onClose={() => setShowModal(false)} />
+    </>
+  )
+}
+
+export function ContractsPage() {
+  const { t } = useTranslation('contracts')
+  const { locale } = useLocale()
+  const { data: contracts, isLoading } = useContractsList()
   const { data: products } = useProducts()
   const { data: clients } = useClients()
   const [showForm, setShowForm] = useState(false)
@@ -179,31 +232,57 @@ export function AllocationsPage() {
     <div>
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-xl font-semibold">{t('title')}</h1>
-        <Button onClick={() => setShowForm(true)}>{t('newAllocation')}</Button>
+        <Button onClick={() => setShowForm(true)}>{t('newContract')}</Button>
       </div>
-      {allocations && allocations.length === 0 && <p className="text-muted-text">{t('empty')}</p>}
-      <div className="flex flex-col gap-1">
-        {allocations?.map((allocation) => (
-          <div
-            key={allocation.id}
-            className="flex items-center justify-between gap-3 rounded-md border border-border-soft p-2 text-sm"
-          >
-            <div className="flex min-w-0 flex-col gap-0.5">
-              <span className="truncate font-medium">{productNames.get(allocation.productId) ?? allocation.productId}</span>
-              <span className="truncate text-muted-text">{clientNames.get(allocation.clientId) ?? allocation.clientId}</span>
-              <span className="text-xs text-muted-text">
-                {dateFormatter.format(parseDateOnly(allocation.checkoutDate))} –{' '}
-                {dateFormatter.format(parseDateOnly(allocation.dueDate))}
-              </span>
-              <Badge className="self-start" tone={STATUS_TONE[allocation.status]}>{t(`status.${allocation.status}`)}</Badge>
+      {contracts && contracts.length === 0 && <p className="text-muted-text">{t('empty')}</p>}
+      <div className="flex flex-col gap-3">
+        {contracts?.map((contract) => (
+          <div key={contract.id} className="rounded-md border border-border-soft p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <div className="flex flex-col">
+                <span className="font-medium">
+                  #{contract.number} — <span>{clientNames.get(contract.clientId) ?? contract.clientId}</span>
+                </span>
+                <span className="text-xs text-muted-text">
+                  {formatDate(parseDateOnly(contract.eventDate), locale, { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Link
+                  to={`/contratos/${contract.id}/imprimir`}
+                  className="inline-flex h-8 items-center justify-center rounded-md border border-border-soft bg-white px-3 text-sm font-medium text-ink transition-colors hover:border-brand-300 hover:bg-brand-50"
+                >
+                  {t('print.action')}
+                </Link>
+                <ContractSignAction contract={contract} />
+                <ContractCancelAction contract={contract} />
+              </div>
             </div>
-            <div className="shrink-0">
-              <RowActions allocation={allocation} />
+            <div className="flex flex-col gap-1">
+              {contract.allocations.map((allocation) => (
+                <div
+                  key={allocation.id}
+                  className="flex items-center justify-between gap-3 rounded-md border border-border-soft p-2 text-sm"
+                >
+                  <div className="flex min-w-0 flex-col gap-0.5">
+                    <span className="truncate font-medium">
+                      {productNames.get(allocation.productId) ?? allocation.productId}
+                    </span>
+                    <span className="text-xs text-muted-text">
+                      {formatDate(parseDateOnly(allocation.checkoutDate), locale, { day: '2-digit', month: '2-digit', year: 'numeric' })} –{' '}
+                      {formatDate(parseDateOnly(allocation.dueDate), locale, { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                    </span>
+                  </div>
+                  <div className="shrink-0">
+                    <RowActions allocation={allocation} />
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         ))}
       </div>
-      {showForm && <NewAllocationForm onClose={() => setShowForm(false)} />}
+      {showForm && <NewContractForm onClose={() => setShowForm(false)} />}
     </div>
   )
 }

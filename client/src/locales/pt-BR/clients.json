@@ -15,6 +15,24 @@
   "errors": {
     "CANNOT_DELETE_WITH_HISTORY": "Não é possível excluir um cliente com histórico de alocações."
   },
+  "identityDocuments": {
+    "title": "Documentos de Identificação",
+    "label": "Rótulo",
+    "value": "Valor",
+    "labelFieldAria": "Rótulo do documento",
+    "valueFieldAria": "Valor do documento",
+    "add": "Adicionar documento",
+    "remove": "Remover documento"
+  },
+  "addressLines": {
+    "title": "Endereço",
+    "label": "Rótulo",
+    "value": "Valor",
+    "labelFieldAria": "Rótulo da linha de endereço",
+    "valueFieldAria": "Valor da linha de endereço",
+    "add": "Adicionar linha de endereço",
+    "remove": "Remover linha de endereço"
+  },
   "empty": "Nenhum cliente cadastrado ainda.",
   "noResults": "Nenhum cliente encontrado para essa busca."
 }

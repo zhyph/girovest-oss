@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api.ts'
-import type { Allocation, NewAllocationFormValues } from './allocationSchemas.ts'
+import type { Allocation } from './allocationSchemas.ts'
 
 const ALLOCATIONS_KEY = ['allocations']
 
@@ -15,15 +15,6 @@ function invalidateAfterMutation(queryClient: QueryClient) {
   queryClient.invalidateQueries({ queryKey: ALLOCATIONS_KEY })
   queryClient.invalidateQueries({ queryKey: ['calendar'] })
   queryClient.invalidateQueries({ queryKey: ['products'] })
-}
-
-export function useCreateAllocation() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: (values: NewAllocationFormValues) =>
-      apiFetch<Allocation>('/api/allocations', { method: 'POST', body: JSON.stringify(values) }),
-    onSuccess: () => invalidateAfterMutation(queryClient),
-  })
 }
 
 export function useCheckOutAllocation() {

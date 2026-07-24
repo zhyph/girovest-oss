@@ -1,37 +1,6 @@
 import { forwardRef, useState, useEffect, type InputHTMLAttributes } from 'react'
 import { cn } from '../../lib/cn.ts'
-
-/**
- * Locale-formatted date input: displays DD/MM/AAAA (pt-BR) regardless of
- * the browser/OS locale — unlike a native <input type="date">, whose
- * displayed text follows the OS locale even when the app's own locale is
- * pt-BR. The emitted value stays a plain YYYY-MM-DD string, matching what
- * a native date input already produces, so callers don't need to change.
- */
-function formatDigits(digits: string): string {
-  const dd = digits.slice(0, 2)
-  const mm = digits.slice(2, 4)
-  const yyyy = digits.slice(4, 8)
-  let out = dd
-  if (digits.length > 2) out += `/${mm}`
-  if (digits.length > 4) out += `/${yyyy}`
-  return out
-}
-
-function digitsToIso(digits: string): string {
-  if (digits.length < 8) return ''
-  const dd = digits.slice(0, 2)
-  const mm = digits.slice(2, 4)
-  const yyyy = digits.slice(4, 8)
-  return `${yyyy}-${mm}-${dd}`
-}
-
-function isoToDigits(iso: string): string {
-  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)
-  if (!match) return ''
-  const [, yyyy, mm, dd] = match
-  return `${dd}${mm}${yyyy}`
-}
+import { useLocale } from '../../lib/LocaleContext.tsx'
 
 type DateInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'type'> & {
   value: string
@@ -40,18 +9,20 @@ type DateInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onC
 
 export const DateInput = forwardRef<HTMLInputElement, DateInputProps>(
   function DateInput({ className, value, onChange, ...props }, ref) {
+    const { config } = useLocale()
+    const { formatDigits, digitsToIso, isoToDigits, placeholder } = config.date
     const [digits, setDigits] = useState(() => isoToDigits(value))
 
     useEffect(() => {
       setDigits(isoToDigits(value))
-    }, [value])
+    }, [value, isoToDigits])
 
     return (
       <input
         ref={ref}
         type="text"
         inputMode="numeric"
-        placeholder="DD/MM/AAAA"
+        placeholder={placeholder}
         value={formatDigits(digits)}
         onChange={(event) => {
           const nextDigits = event.target.value.replace(/\D/g, '').slice(0, 8)

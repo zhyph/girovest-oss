@@ -20,6 +20,54 @@ npm test        # run the full test suite (uses .env.test, SQLite)
 npm run test:postgres   # run the full suite against a throwaway Postgres container (requires Docker)
 ```
 
+### `HOST` binding and remote signing
+
+`npm run dev` binds to `HOST=127.0.0.1` by default (loopback only), matching
+how the packaged Electron app always runs the server — this is also what
+lets the QR-code remote-signing feature work locally, since it needs a real
+LAN address free to bind to (loopback-only leaves the whole LAN free; see
+`server/src/server.ts` for the binding logic).
+
+**Hosted-website deployments must NOT inherit this default.** That mode
+(see the root [`README.md`](../README.md)) needs the server reachable from
+outside the host machine, which requires binding to all interfaces:
+
+```bash
+HOST=0.0.0.0 npm run start   # or omit HOST entirely — 0.0.0.0 is the
+                              # fallback in src/server.ts for any run that
+                              # doesn't go through `npm run dev`'s override
+```
+
+If you ever see `Failed to start signing app on <ip>:<port>: ... EADDRINUSE`
+while running `npm run dev`, something set `HOST=0.0.0.0` for that run (or
+another process already holds the port) — the main API still starts fine
+either way, only the signing app's bind is affected.
+
+### `npm run dev` prints an error when you stop it with Ctrl-C — this is expected
+
+Stopping `npm run dev` (Ctrl-C) reliably prints something like:
+
+```
+[tsx] Previous process hasn't exited yet. Force killing...
+npm error Lifecycle script `dev` failed with error:
+npm error code 130
+```
+
+This is harmless and unrelated to anything in this codebase — it's a known,
+currently-unresolved interaction between `npm`'s own signal handling (changed
+in npm v10.3.0) and `tsx watch`'s dev-mode process supervisor:
+[tsx#586](https://github.com/privatenumber/tsx/issues/586). Any process layer
+between your shell and `tsx watch` — even bare `npm run dev` with no other
+wrapper involved — causes `npm` and the watched child to each receive the
+Ctrl-C signal independently; `tsx watch` sees that as an already-in-progress
+shutdown and force-kills rather than exiting cleanly. Confirmed (2026-07-24)
+that it happens with or without this project's own `HOST`/`cross-env`
+plumbing, and that invoking the `tsx` binary with no wrapper at all
+(`./node_modules/.bin/tsx watch src/server.ts`) does not show it — but that's
+not a viable replacement for `npm run dev` as the documented entry point.
+Nothing is left running, no data is at risk, and the server did shut down;
+it's just a noisier shutdown message than it needs to be.
+
 ## Switching database provider
 
 Set `DB_PROVIDER=sqlite` (default) or `DB_PROVIDER=postgresql` in your env

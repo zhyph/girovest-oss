@@ -168,7 +168,7 @@ async function wipeAllData() {
   const confirmed = orExitOnCancel(
     await p.confirm({
       message:
-        'This permanently deletes ALL data (allocations, products, clients, staff, locations). Continue?',
+        'This permanently deletes ALL data (contracts, allocations, products, clients, staff, locations). Continue?',
       initialValue: false,
     }),
   )
@@ -184,7 +184,14 @@ async function wipeAllData() {
 
   const spinner = p.spinner()
   spinner.start('Deleting all data')
+  // Contract holds RESTRICT-on-delete FKs to Location/Client/Staff, so it
+  // (and its dependents) must be cleared before those tables — deleting
+  // Client/Staff/Location first throws a foreign key constraint violation
+  // as soon as any Contract still references them.
+  await prisma.signingToken.deleteMany()
+  await prisma.installment.deleteMany()
   await prisma.allocation.deleteMany()
+  await prisma.contract.deleteMany()
   await prisma.product.deleteMany()
   await prisma.client.deleteMany()
   await prisma.staff.deleteMany()

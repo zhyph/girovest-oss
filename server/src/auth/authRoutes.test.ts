@@ -95,6 +95,18 @@ describe('GET /api/auth/me', () => {
     expect(response.body).toMatchObject({ name: 'Bruno Staff', role: 'staff', locationId })
   })
 
+  it('returns the location locale, defaulting to pt-BR', async () => {
+    const login = await request(app)
+      .post('/api/auth/login')
+      .send({ login: 'bruno', password: 'correct-horse' })
+
+    const response = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${login.body.token}`)
+
+    expect(response.body.locale).toBe('pt-BR')
+  })
+
   it('rejects a request with no token', async () => {
     const response = await request(app).get('/api/auth/me')
     expect(response.status).toBe(401)

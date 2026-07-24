@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next'
-import { parseDateOnly } from '../../lib/date.ts'
+import { parseDateOnly, formatDate } from '../../lib/date.ts'
+import { useLocale } from '../../lib/LocaleContext.tsx'
 import type { Allocation } from '../allocations/allocationSchemas.ts'
 
 type Group = 'overdue' | 'today' | 'tomorrow' | 'thisWeek' | 'later'
@@ -33,7 +34,7 @@ export function AgendaView({
   clientNames: Map<string, string>
 }) {
   const { t } = useTranslation('calendarScreen')
-  const formatter = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit' })
+  const { locale } = useLocale()
 
   if (allocations.length === 0) {
     return <p className="text-muted-text">{t('empty')}</p>
@@ -65,7 +66,7 @@ export function AgendaView({
                   {clientNames.get(allocation.clientId) ?? allocation.clientId}
                 </span>
               </div>
-              <span className="text-muted-text">{formatter.format(parseDateOnly(allocation[dateField]))}</span>
+              <span className="text-muted-text">{formatDate(parseDateOnly(allocation[dateField]), locale, { day: '2-digit', month: '2-digit' })}</span>
             </div>
           ))}
         </div>

@@ -1,9 +1,16 @@
 import { toast } from 'sonner'
 
-// Every toast in this app today is an error the staff member needs to
-// actually read and act on (save/delete/check-out/return/cancel failures),
-// not a routine success confirmation — so these stay until dismissed
-// instead of Sonner's default ~4s auto-dismiss.
+// Errors need to actually be read and acted on (save/delete/check-out/
+// return/cancel failures), so they stay up longer than Sonner's ~4s
+// default — but not forever; the closeButton is there for anyone who
+// wants to dismiss sooner.
+const ERROR_TOAST_DURATION_MS = 10000
+const SUCCESS_TOAST_DURATION_MS = 4000
+
 export function showErrorToast(message: string) {
-  toast.error(message, { duration: Infinity })
+  toast.error(message, { duration: ERROR_TOAST_DURATION_MS })
+}
+
+export function showSuccessToast(message: string) {
+  toast.success(message, { duration: SUCCESS_TOAST_DURATION_MS })
 }
