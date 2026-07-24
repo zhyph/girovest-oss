@@ -52,6 +52,7 @@
     "modalTitle": "Assinatura remota",
     "instructions": "Peça ao cliente para escanear o código com o celular.",
     "regenerate": "Gerar novo código",
+    "qrAlt": "Código QR para assinatura",
     "noLan": "Nenhuma rede local detectada. Não é possível assinar remotamente neste momento.",
     "pickNetwork": "Rede",
     "waiting": "Aguardando assinatura...",

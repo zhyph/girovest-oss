@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import '../../i18n.ts'
 import { SignRemotelyModal } from './SignRemotelyModal.tsx'
@@ -76,5 +77,86 @@ describe('SignRemotelyModal', () => {
     renderWithProviders(<SignRemotelyModal contractId="ct1" open onClose={vi.fn()} />)
 
     await waitFor(() => expect(screen.getByText('Assinado com sucesso!')).toBeInTheDocument())
+  })
+
+  it('shows a regenerate action in the no-LAN state', async () => {
+    mockHooks({ issueImpl: vi.fn().mockResolvedValue({ ...tokenResponse, candidates: [] }) })
+
+    renderWithProviders(<SignRemotelyModal contractId="ct1" open onClose={vi.fn()} />)
+
+    await waitFor(() => expect(screen.getByText(/Nenhuma rede local detectada/)).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: 'Gerar novo código' })).toBeInTheDocument()
+  })
+
+  it('does not reissue the token when the contract updates from polling', async () => {
+    const issueImpl = vi.fn().mockResolvedValue(tokenResponse)
+    mockHooks({ issueImpl })
+
+    const queryClient = new QueryClient()
+    const { rerender } = render(
+      <QueryClientProvider client={queryClient}>
+        <SignRemotelyModal contractId="ct1" open onClose={vi.fn()} />
+      </QueryClientProvider>,
+    )
+    await waitFor(() => expect(issueImpl).toHaveBeenCalledTimes(1))
+
+    // Simulate a poll tick updating the contract data (still unsigned) —
+    // reconfigure the mock, then re-render the SAME component instance
+    // (same queryClient, same rerender target) with unchanged open/contractId
+    // props, matching what a poll-driven re-render actually looks like.
+    vi.spyOn(useContractsModule, 'useContract').mockReturnValue({
+      data: { ...unsignedContract, createdAt: '2026-09-02' },
+    } as never)
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <SignRemotelyModal contractId="ct1" open onClose={vi.fn()} />
+      </QueryClientProvider>,
+    )
+
+    expect(issueImpl).toHaveBeenCalledTimes(1)
+  })
+
+  it('rebuilds the QR code when the network selection changes', async () => {
+    const issueImpl = vi.fn().mockResolvedValue({
+      ...tokenResponse,
+      candidates: [
+        { interfaceName: 'wlan0', address: '192.168.1.42' },
+        { interfaceName: 'eth0', address: '192.168.1.43' },
+      ],
+    })
+    mockHooks({ issueImpl })
+
+    renderWithProviders(<SignRemotelyModal contractId="ct1" open onClose={vi.fn()} />)
+
+    const img = await screen.findByRole('img', { name: /qr/i })
+    const firstSrc = img.getAttribute('src')
+    expect(firstSrc).toBeTruthy()
+
+    await userEvent.selectOptions(screen.getByLabelText('Rede'), '192.168.1.43')
+
+    await waitFor(() => expect(img.getAttribute('src')).not.toBe(firstSrc))
+  })
+
+  it('stops polling once the modal closes', () => {
+    const useContractSpy = vi.spyOn(useContractsModule, 'useContract').mockReturnValue({ data: unsignedContract } as never)
+    vi.spyOn(useContractsModule, 'useIssueSigningToken').mockReturnValue({
+      mutateAsync: vi.fn().mockResolvedValue(tokenResponse),
+      isPending: false,
+    } as never)
+
+    const queryClient = new QueryClient()
+    const { rerender } = render(
+      <QueryClientProvider client={queryClient}>
+        <SignRemotelyModal contractId="ct1" open onClose={vi.fn()} />
+      </QueryClientProvider>,
+    )
+    expect(useContractSpy).toHaveBeenLastCalledWith('ct1', { refetchInterval: 3000 })
+
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <SignRemotelyModal contractId="ct1" open={false} onClose={vi.fn()} />
+      </QueryClientProvider>,
+    )
+    expect(useContractSpy).toHaveBeenLastCalledWith('ct1', { refetchInterval: false })
   })
 })

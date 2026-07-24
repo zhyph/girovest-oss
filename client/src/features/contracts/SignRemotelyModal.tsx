@@ -30,6 +30,8 @@ export function SignRemotelyModal({ contractId, open, onClose }: SignRemotelyMod
   const isSigned = contract?.signatureStatus === 'signed'
 
   async function generateToken() {
+    setTokenResponse(null)
+    setQrDataUrl('')
     const response = await issueSigningToken.mutateAsync(contractId)
     setTokenResponse(response)
     setSelectedAddress(response.candidates[0]?.address ?? '')
@@ -62,13 +64,18 @@ export function SignRemotelyModal({ contractId, open, onClose }: SignRemotelyMod
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
-      <DialogContent className="max-w-md gap-4">
+      <DialogContent className="max-w-md gap-4" showCloseButton={false}>
         <DialogTitle className="text-base font-semibold text-ink">{t('sign.modalTitle')}</DialogTitle>
 
         {isSigned ? (
           <p className="text-sm text-ink">{t('sign.signed')}</p>
         ) : tokenResponse && tokenResponse.candidates.length === 0 ? (
-          <p className="text-sm text-ink">{t('sign.noLan')}</p>
+          <div className="flex flex-col items-center gap-3">
+            <p className="text-sm text-ink">{t('sign.noLan')}</p>
+            <Button type="button" variant="secondary" onClick={() => void generateToken()} disabled={issueSigningToken.isPending}>
+              {t('sign.regenerate')}
+            </Button>
+          </div>
         ) : (
           <div className="flex flex-col items-center gap-3">
             <p className="text-sm text-muted-text">{t('sign.instructions')}</p>
@@ -90,7 +97,7 @@ export function SignRemotelyModal({ contractId, open, onClose }: SignRemotelyMod
               </label>
             )}
 
-            {qrDataUrl && <img src={qrDataUrl} alt={t('sign.modalTitle') + ' QR'} className="h-48 w-48" />}
+            {qrDataUrl && <img src={qrDataUrl} alt={t('sign.qrAlt')} className="h-48 w-48" />}
 
             {isExpired ? (
               <p className="text-sm text-red-600">{t('sign.expired')}</p>
