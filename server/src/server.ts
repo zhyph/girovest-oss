@@ -26,17 +26,35 @@ server.on('error', (error) => {
 })
 
 // signingApp binds to each detected LAN candidate individually (never
-// 0.0.0.0 — see the design's security boundary). A bind failure on one
-// candidate (e.g. the interface disappeared between detection and bind)
-// is logged, not fatal — remote signing on that address just won't work,
-// but the rest of the app (including print, and signing on any other
-// detected candidate) keeps running.
-for (const candidate of detectLanCandidates()) {
-  signingApp
-    .listen(port, candidate.address, () => {
-      console.log(`Signing app listening on ${candidate.address}:${port}`)
-    })
-    .on('error', (error) => {
-      console.error(`Failed to start signing app on ${candidate.address}:${port}:`, error)
-    })
+// 0.0.0.0 — see the design's security boundary). When the main app itself
+// binds to 0.0.0.0 (the standalone/non-Electron default), it already
+// occupies every address on this port, so any candidate bind would
+// deterministically fail with EADDRINUSE — not a leftover-process problem,
+// just an expected consequence of running standalone. Skip those up front
+// with one clear line instead of letting each one crash-log a raw Node
+// error object, which reads as a hard startup failure even though it
+// isn't. Electron always sets HOST=127.0.0.1, so this only affects local/
+// standalone runs — remote signing is simply unavailable there.
+if (host === '0.0.0.0') {
+  console.log(
+    'Main app is bound to 0.0.0.0 (every address) — skipping the signing app, since any address it tried would already be taken. Remote signing isn\'t available when running standalone; it works normally under Electron (HOST=127.0.0.1).',
+  )
+} else {
+  for (const candidate of detectLanCandidates()) {
+    if (candidate.address === host) {
+      console.log(`Skipping signing app on ${candidate.address}:${port} — already the main app's address.`)
+      continue
+    }
+    // A bind failure on one candidate (e.g. the interface disappeared
+    // between detection and bind) is logged, not fatal — remote signing on
+    // that address just won't work, but the rest of the app (including
+    // print, and signing on any other detected candidate) keeps running.
+    signingApp
+      .listen(port, candidate.address, () => {
+        console.log(`Signing app listening on ${candidate.address}:${port}`)
+      })
+      .on('error', (error) => {
+        console.error(`Failed to start signing app on ${candidate.address}:${port}:`, error)
+      })
+  }
 }
