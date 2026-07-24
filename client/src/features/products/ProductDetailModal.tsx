@@ -52,7 +52,7 @@ export function ProductDetailModal({
         {product.photos && product.photos.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">
             {product.photos.map((url) => (
-              <img key={url} src={url} className="h-24 w-24 rounded object-cover" />
+              <img key={url} src={url} alt={product.name} className="h-24 w-24 rounded object-cover" />
             ))}
           </div>
         )}
