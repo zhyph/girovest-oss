@@ -33,6 +33,10 @@ export function CalendarPage() {
     () => new Map((products ?? []).map((product) => [product.id, product.name])),
     [products],
   )
+  const productsById = useMemo(
+    () => new Map((products ?? []).map((product) => [product.id, product])),
+    [products],
+  )
   const clientNames = useMemo(
     () => new Map((clients ?? []).map((client) => [client.id, client.name])),
     [clients],
@@ -61,7 +65,7 @@ export function CalendarPage() {
         <AgendaView
           allocations={allocations ?? []}
           dateField={tabDateField[tab]}
-          productNames={productNames}
+          products={productsById}
           clientNames={clientNames}
         />
       ) : (

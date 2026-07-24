@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react'
 import '../../i18n.ts'
 import { AgendaView } from './AgendaView.tsx'
 import type { Allocation } from '../allocations/allocationSchemas.ts'
+import type { Product } from '../products/productSchemas.ts'
 
 function isoDateDaysFromNow(days: number): string {
   const date = new Date()
@@ -21,12 +22,22 @@ function makeAllocation(overrides: Partial<Allocation> = {}): Allocation {
   }
 }
 
-const productNames = new Map([['p1', 'Vestido Azul']])
+function makeProduct(overrides: Partial<Product> = {}): Product {
+  return {
+    id: 'p1', locationId: 'loc1', name: 'Vestido Azul', category: 'festa', size: 'M', color: 'azul',
+    rentalPrice: 250, depositAmount: 150,
+    status: 'active', availability: 'available', hasAllocationHistory: false,
+    createdAt: '2026-07-01T00:00:00.000Z',
+    ...overrides,
+  }
+}
+
+const products = new Map([['p1', makeProduct()]])
 const clientNames = new Map([['c1', 'Maria Silva']])
 
 describe('AgendaView', () => {
   it('shows the empty message when there are no allocations', () => {
-    render(<AgendaView allocations={[]} dateField="checkoutDate" productNames={productNames} clientNames={clientNames} />)
+    render(<AgendaView allocations={[]} dateField="checkoutDate" products={products} clientNames={clientNames} />)
     expect(screen.getByText('Nada para mostrar neste período.')).toBeInTheDocument()
   })
 
@@ -35,7 +46,7 @@ describe('AgendaView', () => {
       <AgendaView
         allocations={[makeAllocation({ checkoutDate: isoDateDaysFromNow(0) })]}
         dateField="checkoutDate"
-        productNames={productNames}
+        products={products}
         clientNames={clientNames}
       />,
     )
@@ -54,7 +65,7 @@ describe('AgendaView', () => {
           makeAllocation({ id: 'later', checkoutDate: isoDateDaysFromNow(20) }),
         ]}
         dateField="checkoutDate"
-        productNames={productNames}
+        products={products}
         clientNames={clientNames}
       />,
     )
@@ -71,7 +82,7 @@ describe('AgendaView', () => {
       <AgendaView
         allocations={[makeAllocation({ checkoutDate: isoDateDaysFromNow(0) })]}
         dateField="checkoutDate"
-        productNames={productNames}
+        products={products}
         clientNames={clientNames}
       />,
     )
@@ -80,5 +91,13 @@ describe('AgendaView', () => {
     expect(screen.queryByText('Esta semana')).not.toBeInTheDocument()
     expect(screen.queryByText('Mais tarde')).not.toBeInTheDocument()
     expect(screen.queryByText('Atrasado')).not.toBeInTheDocument()
+  })
+
+  it('paginates a single day-group that exceeds the page size', () => {
+    const allocations = Array.from({ length: 25 }, (_, i) =>
+      makeAllocation({ id: `a${i}`, checkoutDate: isoDateDaysFromNow(0) }),
+    )
+    render(<AgendaView allocations={allocations} dateField="checkoutDate" products={products} clientNames={clientNames} />)
+    expect(screen.getByText('1 / 2')).toBeInTheDocument()
   })
 })

@@ -1,7 +1,8 @@
 import { useTranslation } from 'react-i18next'
-import { parseDateOnly, formatDate } from '../../lib/date.ts'
-import { useLocale } from '../../lib/LocaleContext.tsx'
+import { parseDateOnly } from '../../lib/date.ts'
+import { CalendarDayItemsList } from './CalendarDayItemsList.tsx'
 import type { Allocation } from '../allocations/allocationSchemas.ts'
+import type { Product } from '../products/productSchemas.ts'
 
 type Group = 'overdue' | 'today' | 'tomorrow' | 'thisWeek' | 'later'
 const GROUP_ORDER: Group[] = ['overdue', 'today', 'tomorrow', 'thisWeek', 'later']
@@ -25,16 +26,15 @@ function groupFor(date: Date, today: Date): Group {
 export function AgendaView({
   allocations,
   dateField,
-  productNames,
+  products,
   clientNames,
 }: {
   allocations: Allocation[]
   dateField: 'checkoutDate' | 'dueDate'
-  productNames: Map<string, string>
+  products: Map<string, Product>
   clientNames: Map<string, string>
 }) {
   const { t } = useTranslation('calendarScreen')
-  const { locale } = useLocale()
 
   if (allocations.length === 0) {
     return <p className="text-muted-text">{t('empty')}</p>
@@ -58,17 +58,12 @@ export function AgendaView({
       {GROUP_ORDER.filter((group) => grouped.has(group)).map((group) => (
         <div key={group} className="flex flex-col gap-2">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-text">{t(`groups.${group}`)}</h2>
-          {grouped.get(group)!.map((allocation) => (
-            <div key={allocation.id} className="flex justify-between rounded-md border border-border-soft p-2 text-sm">
-              <div className="flex flex-col">
-                <span>{productNames.get(allocation.productId) ?? allocation.productId}</span>
-                <span className="text-xs text-muted-text">
-                  {clientNames.get(allocation.clientId) ?? allocation.clientId}
-                </span>
-              </div>
-              <span className="text-muted-text">{formatDate(parseDateOnly(allocation[dateField]), locale, { day: '2-digit', month: '2-digit' })}</span>
-            </div>
-          ))}
+          <CalendarDayItemsList
+            allocations={grouped.get(group)!}
+            products={products}
+            clientNames={clientNames}
+            dateField={dateField}
+          />
         </div>
       ))}
     </div>
