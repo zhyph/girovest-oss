@@ -93,6 +93,16 @@ describe('happy path: register client -> register dress -> allocate -> check out
     expect(typeof signTokenResponse.body.token).toBe('string')
     expect(Array.isArray(signTokenResponse.body.candidates)).toBe(true)
 
+    // signingApp never binds anywhere when the main app is on 0.0.0.0 (see
+    // server.ts) — this route must not report LAN candidates in that case,
+    // since the desktop would otherwise generate a QR code for an address
+    // nothing is actually listening on.
+    const originalHost = process.env.HOST
+    process.env.HOST = '0.0.0.0'
+    const noLanResponse = await auth(request(app).post(`/api/contracts/${contractResponse.body.id}/sign-token`))
+    process.env.HOST = originalHost
+    expect(noLanResponse.body.candidates).toEqual([])
+
     const availabilityReserved = await auth(
       request(app).get(`/api/allocations/products/${productId}/availability?asOf=2020-01-03`),
     )

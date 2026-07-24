@@ -20,6 +20,18 @@ async function resolveLocationId(staffId: string): Promise<string> {
   return staff.locationId
 }
 
+// Mirrors server.ts's own binding decision exactly: when the main app is
+// bound to 0.0.0.0 (the standalone/non-Electron default), signingApp never
+// binds anywhere at all, and a candidate whose address equals the main
+// app's specific host is skipped too. Reporting a candidate here that
+// signingApp didn't actually bind to would have the desktop generate a
+// working-looking QR code for an address nothing is listening on.
+function reachableSigningCandidates(): ReturnType<typeof detectLanCandidates> {
+  const host = process.env.HOST ?? '0.0.0.0'
+  if (host === '0.0.0.0') return []
+  return detectLanCandidates().filter((candidate) => candidate.address !== host)
+}
+
 contractsRouter.get('/', async (req, res) => {
   if (!req.staff) throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Unauthorized')
   const locationId = await resolveLocationId(req.staff.staffId)
@@ -76,6 +88,6 @@ contractsRouter.post('/:id/sign-token', async (req, res) => {
     token,
     expiresAt,
     port: Number(process.env.PORT ?? 3000),
-    candidates: detectLanCandidates(),
+    candidates: reachableSigningCandidates(),
   })
 })
