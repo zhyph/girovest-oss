@@ -54,8 +54,9 @@ model Product {
   status        String   @default("active")
   createdAt     DateTime @default(now())
 
-  location    Location     @relation(fields: [locationId], references: [id])
-  allocations Allocation[]
+  location     Location              @relation(fields: [locationId], references: [id])
+  allocations  Allocation[]
+  photoTokens  ProductPhotoToken[]
 }
 
 model Allocation {
@@ -113,6 +114,17 @@ model SigningToken {
   createdAt  DateTime  @default(now())
 
   contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+}
+
+model ProductPhotoToken {
+  id         String    @id @default(uuid())
+  token      String    @unique
+  productId  String
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 }
 
 model Installment {
