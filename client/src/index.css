@@ -78,3 +78,8 @@ body {
   background-color: var(--color-cream);
   color: var(--color-ink);
 }
+
+@page {
+  size: A4;
+  margin: 12mm;
+}

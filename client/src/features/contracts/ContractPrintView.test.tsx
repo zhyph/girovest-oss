@@ -83,4 +83,14 @@ describe('ContractPrintView', () => {
     expect(screen.getByAltText('Assinatura do Cliente')).toBeInTheDocument()
     expect(screen.getByText(/Assinado em/)).toBeInTheDocument()
   })
+
+  it('marks item rows and the signature block to avoid splitting across a print page break', () => {
+    const { container } = render(<ContractPrintView contract={baseContract} />)
+
+    const row = container.querySelector('tbody tr')
+    expect(row?.className).toContain('print:break-inside-avoid')
+
+    const signatureBlock = screen.getByText('Assinatura do Cliente').closest('section')
+    expect(signatureBlock?.className).toContain('print:break-inside-avoid')
+  })
 })

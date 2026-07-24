@@ -16,8 +16,8 @@ export function ContractPrintView({ contract }: ContractPrintViewProps) {
   const total = contract.allocations.reduce((sum, allocation) => sum + allocation.priceCharged, 0)
 
   return (
-    <article className="flex flex-col gap-6 text-sm text-ink">
-      <header className="flex flex-col gap-1 border-b border-border-soft pb-4">
+    <article className="flex flex-col gap-6 print:gap-3 text-sm print:text-xs text-ink">
+      <header className="flex flex-col gap-1 border-b border-border-soft pb-4 print:pb-2">
         <h1 className="text-lg font-semibold">{contract.location.name}</h1>
         <p>{contract.location.address}</p>
         {contract.location.phone && <p>{contract.location.phone}</p>}
@@ -57,7 +57,7 @@ export function ContractPrintView({ contract }: ContractPrintViewProps) {
           </thead>
           <tbody>
             {contract.allocations.map((allocation) => (
-              <tr key={allocation.id} className="border-b border-border-soft">
+              <tr key={allocation.id} className="border-b border-border-soft print:break-inside-avoid">
                 <td className="py-1">{allocation.product.name}</td>
                 <td className="py-1">
                   {formatDate(parseDateOnly(allocation.checkoutDate), locale, DATE_FORMAT_OPTIONS)}
@@ -90,7 +90,7 @@ export function ContractPrintView({ contract }: ContractPrintViewProps) {
               </thead>
               <tbody>
                 {contract.installments.map((installment) => (
-                  <tr key={installment.id} className="border-b border-border-soft">
+                  <tr key={installment.id} className="border-b border-border-soft print:break-inside-avoid">
                     <td className="py-1">
                       {formatDate(parseDateOnly(installment.dueDate), locale, DATE_FORMAT_OPTIONS)}
                     </td>
@@ -115,10 +115,10 @@ export function ContractPrintView({ contract }: ContractPrintViewProps) {
         </ol>
       </section>
 
-      <section className="mt-8 flex flex-col items-center gap-2">
+      <section className="mt-8 print:mt-4 flex flex-col items-center gap-2 print:break-inside-avoid">
         {contract.signatureImage ? (
           <>
-            <img src={contract.signatureImage} alt={t('print.signatureLabel')} className="h-24" />
+            <img src={contract.signatureImage} alt={t('print.signatureLabel')} className="h-24 print:h-16" />
             <p>{t('print.signatureLabel')}</p>
             {contract.signedAt && (
               <p className="text-xs text-muted-text">
@@ -128,7 +128,7 @@ export function ContractPrintView({ contract }: ContractPrintViewProps) {
           </>
         ) : (
           <>
-            <div className="h-24 w-64 border-b border-ink" />
+            <div className="h-24 w-64 print:h-16 border-b border-ink" />
             <p>{t('print.signatureLabel')}</p>
           </>
         )}
