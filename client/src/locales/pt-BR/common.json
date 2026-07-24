@@ -14,7 +14,8 @@
     "edit": "Editar",
     "delete": "Excluir",
     "create": "Novo",
-    "logout": "Sair"
+    "logout": "Sair",
+    "close": "Fechar"
   },
   "errors": {
     "UNKNOWN": "Algo deu errado. Tente novamente."
