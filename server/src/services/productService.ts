@@ -164,15 +164,21 @@ export async function listProductsForLocation(
   locationId: string,
   opts: { search?: string; limit?: number },
 ): Promise<ProductDTO[]> {
+  // Prisma's `contains` is case-sensitive on Postgres but case-insensitive on
+  // SQLite (by accident of SQLite's default LIKE collation). `mode: 'insensitive'`
+  // makes Postgres match SQLite's behavior, but SQLite doesn't support `mode` at
+  // all, so it's only added when actually running against Postgres.
+  const insensitiveMode = process.env.DB_PROVIDER === 'postgresql' ? ({ mode: 'insensitive' } as const) : {}
+
   const rows = await prisma.product.findMany({
     where: {
       locationId,
       ...(opts.search
         ? {
             OR: [
-              { name: { contains: opts.search } },
-              { category: { contains: opts.search } },
-              { color: { contains: opts.search } },
+              { name: { contains: opts.search, ...insensitiveMode } },
+              { category: { contains: opts.search, ...insensitiveMode } },
+              { color: { contains: opts.search, ...insensitiveMode } },
             ],
           }
         : {}),
