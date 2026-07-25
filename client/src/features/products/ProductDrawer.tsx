@@ -121,8 +121,9 @@ export function ProductDrawer({
   return (
     <>
       <div className="fixed inset-0 z-40 bg-ink/40 opacity-100 transition-opacity duration-200 starting:opacity-0" onClick={onClose} aria-hidden="true" />
-      <div className="fixed inset-y-0 right-0 z-50 w-80 translate-x-0 border-l border-border-soft bg-white p-4 shadow-lg transition-transform duration-200 ease-out starting:translate-x-full">
-      <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3">
+      <div className="fixed inset-y-0 right-0 z-50 flex w-80 translate-x-0 flex-col overflow-hidden border-l border-border-soft bg-white shadow-lg transition-transform duration-200 ease-out starting:translate-x-full">
+      <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col p-4">
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
         <input type="hidden" {...register('locationId')} />
         <label className="flex flex-col gap-1 text-sm">
           {t('fields.name')}
@@ -222,7 +223,8 @@ export function ProductDrawer({
             {t('common:actions.saveAndAddAnother', { ns: 'common' })}
           </label>
         )}
-        <div className="mt-2 flex justify-between gap-2">
+        </div>
+        <div className="mt-2 flex flex-shrink-0 justify-between gap-2">
           {product && !product.hasAllocationHistory && (
             <Button
               type="button"
@@ -233,7 +235,7 @@ export function ProductDrawer({
               {t('common:actions.delete', { ns: 'common' })}
             </Button>
           )}
-          <div className="flex flex-1 justify-end gap-2">
+          <div className="flex flex-1 flex-shrink-0 justify-end gap-2">
             <Button type="button" variant="secondary" onClick={onClose}>
               {t('common:actions.cancel', { ns: 'common' })}
             </Button>

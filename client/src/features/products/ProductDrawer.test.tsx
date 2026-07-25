@@ -232,4 +232,11 @@ describe('ProductDrawer', () => {
     const thumbnail = container.querySelector('img[src="https://example.com/a.jpg"]')
     expect(thumbnail).toHaveClass('h-16', 'w-16')
   })
+
+  it('keeps the footer action buttons in a flex-shrink-0 region, form scrolls internally', () => {
+    mockProductHooks(vi.fn())
+    renderWithToast(<ProductDrawer product={product} onClose={vi.fn()} />)
+    const footer = screen.getByRole('button', { name: 'Salvar' }).closest('div')
+    expect(footer?.className).toContain('flex-shrink-0')
+  })
 })

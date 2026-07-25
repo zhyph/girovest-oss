@@ -130,6 +130,21 @@ on the same day (tomorrow, relative to when the script runs), used by
 volume. Requires `seed-e2e.ts` to have been run first.
 
 ```bash
+npx tsx seed-e2e-list-layout.ts
+```
+
+Seeds 40 fixed-ID products (`e2e-list-layout-product-1..40`), 40 fixed-ID
+clients (`e2e-list-layout-client-1..40`), 20 fixed-ID contracts
+(`e2e-list-layout-contract-1..20`, one allocation each), and one product with
+3 real photo files attached (`e2e-list-layout-photo-product`). Used by
+`client/e2e/list-layout.spec.ts` to prove the sticky-header/scrollable-list
+layout fix: enough rows to overflow the viewport without it, and enough
+photos on one product to test `ProductDrawer`'s footer-overflow fix. Requires
+`seed-e2e.ts` to have been run first; also run `seed-e2e-calendar-load.ts`
+first if you want the Dashboard's "upcoming" list long enough to matter too
+(it reuses that seed's 300 same-day allocations rather than duplicating them).
+
+```bash
 npx tsx seed-staff.ts <login> <password> <name> <role: owner|staff> <locationId>
 ```
 
