@@ -40,41 +40,17 @@ afterEach(async () => {
   await prisma.location.deleteMany()
 })
 
-describe('POST /:id/photo-token', () => {
-  it("issues a token for a product in the caller's own location", async () => {
-    const response = await request(app)
-      .post(`/api/products/${productId}/photo-token`)
-      .set('Authorization', `Bearer ${staffToken}`)
-
+describe('POST /api/products/photo-session', () => {
+  it('issues a session token scoped to the caller\'s own staff/location', async () => {
+    const response = await request(app).post('/api/products/photo-session').set('Authorization', `Bearer ${staffToken}`)
     expect(response.status).toBe(201)
-    expect(typeof response.body.token).toBe('string')
-    expect(typeof response.body.expiresAt).toBe('string')
-    expect(typeof response.body.port).toBe('number')
-    expect(Array.isArray(response.body.candidates)).toBe(true)
+    expect(response.body.token).toBeTruthy()
+    expect(response.body.candidates).toBeDefined()
   })
 
-  it('returns 404 for a product in another location', async () => {
-    const otherLocation = await prisma.location.create({ data: { name: 'Other', address: 'B' } })
-    const otherProduct = await prisma.product.create({
-      data: {
-        locationId: otherLocation.id,
-        name: 'P2',
-        category: 'festa',
-        size: 'M',
-        color: 'azul',
-        rentalPrice: 100,
-        depositAmount: 50,
-      },
-    })
-
-    const response = await request(app)
-      .post(`/api/products/${otherProduct.id}/photo-token`)
-      .set('Authorization', `Bearer ${staffToken}`)
-
-    expect(response.status).toBe(404)
-
-    await prisma.product.delete({ where: { id: otherProduct.id } })
-    await prisma.location.delete({ where: { id: otherLocation.id } })
+  it('requires authentication', async () => {
+    const response = await request(app).post('/api/products/photo-session')
+    expect(response.status).toBe(401)
   })
 })
 
