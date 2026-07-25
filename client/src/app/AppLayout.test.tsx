@@ -1,8 +1,15 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AppLayout } from './AppLayout.tsx'
+
+// AppLayout renders at the app root, unconditionally calling this hook.
+// A page-level layout test should never make a real network call, so the
+// hook's own connection/retry behavior is covered by its dedicated test suite.
+vi.mock('../features/products/useProductPhotoEvents.ts', () => ({
+  useProductPhotoEvents: vi.fn(),
+}))
 
 describe('AppLayout', () => {
   it('caps the outer shell at the viewport height so main scrolls internally, not the page', () => {

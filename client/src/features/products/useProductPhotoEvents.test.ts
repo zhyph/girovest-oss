@@ -76,4 +76,39 @@ describe('useProductPhotoEvents', () => {
       expect(cached.find((p) => p.id === 'p1')?.photos).toEqual([])
     })
   })
+
+  describe('when the ticket-mint fetch fails', () => {
+    beforeEach(() => {
+      vi.useFakeTimers()
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('does not leave an unhandled rejection and retries until it succeeds', async () => {
+      global.fetch = vi
+        .fn()
+        .mockRejectedValueOnce(new Error('network blip'))
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 201,
+          json: () => Promise.resolve({ ticket: 'retry-ticket', expiresAt: Date.now() + 5 * 60 * 1000 }),
+        })
+
+      const queryClient = new QueryClient()
+      renderWithClient(queryClient)
+
+      // Let the rejected first attempt settle before advancing timers.
+      await vi.waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1))
+
+      expect(FakeEventSource.instances).toHaveLength(0)
+
+      // Advance past the retry delay to trigger the second connect() attempt.
+      await vi.advanceTimersByTimeAsync(5 * 1000)
+
+      await vi.waitFor(() => expect(FakeEventSource.instances).toHaveLength(1))
+      expect(FakeEventSource.instances[0].url).toContain('ticket=retry-ticket')
+    })
+  })
 })
