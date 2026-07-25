@@ -140,9 +140,10 @@ clients (`e2e-list-layout-client-1..40`), 20 fixed-ID contracts
 `client/e2e/list-layout.spec.ts` to prove the sticky-header/scrollable-list
 layout fix: enough rows to overflow the viewport without it, and enough
 photos on one product to test `ProductDrawer`'s footer-overflow fix. Requires
-`seed-e2e.ts` to have been run first; also run `seed-e2e-calendar-load.ts`
-first if you want the Dashboard's "upcoming" list long enough to matter too
-(it reuses that seed's 300 same-day allocations rather than duplicating them).
+`seed-e2e.ts` **and** `seed-e2e-calendar-load.ts` to have been run first —
+`list-layout.spec.ts`'s dashboard-route assertion targets a product
+(`Vestido Carga E2E`) that only exists via that seed's data, so skipping it
+causes a hard element-not-found failure, not just a thinner test.
 
 ```bash
 npx tsx seed-staff.ts <login> <password> <name> <role: owner|staff> <locationId>
