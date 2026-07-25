@@ -18,10 +18,11 @@ model Location {
   phone     String?
   createdAt DateTime @default(now())
 
-  staff           Staff[]
-  products        Product[]
-  contracts       Contract[]
-  contractClauses LocationContractClause[]
+  staff                Staff[]
+  products             Product[]
+  contracts            Contract[]
+  contractClauses      LocationContractClause[]
+  productPhotoTokens   ProductPhotoToken[]
 }
 
 model Staff {
@@ -33,9 +34,10 @@ model Staff {
   locationId   String
   createdAt    DateTime @default(now())
 
-  location    Location     @relation(fields: [locationId], references: [id])
-  allocations Allocation[]
-  contracts   Contract[]
+  location              Location     @relation(fields: [locationId], references: [id])
+  allocations           Allocation[]
+  contracts             Contract[]
+  productPhotoTokens    ProductPhotoToken[]
 }
 
 model Client {
@@ -66,9 +68,8 @@ model Product {
   status        String   @default("active")
   createdAt     DateTime @default(now())
 
-  location     Location              @relation(fields: [locationId], references: [id])
-  allocations  Allocation[]
-  photoTokens  ProductPhotoToken[]
+  location    Location     @relation(fields: [locationId], references: [id])
+  allocations Allocation[]
 }
 
 model Allocation {
@@ -129,14 +130,15 @@ model SigningToken {
 }
 
 model ProductPhotoToken {
-  id         String    @id @default(uuid())
-  token      String    @unique
-  productId  String
+  id         String   @id @default(uuid())
+  token      String   @unique
+  staffId    String
+  locationId String
   expiresAt  DateTime
-  usedAt     DateTime?
-  createdAt  DateTime  @default(now())
+  createdAt  DateTime @default(now())
 
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  staff    Staff    @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
 }
 
 model Installment {
