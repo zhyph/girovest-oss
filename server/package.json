@@ -1,6 +1,6 @@
 {
   "name": "girovest-server",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "private": true,
   "description": "Girovest API server — Express + Prisma, SQLite or Postgres.",
   "author": "Girovest",
