@@ -13,7 +13,7 @@ import {
   updateProduct,
   deleteProduct,
 } from '../services/productService.js'
-import { issueProductPhotoToken } from '../services/productPhotoTokenService.js'
+import { issueProductPhotoSession } from '../services/productPhotoTokenService.js'
 import { reachableSigningCandidates } from './contracts.js'
 
 export const productsRouter = Router()
@@ -75,7 +75,15 @@ productsRouter.delete('/:id', async (req, res) => {
 productsRouter.post('/:id/photo-token', async (req, res) => {
   if (!req.staff) throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Unauthorized')
   const staff = await prisma.staff.findUniqueOrThrow({ where: { id: req.staff.staffId } })
-  const { token, expiresAt } = await issueProductPhotoToken(req.params.id, staff.locationId)
+  // The session token itself is no longer product-scoped (see
+  // productPhotoTokenService), but this route still validates that the
+  // product exists in the caller's own location before handing out a
+  // session — same boundary the old per-product token enforced at issuance.
+  const product = await prisma.product.findUnique({ where: { id: req.params.id } })
+  if (!product || product.locationId !== staff.locationId) {
+    throw new AppError(ErrorCodes.NOT_FOUND, 404, `Product ${req.params.id} not found`)
+  }
+  const { token, expiresAt } = await issueProductPhotoSession(staff.id, staff.locationId)
   res.status(201).json({
     token,
     expiresAt,

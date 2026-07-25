@@ -6,11 +6,12 @@ import path from 'path'
 import { signingApp } from './signingApp.js'
 import { prisma } from './db/client.js'
 import { issueSigningToken } from './services/signingService.js'
-import { issueProductPhotoToken } from './services/productPhotoTokenService.js'
+import { issueProductPhotoSession } from './services/productPhotoTokenService.js'
 
 let contractId: string
 let productId: string
 let locationId: string
+let staffId: string
 let photosDir: string
 let originalPhotosDir: string | undefined
 
@@ -20,6 +21,7 @@ beforeEach(async () => {
   const staff = await prisma.staff.create({
     data: { name: 'S', login: `staff-${Date.now()}-${Math.random()}`, passwordHash: 'x', role: 'staff', locationId },
   })
+  staffId = staff.id
   const client = await prisma.client.create({ data: { name: 'C', phone: '1', email: 'c@example.com' } })
   const contract = await prisma.contract.create({
     data: { number: 1, locationId, clientId: client.id, staffId: staff.id, eventDate: new Date('2026-10-03'), paymentMethod: 'PIX' },
@@ -111,7 +113,7 @@ describe('POST /sign/:token/submit', () => {
 
 describe('GET /product-photos/:token', () => {
   it('serves the photo intake page for a valid token', async () => {
-    const { token } = await issueProductPhotoToken(productId, locationId)
+    const { token } = await issueProductPhotoSession(staffId, locationId)
 
     const response = await request(signingApp).get(`/product-photos/${token}`)
 
@@ -131,19 +133,19 @@ describe('GET /product-photos/:token', () => {
 
 describe('POST /product-photos/:token/submit', () => {
   it('accepts a valid photo submission', async () => {
-    const { token } = await issueProductPhotoToken(productId, locationId)
+    const { token } = await issueProductPhotoSession(staffId, locationId)
 
     const response = await request(signingApp)
       .post(`/product-photos/${token}/submit`)
-      .send({ photos: ['data:image/jpeg;base64,abc'] })
+      .send({ productId, photos: ['data:image/jpeg;base64,abc'] })
 
     expect(response.status).toBe(200)
   })
 
   it('rejects a missing photos array with 400', async () => {
-    const { token } = await issueProductPhotoToken(productId, locationId)
+    const { token } = await issueProductPhotoSession(staffId, locationId)
 
-    const response = await request(signingApp).post(`/product-photos/${token}/submit`).send({})
+    const response = await request(signingApp).post(`/product-photos/${token}/submit`).send({ productId })
 
     expect(response.status).toBe(400)
   })
@@ -151,7 +153,7 @@ describe('POST /product-photos/:token/submit', () => {
   it('rejects a submit with an unknown token', async () => {
     const response = await request(signingApp)
       .post('/product-photos/unknown-token/submit')
-      .send({ photos: ['data:image/jpeg;base64,abc'] })
+      .send({ productId, photos: ['data:image/jpeg;base64,abc'] })
 
     expect(response.status).toBe(404)
   })

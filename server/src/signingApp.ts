@@ -50,6 +50,7 @@ signingApp.get('/product-photos/:token', async (req, res) => {
 })
 
 const submitPhotosSchema = z.object({
+  productId: z.string().min(1),
   photos: z.array(z.string().min(1)).min(1).max(10),
 })
 
@@ -58,7 +59,7 @@ signingApp.post('/product-photos/:token/submit', async (req, res) => {
   if (!parsed.success) {
     throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'Invalid photo payload')
   }
-  await submitPhotos(req.params.token, parsed.data.photos)
+  await submitPhotos(req.params.token, parsed.data.productId, parsed.data.photos)
   res.json({ status: 'ok' })
 })
 
