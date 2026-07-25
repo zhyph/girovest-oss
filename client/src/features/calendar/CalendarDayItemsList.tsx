@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../../components/ui/button.tsx'
+import { AuthenticatedPhoto } from '../../components/ui/authenticated-photo.tsx'
 import { ProductDetailModal } from '../products/ProductDetailModal.tsx'
 import { parseDateOnly, formatDate } from '../../lib/date.ts'
 import { useLocale } from '../../lib/LocaleContext.tsx'
@@ -47,7 +48,7 @@ export function CalendarDayItemsList({
             >
               <div className="flex items-center gap-2">
                 {photo && (
-                  <img src={photo} alt={product?.name ?? ''} className="h-8 w-8 rounded object-cover" />
+                  <AuthenticatedPhoto url={photo} alt={product?.name ?? ''} className="h-8 w-8 rounded object-cover" />
                 )}
                 <div className="flex flex-col">
                   <span>{product?.name ?? allocation.productId}</span>

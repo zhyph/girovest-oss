@@ -8,16 +8,14 @@ import { CurrencyInput } from '../../components/ui/currency-input.tsx'
 import { Modal } from '../../components/ui/modal.tsx'
 import { showErrorToast } from '../../lib/toast.ts'
 import { useAuth } from '../../lib/useAuth.ts'
-import { useAuthenticatedImageUrl } from '../../lib/useAuthenticatedImageUrl.ts'
+import { AuthenticatedPhoto } from '../../components/ui/authenticated-photo.tsx'
 import { productSchema, type Product, type ProductFormValues, type ProductStatus } from './productSchemas.ts'
 import { useCreateProduct, useUpdateProduct, useDeleteProduct } from './useProducts.ts'
 
 const STATUS_OPTIONS: ProductStatus[] = ['active', 'maintenance', 'retired']
 
 function PhotoThumbnail({ url }: { url: string }) {
-  const isRemotePath = url.startsWith('/api/')
-  const authenticatedUrl = useAuthenticatedImageUrl(isRemotePath ? url : null)
-  return <img src={isRemotePath ? (authenticatedUrl ?? '') : url} alt="" className="h-16 w-16 rounded object-cover" />
+  return <AuthenticatedPhoto url={url} alt="" className="h-16 w-16 rounded object-cover" />
 }
 
 export function ProductDrawer({

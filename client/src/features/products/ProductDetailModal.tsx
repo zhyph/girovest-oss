@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { Dialog, DialogContent, DialogTitle } from '../../components/ui/dialog.tsx'
 import { Button } from '../../components/ui/button.tsx'
+import { AuthenticatedPhoto } from '../../components/ui/authenticated-photo.tsx'
 import { useLocale } from '../../lib/LocaleContext.tsx'
 import { getLocaleConfig, formatCurrency } from '../../lib/locale.ts'
 import type { Product } from './productSchemas.ts'
@@ -52,7 +53,7 @@ export function ProductDetailModal({
         {product.photos && product.photos.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">
             {product.photos.map((url) => (
-              <img key={url} src={url} alt={product.name} className="h-24 w-24 rounded object-cover" />
+              <AuthenticatedPhoto key={url} url={url} alt={product.name} className="h-24 w-24 rounded object-cover" />
             ))}
           </div>
         )}
