@@ -6,9 +6,19 @@ import type { Allocation } from '../allocations/allocationSchemas.ts'
 import type { Product } from '../products/productSchemas.ts'
 
 function isoDateDaysFromNow(days: number): string {
+  // Build the date string from local year/month/day components, not
+  // toISOString() (which converts to UTC) -- late at night in a
+  // negative-UTC-offset timezone, toISOString() rolls over to the next
+  // calendar day, producing a date string one day ahead of the actual
+  // local "today"/"tomorrow"/etc this test means to construct. parseDateOnly
+  // (lib/date.ts), which the real AgendaView uses, correctly parses via
+  // local components -- so the mismatch was in this helper, not app code.
   const date = new Date()
   date.setDate(date.getDate() + days)
-  return date.toISOString().slice(0, 10)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 function makeAllocation(overrides: Partial<Allocation> = {}): Allocation {
