@@ -31,3 +31,8 @@ export interface PhotoTokenResponse {
   port: number
   candidates: { interfaceName: string; address: string }[]
 }
+
+export interface SseTicketResponse {
+  ticket: string
+  expiresAt: number
+}
