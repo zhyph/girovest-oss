@@ -119,7 +119,6 @@ describe('GET /product-photos/:token', () => {
 
     expect(response.status).toBe(200)
     expect(response.headers['content-type']).toContain('text/html')
-    // Expected to fail until Task 5 (server/src/productPhotoPage.ts) provides real phone-page markup
     expect(response.text).toContain('type="file"')
   })
 
@@ -128,6 +127,47 @@ describe('GET /product-photos/:token', () => {
 
     expect(response.status).toBe(200)
     expect(response.text).not.toContain('type="file"')
+  })
+
+  it('renders a product-picker screen with a search input and product list container', async () => {
+    const { token } = await issueProductPhotoSession(staffId, locationId)
+
+    const response = await request(signingApp).get(`/product-photos/${token}`)
+
+    expect(response.text).toContain('id="search-input"')
+    expect(response.text).toContain('id="product-list"')
+    expect(response.text).toContain('id="picker-screen"')
+  })
+
+  it('renders a camera-capture screen with two distinct file inputs: a single-shot camera input and a multi-select gallery input', async () => {
+    const { token } = await issueProductPhotoSession(staffId, locationId)
+
+    const response = await request(signingApp).get(`/product-photos/${token}`)
+
+    // Root cause of the original one-photo-only bug: capture="environment" on a mobile
+    // browser returns exactly one photo per invocation no matter what else is on that
+    // input, so the fix requires two separate inputs rather than tweaking one.
+    const cameraInputMatch = response.text.match(/<input[^>]*id="camera-input"[^>]*>/)
+    expect(cameraInputMatch).not.toBeNull()
+    expect(cameraInputMatch![0]).toContain('capture="environment"')
+    expect(cameraInputMatch![0]).not.toContain('multiple')
+
+    const galleryInputMatch = response.text.match(/<input[^>]*id="gallery-input"[^>]*>/)
+    expect(galleryInputMatch).not.toBeNull()
+    expect(galleryInputMatch![0]).toContain('multiple')
+    expect(galleryInputMatch![0]).not.toContain('capture')
+
+    expect(response.text).toContain('id="take-photo"')
+    expect(response.text).toContain('id="gallery-link"')
+    expect(response.text).toContain('id="back-link"')
+  })
+
+  it('embeds the token in the inline script so the picker/capture screens can call the token-scoped API', async () => {
+    const { token } = await issueProductPhotoSession(staffId, locationId)
+
+    const response = await request(signingApp).get(`/product-photos/${token}`)
+
+    expect(response.text).toContain(JSON.stringify(token))
   })
 })
 

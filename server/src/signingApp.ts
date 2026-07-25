@@ -48,7 +48,7 @@ signingApp.post('/sign/:token/submit', async (req, res) => {
 signingApp.get('/product-photos/:token', async (req, res) => {
   const status = await checkPhotoTokenValidity(req.params.token)
   res.set('Content-Type', 'text/html; charset=utf-8')
-  res.send(getProductPhotoPageHtml(status))
+  res.send(getProductPhotoPageHtml(status, req.params.token))
 })
 
 signingApp.get('/product-photos/:token/products', async (req, res) => {
