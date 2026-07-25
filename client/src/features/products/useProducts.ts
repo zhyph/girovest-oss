@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api.ts'
 import type { PhotoTokenResponse, Product, ProductFormValues, ProductStatus } from './productSchemas.ts'
 
-const PRODUCTS_KEY = ['products']
+export const PRODUCTS_KEY = ['products']
 
 export function useProducts(options: { refetchInterval?: number | false } = {}) {
   return useQuery({

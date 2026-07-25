@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '../../components/ui/button.tsx'
 import { Input } from '../../components/ui/input.tsx'
 import { Badge } from '../../components/ui/badge.tsx'
 import { cn } from '../../lib/cn.ts'
-import { useProducts } from './useProducts.ts'
+import { useProducts, PRODUCTS_KEY } from './useProducts.ts'
 import { ProductDrawer } from './ProductDrawer.tsx'
 import { AddPhotosSessionModal } from './AddPhotosSessionModal.tsx'
 import type { Product, ProductAvailability, ProductFormValues, ProductStatus } from './productSchemas.ts'
@@ -23,10 +24,15 @@ const STATUS_TONE: Record<ProductStatus, 'neutral' | 'success' | 'warning' | 'da
 
 export function ProductsPage() {
   const { t } = useTranslation(['products', 'common'])
-  const { data: products, isLoading } = useProducts()
+  const queryClient = useQueryClient()
   const [editing, setEditing] = useState<Product | null | undefined>(undefined)
   const [search, setSearch] = useState('')
   const [addingPhotosRemotely, setAddingPhotosRemotely] = useState(false)
+  // Staff may be sending photos from a phone while this stays open — the
+  // submission happens on a separate unauthenticated app with no shared
+  // query client, so this tab has no way to learn about it except by
+  // polling. Matches the phone-side product picker's own 5s poll interval.
+  const { data: products, isLoading } = useProducts({ refetchInterval: addingPhotosRemotely ? 5000 : false })
   // In-memory only, never persisted: cleared on page reload, updated only by a successful create.
   const [lastCreatedDefaults, setLastCreatedDefaults] = useState<Partial<ProductFormValues> | null>(null)
 
@@ -120,7 +126,15 @@ export function ProductsPage() {
           }
         />
       )}
-      <AddPhotosSessionModal open={addingPhotosRemotely} onClose={() => setAddingPhotosRemotely(false)} />
+      <AddPhotosSessionModal
+        open={addingPhotosRemotely}
+        onClose={() => {
+          setAddingPhotosRemotely(false)
+          // Catches the tail case: a photo submitted moments before closing,
+          // before the next 5s poll tick would have fired.
+          void queryClient.invalidateQueries({ queryKey: PRODUCTS_KEY })
+        }}
+      />
     </div>
   )
 }

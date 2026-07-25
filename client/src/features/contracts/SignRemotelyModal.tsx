@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useQueryClient } from '@tanstack/react-query'
 import QRCode from 'qrcode'
 import { Dialog, DialogContent, DialogTitle } from '../../components/ui/dialog.tsx'
 import { Button } from '../../components/ui/button.tsx'
-import { useContract, useIssueSigningToken } from './useContracts.ts'
+import { useContract, useIssueSigningToken, CONTRACTS_KEY } from './useContracts.ts'
 import type { SigningTokenResponse } from './contractSchemas.ts'
 
 const POLL_INTERVAL_MS = 3000
@@ -20,6 +21,7 @@ interface SignRemotelyModalProps {
 
 export function SignRemotelyModal({ contractId, open, onClose }: SignRemotelyModalProps) {
   const { t } = useTranslation('contracts')
+  const queryClient = useQueryClient()
   const issueSigningToken = useIssueSigningToken()
   const { data: contract } = useContract(contractId, { refetchInterval: open ? POLL_INTERVAL_MS : false })
 
@@ -28,6 +30,16 @@ export function SignRemotelyModal({ contractId, open, onClose }: SignRemotelyMod
   const [qrDataUrl, setQrDataUrl] = useState<string>('')
 
   const isSigned = contract?.signatureStatus === 'signed'
+
+  useEffect(() => {
+    // This modal polls `useContract`'s own single-contract cache entry, a
+    // different query key than the list ContractsPage renders rows from —
+    // without this, the list keeps showing "Assinar remotamente" on an
+    // already-signed contract until something else happens to invalidate it.
+    if (isSigned) {
+      void queryClient.invalidateQueries({ queryKey: CONTRACTS_KEY })
+    }
+  }, [isSigned, queryClient])
 
   async function generateToken() {
     setTokenResponse(null)

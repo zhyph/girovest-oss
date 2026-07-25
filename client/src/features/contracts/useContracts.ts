@@ -2,7 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient, type QueryClie
 import { apiFetch } from '../../lib/api.ts'
 import type { Contract, ContractDetail, NewContractFormValues, SigningTokenResponse } from './contractSchemas.ts'
 
-const CONTRACTS_KEY = ['contracts']
+export const CONTRACTS_KEY = ['contracts']
 
 export function useContractsList({
   page = 1,

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router'
 import { Button } from '../../components/ui/button.tsx'
 import { Input } from '../../components/ui/input.tsx'
@@ -16,7 +17,7 @@ import {
   useCancelAllocation,
 } from '../allocations/useAllocations.ts'
 import type { Allocation } from '../allocations/allocationSchemas.ts'
-import { useContractsList, useCancelContract } from './useContracts.ts'
+import { useContractsList, useCancelContract, CONTRACTS_KEY } from './useContracts.ts'
 import type { Contract } from './contractSchemas.ts'
 import { NewContractForm } from './NewContractForm.tsx'
 import { SignRemotelyModal } from './SignRemotelyModal.tsx'
@@ -195,6 +196,7 @@ function ContractCancelAction({ contract }: { contract: Contract }) {
 
 function ContractSignAction({ contract }: { contract: Contract }) {
   const { t } = useTranslation('contracts')
+  const queryClient = useQueryClient()
   const [showModal, setShowModal] = useState(false)
 
   if (contract.signatureStatus === 'signed') return null
@@ -204,7 +206,16 @@ function ContractSignAction({ contract }: { contract: Contract }) {
       <Button size="sm" variant="secondary" onClick={() => setShowModal(true)}>
         {t('sign.action')}
       </Button>
-      <SignRemotelyModal contractId={contract.id} open={showModal} onClose={() => setShowModal(false)} />
+      <SignRemotelyModal
+        contractId={contract.id}
+        open={showModal}
+        onClose={() => {
+          setShowModal(false)
+          // Tail case: a signature completed moments before closing, before
+          // the modal's own poll-triggered invalidation would have fired.
+          void queryClient.invalidateQueries({ queryKey: CONTRACTS_KEY })
+        }}
+      />
     </>
   )
 }
