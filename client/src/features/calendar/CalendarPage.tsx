@@ -43,14 +43,14 @@ export function CalendarPage() {
   )
 
   return (
-    <div>
-      <div className="mb-4 flex items-center justify-between">
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="mb-4 flex flex-shrink-0 items-center justify-between">
         <h1 className="text-xl font-semibold">{t('title')}</h1>
         <Button size="sm" variant="secondary" onClick={() => setView(view === 'agenda' ? 'month' : 'agenda')}>
           {view === 'agenda' ? t('viewMonth') : t('viewAgenda')}
         </Button>
       </div>
-      <div className="mb-4 flex gap-2">
+      <div className="mb-4 flex flex-shrink-0 gap-2">
         <Button size="sm" variant={tab === 'going-out' ? 'primary' : 'secondary'} onClick={() => setTab('going-out')}>
           {t('tabs.goingOut')}
         </Button>
@@ -61,28 +61,30 @@ export function CalendarPage() {
           {t('tabs.overdue')}
         </Button>
       </div>
-      {view === 'agenda' ? (
-        <AgendaView
-          allocations={allocations ?? []}
-          dateField={tabDateField[tab]}
-          products={productsById}
-          clientNames={clientNames}
-        />
-      ) : (
-        <MonthView
-          allocations={allocations ?? []}
-          dateField={tabDateField[tab]}
-          productNames={productNames}
-          products={productsById}
-          clientNames={clientNames}
-          date={anchor}
-          onNavigate={setAnchor}
-          onSelectDay={(date) => {
-            setAnchor(date)
-            setView('agenda')
-          }}
-        />
-      )}
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {view === 'agenda' ? (
+          <AgendaView
+            allocations={allocations ?? []}
+            dateField={tabDateField[tab]}
+            products={productsById}
+            clientNames={clientNames}
+          />
+        ) : (
+          <MonthView
+            allocations={allocations ?? []}
+            dateField={tabDateField[tab]}
+            productNames={productNames}
+            products={productsById}
+            clientNames={clientNames}
+            date={anchor}
+            onNavigate={setAnchor}
+            onSelectDay={(date) => {
+              setAnchor(date)
+              setView('agenda')
+            }}
+          />
+        )}
+      </div>
     </div>
   )
 }
