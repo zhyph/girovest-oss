@@ -276,6 +276,49 @@ describe('listContracts pagination and search', () => {
     expect(noMatch.contracts).toHaveLength(0)
   })
 
+  it('searches by contract number', async () => {
+    const location = await prisma.location.create({ data: { name: 'L3', address: 'A' } })
+    const staff = await prisma.staff.create({ data: { name: 'S', login: `s3-${Date.now()}`, passwordHash: 'x', role: 'staff', locationId: location.id } })
+    const client = await prisma.client.create({ data: { name: 'Joana Souza', phone: '1', email: 'j@e.com' } })
+    await prisma.contract.create({
+      data: { number: 42, locationId: location.id, clientId: client.id, staffId: staff.id, eventDate: new Date(), paymentMethod: 'PIX' },
+    })
+    await prisma.contract.create({
+      data: { number: 7, locationId: location.id, clientId: client.id, staffId: staff.id, eventDate: new Date(), paymentMethod: 'PIX' },
+    })
+
+    const result = await listContracts(location.id, { page: 1, pageSize: 20, search: '42' })
+    expect(result.contracts).toHaveLength(1)
+    expect(result.contracts[0].number).toBe(42)
+  })
+
+  it('returns zero results for a search term matching neither client name nor any contract number', async () => {
+    const location = await prisma.location.create({ data: { name: 'L4', address: 'A' } })
+    const staff = await prisma.staff.create({ data: { name: 'S', login: `s4-${Date.now()}`, passwordHash: 'x', role: 'staff', locationId: location.id } })
+    const client = await prisma.client.create({ data: { name: 'Joana Souza', phone: '1', email: 'j2@e.com' } })
+    await prisma.contract.create({
+      data: { number: 42, locationId: location.id, clientId: client.id, staffId: staff.id, eventDate: new Date(), paymentMethod: 'PIX' },
+    })
+
+    const noMatch = await listContracts(location.id, { page: 1, pageSize: 20, search: '999' })
+    expect(noMatch.contracts).toHaveLength(0)
+  })
+
+  it('falls back to name-only matching for a non-numeric search term without crashing', async () => {
+    const location = await prisma.location.create({ data: { name: 'L5', address: 'A' } })
+    const staff = await prisma.staff.create({ data: { name: 'S', login: `s5-${Date.now()}`, passwordHash: 'x', role: 'staff', locationId: location.id } })
+    const client = await prisma.client.create({ data: { name: 'Joana Souza', phone: '1', email: 'j3@e.com' } })
+    await prisma.contract.create({
+      data: { number: 42, locationId: location.id, clientId: client.id, staffId: staff.id, eventDate: new Date(), paymentMethod: 'PIX' },
+    })
+
+    const result = await listContracts(location.id, { page: 1, pageSize: 20, search: 'joana' })
+    expect(result.contracts).toHaveLength(1)
+
+    const noMatch = await listContracts(location.id, { page: 1, pageSize: 20, search: 'not-a-number' })
+    expect(noMatch.contracts).toHaveLength(0)
+  })
+
   it('never returns a contract from a different location', async () => {
     const locationA = await prisma.location.create({ data: { name: 'LA', address: 'A' } })
     const locationB = await prisma.location.create({ data: { name: 'LB', address: 'A' } })

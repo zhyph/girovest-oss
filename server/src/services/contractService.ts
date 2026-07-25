@@ -190,10 +190,18 @@ export async function listContracts(
   { page = 1, pageSize = 20, search = '' }: { page?: number; pageSize?: number; search?: string } = {},
 ) {
   const searchMode = process.env.DB_PROVIDER === 'postgresql' ? { mode: 'insensitive' as const } : {}
+  const trimmedSearch = search.trim()
+  const searchAsNumber = Number(trimmedSearch)
+  const isNumericSearch = trimmedSearch !== '' && Number.isInteger(searchAsNumber)
   const where = {
     locationId,
-    ...(search
-      ? { client: { name: { contains: search, ...searchMode } } }
+    ...(trimmedSearch
+      ? {
+          OR: [
+            { client: { name: { contains: trimmedSearch, ...searchMode } } },
+            ...(isNumericSearch ? [{ number: searchAsNumber }] : []),
+          ],
+        }
       : {}),
   }
   const [contracts, total] = await Promise.all([
