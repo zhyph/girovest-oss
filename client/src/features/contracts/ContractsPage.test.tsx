@@ -35,8 +35,9 @@ const contract: Contract = {
 }
 
 function mockHooks(overrides: { contracts?: Contract[]; cancelImpl?: (...args: never[]) => Promise<unknown> } = {}) {
+  const contracts = overrides.contracts ?? [contract]
   vi.spyOn(useContractsModule, 'useContractsList').mockReturnValue({
-    data: overrides.contracts ?? [contract],
+    data: { contracts, total: contracts.length, page: 1, pageSize: 20 },
     isLoading: false,
   } as never)
   vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [{ id: 'p1', name: 'Vestido Azul' }] } as never)
@@ -66,7 +67,7 @@ describe('ContractsPage', () => {
     mockHooks()
     renderWithProviders(<ContractsPage />)
     await userEvent.click(screen.getByRole('button', { name: /novo contrato/i }))
-    expect(screen.getByLabelText(/cliente/i)).toBeInTheDocument()
+    expect(screen.getByLabelText('Cliente')).toBeInTheDocument()
   })
 
   it('shows the reserved item\'s check-out action', () => {
@@ -108,5 +109,28 @@ describe('ContractsPage', () => {
     mockHooks({ contracts: [signedContract] })
     renderWithProviders(<ContractsPage />)
     expect(screen.queryByRole('button', { name: 'Assinar remotamente' })).not.toBeInTheDocument()
+  })
+
+  it('shows pagination controls and a search box, and searching resets to page 1', async () => {
+    const listSpy = vi.spyOn(useContractsModule, 'useContractsList').mockReturnValue({
+      data: { contracts: [contract], total: 25, page: 1, pageSize: 20 },
+      isLoading: false,
+    } as never)
+    vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [{ id: 'p1', name: 'Vestido Azul' }] } as never)
+    vi.spyOn(useClientsModule, 'useClients').mockReturnValue({ data: [{ id: 'c1', name: 'Maria' }] } as never)
+    vi.spyOn(useContractsModule, 'useCancelContract').mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
+    vi.spyOn(useContractsModule, 'useIssueSigningToken').mockReturnValue({
+      mutateAsync: vi.fn().mockResolvedValue({ token: 't', expiresAt: new Date().toISOString(), port: 3000, candidates: [] }),
+      isPending: false,
+    } as never)
+
+    renderWithProviders(<ContractsPage />)
+
+    expect(screen.getByLabelText(/buscar/i)).toBeInTheDocument()
+    expect(screen.getByText('1 / 2')).toBeInTheDocument()
+
+    await userEvent.type(screen.getByLabelText(/buscar/i), 'maria')
+
+    expect(listSpy).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, search: 'maria' }))
   })
 })

@@ -2,6 +2,13 @@
   "title": "Contratos",
   "newContract": "Novo Contrato",
   "empty": "Nenhum contrato cadastrado ainda.",
+  "noResults": "Nenhum contrato encontrado para essa busca.",
+  "searchPlaceholder": "Buscar por número ou cliente...",
+  "pagination": {
+    "previous": "Anterior",
+    "next": "Próximo",
+    "pageOf": "{{page}} / {{total}}"
+  },
   "fields": {
     "client": "Cliente",
     "eventDate": "Data do Evento",

@@ -1,13 +1,21 @@
-import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api.ts'
 import type { Contract, ContractDetail, NewContractFormValues, SigningTokenResponse } from './contractSchemas.ts'
 
 const CONTRACTS_KEY = ['contracts']
 
-export function useContractsList() {
+export function useContractsList({
+  page = 1,
+  pageSize = 20,
+  search = '',
+}: { page?: number; pageSize?: number; search?: string } = {}) {
   return useQuery({
-    queryKey: CONTRACTS_KEY,
-    queryFn: () => apiFetch<Contract[]>('/api/contracts'),
+    queryKey: [...CONTRACTS_KEY, page, pageSize, search],
+    queryFn: () =>
+      apiFetch<{ contracts: Contract[]; total: number; page: number; pageSize: number }>(
+        `/api/contracts?page=${page}&pageSize=${pageSize}&search=${encodeURIComponent(search)}`,
+      ),
+    placeholderData: keepPreviousData,
   })
 }
 

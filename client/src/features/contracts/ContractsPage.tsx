@@ -212,7 +212,9 @@ function ContractSignAction({ contract }: { contract: Contract }) {
 export function ContractsPage() {
   const { t } = useTranslation('contracts')
   const { locale } = useLocale()
-  const { data: contracts, isLoading } = useContractsList()
+  const [page, setPage] = useState(1)
+  const [search, setSearch] = useState('')
+  const { data, isLoading } = useContractsList({ page, search })
   const { data: products } = useProducts()
   const { data: clients } = useClients()
   const [showForm, setShowForm] = useState(false)
@@ -226,62 +228,108 @@ export function ContractsPage() {
     [clients],
   )
 
+  const contracts = data?.contracts
+  const pageSize = data?.pageSize ?? 20
+  const currentPage = data?.page ?? page
+  const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / pageSize))
+
+  function handleSearchChange(value: string) {
+    setSearch(value)
+    setPage(1)
+  }
+
   if (isLoading) return <div>{t('title')}</div>
 
   return (
-    <div>
-      <div className="mb-4 flex items-center justify-between">
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="mb-4 flex flex-shrink-0 items-center justify-between">
         <h1 className="text-xl font-semibold">{t('title')}</h1>
         <Button onClick={() => setShowForm(true)}>{t('newContract')}</Button>
       </div>
-      {contracts && contracts.length === 0 && <p className="text-muted-text">{t('empty')}</p>}
-      <div className="flex flex-col gap-3">
-        {contracts?.map((contract) => (
-          <div key={contract.id} className="rounded-md border border-border-soft p-3">
-            <div className="mb-2 flex items-center justify-between">
-              <div className="flex flex-col">
-                <span className="font-medium">
-                  #{contract.number} — <span>{clientNames.get(contract.clientId) ?? contract.clientId}</span>
-                </span>
-                <span className="text-xs text-muted-text">
-                  {formatDate(parseDateOnly(contract.eventDate), locale, { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Link
-                  to={`/contratos/${contract.id}/imprimir`}
-                  className="inline-flex h-8 items-center justify-center rounded-md border border-border-soft bg-white px-3 text-sm font-medium text-ink transition-colors hover:border-brand-300 hover:bg-brand-50"
-                >
-                  {t('print.action')}
-                </Link>
-                <ContractSignAction contract={contract} />
-                <ContractCancelAction contract={contract} />
-              </div>
-            </div>
-            <div className="flex flex-col gap-1">
-              {contract.allocations.map((allocation) => (
-                <div
-                  key={allocation.id}
-                  className="flex items-center justify-between gap-3 rounded-md border border-border-soft p-2 text-sm"
-                >
-                  <div className="flex min-w-0 flex-col gap-0.5">
-                    <span className="truncate font-medium">
-                      {productNames.get(allocation.productId) ?? allocation.productId}
-                    </span>
-                    <span className="text-xs text-muted-text">
-                      {formatDate(parseDateOnly(allocation.checkoutDate), locale, { day: '2-digit', month: '2-digit', year: 'numeric' })} –{' '}
-                      {formatDate(parseDateOnly(allocation.dueDate), locale, { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                    </span>
-                  </div>
-                  <div className="shrink-0">
-                    <RowActions allocation={allocation} />
-                  </div>
+      <Input
+        value={search}
+        onChange={(event) => handleSearchChange(event.target.value)}
+        placeholder={t('searchPlaceholder')}
+        className="mb-3 flex-shrink-0"
+        aria-label={t('searchPlaceholder')}
+      />
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {contracts && contracts.length === 0 && (
+          <p className="text-muted-text">{search ? t('noResults') : t('empty')}</p>
+        )}
+        <div className="flex flex-col gap-3">
+          {contracts?.map((contract) => (
+            <div key={contract.id} className="rounded-md border border-border-soft p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <div className="flex flex-col">
+                  <span className="font-medium">
+                    #{contract.number} — <span>{clientNames.get(contract.clientId) ?? contract.clientId}</span>
+                  </span>
+                  <span className="text-xs text-muted-text">
+                    {formatDate(parseDateOnly(contract.eventDate), locale, { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                  </span>
                 </div>
-              ))}
+                <div className="flex items-center gap-2">
+                  <Link
+                    to={`/contratos/${contract.id}/imprimir`}
+                    className="inline-flex h-8 items-center justify-center rounded-md border border-border-soft bg-white px-3 text-sm font-medium text-ink transition-colors hover:border-brand-300 hover:bg-brand-50"
+                  >
+                    {t('print.action')}
+                  </Link>
+                  <ContractSignAction contract={contract} />
+                  <ContractCancelAction contract={contract} />
+                </div>
+              </div>
+              <div className="flex flex-col gap-1">
+                {contract.allocations.map((allocation) => (
+                  <div
+                    key={allocation.id}
+                    className="flex items-center justify-between gap-3 rounded-md border border-border-soft p-2 text-sm"
+                  >
+                    <div className="flex min-w-0 flex-col gap-0.5">
+                      <span className="truncate font-medium">
+                        {productNames.get(allocation.productId) ?? allocation.productId}
+                      </span>
+                      <span className="text-xs text-muted-text">
+                        {formatDate(parseDateOnly(allocation.checkoutDate), locale, { day: '2-digit', month: '2-digit', year: 'numeric' })} –{' '}
+                        {formatDate(parseDateOnly(allocation.dueDate), locale, { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                      </span>
+                    </div>
+                    <div className="shrink-0">
+                      <RowActions allocation={allocation} />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
+      {totalPages > 1 && (
+        <div className="flex flex-shrink-0 items-center justify-between text-sm">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={currentPage <= 1}
+            onClick={() => setPage(currentPage - 1)}
+          >
+            {t('pagination.previous')}
+          </Button>
+          <span className="text-muted-text">
+            {t('pagination.pageOf', { page: currentPage, total: totalPages })}
+          </span>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={currentPage >= totalPages}
+            onClick={() => setPage(currentPage + 1)}
+          >
+            {t('pagination.next')}
+          </Button>
+        </div>
+      )}
       {showForm && <NewContractForm onClose={() => setShowForm(false)} />}
     </div>
   )
