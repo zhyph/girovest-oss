@@ -26,7 +26,18 @@ describe('DashboardPage', () => {
     const { container } = render(<DashboardPage />)
     const root = container.firstElementChild as HTMLElement
     expect(root.className).toContain('min-h-0')
-    expect(container.querySelector('.overflow-y-auto')).not.toBeNull()
+
+    const scrollRegion = container.querySelector('.overflow-y-auto')
+    expect(scrollRegion).not.toBeNull()
+
+    const statGrid = container.querySelector('.grid.grid-cols-3')
+    expect(statGrid).not.toBeNull()
+
+    // The stat tiles must be pinned outside the scroll region, not nested
+    // inside it — a regression here would re-scroll the tiles along with
+    // the list, which is exactly the bug this test guards against.
+    expect(statGrid).not.toBe(scrollRegion)
+    expect(scrollRegion!.contains(statGrid)).toBe(false)
   })
 
   it('shows the three today counts', async () => {
