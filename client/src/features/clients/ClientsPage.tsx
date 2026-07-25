@@ -27,8 +27,8 @@ export function ClientsPage() {
   if (isLoading) return <div>{t('title')}</div>
 
   return (
-    <div>
-      <div className="mb-4 flex items-center justify-between">
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="mb-4 flex flex-shrink-0 items-center justify-between">
         <h1 className="text-xl font-semibold">{t('title')}</h1>
         <Button onClick={() => setEditing(null)}>{t('common:actions.create', { ns: 'common' })}</Button>
       </div>
@@ -36,36 +36,38 @@ export function ClientsPage() {
         value={search}
         onChange={(event) => setSearch(event.target.value)}
         placeholder={t('searchPlaceholder')}
-        className="mb-3"
+        className="mb-3 flex-shrink-0"
         aria-label={t('searchPlaceholder')}
       />
-      {clients && clients.length === 0 && <p className="text-muted-text">{t('empty')}</p>}
-      {clients && clients.length > 0 && filteredClients?.length === 0 && (
-        <p className="text-muted-text">{t('noResults')}</p>
-      )}
-      {filteredClients && filteredClients.length > 0 && (
-        <div className="overflow-hidden rounded-md border border-border-soft">
-          <div className="flex justify-between bg-gray-50 px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-text">
-            <span>{t('fields.name')}</span>
-            <span>{t('fields.phone')}</span>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {clients && clients.length === 0 && <p className="text-muted-text">{t('empty')}</p>}
+        {clients && clients.length > 0 && filteredClients?.length === 0 && (
+          <p className="text-muted-text">{t('noResults')}</p>
+        )}
+        {filteredClients && filteredClients.length > 0 && (
+          <div className="overflow-hidden rounded-md border border-border-soft">
+            <div className="flex justify-between bg-gray-50 px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-text">
+              <span>{t('fields.name')}</span>
+              <span>{t('fields.phone')}</span>
+            </div>
+            <div className="flex flex-col">
+              {filteredClients.map((client, index) => (
+                <button
+                  key={client.id}
+                  onClick={() => setEditing(client)}
+                  className={cn(
+                    'flex justify-between p-2 text-left text-sm hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-cream',
+                    index % 2 === 1 && 'bg-gray-50/50',
+                  )}
+                >
+                  <span>{client.name}</span>
+                  <span className="text-muted-text">{client.phone}</span>
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="flex flex-col">
-            {filteredClients.map((client, index) => (
-              <button
-                key={client.id}
-                onClick={() => setEditing(client)}
-                className={cn(
-                  'flex justify-between p-2 text-left text-sm hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-cream',
-                  index % 2 === 1 && 'bg-gray-50/50',
-                )}
-              >
-                <span>{client.name}</span>
-                <span className="text-muted-text">{client.phone}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+        )}
+      </div>
       {editing !== undefined && (
         <ClientDrawer key={editing?.id ?? 'new'} client={editing} onClose={() => setEditing(undefined)} />
       )}

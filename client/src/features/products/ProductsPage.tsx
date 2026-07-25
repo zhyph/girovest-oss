@@ -44,8 +44,8 @@ export function ProductsPage() {
   if (isLoading) return <div>{t('title')}</div>
 
   return (
-    <div>
-      <div className="mb-4 flex items-center justify-between">
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="mb-4 flex flex-shrink-0 items-center justify-between">
         <h1 className="text-xl font-semibold">{t('title')}</h1>
         <div className="flex gap-2">
           <Button variant="secondary" onClick={() => setAddingPhotosRemotely(true)}>
@@ -58,48 +58,50 @@ export function ProductsPage() {
         value={search}
         onChange={(event) => setSearch(event.target.value)}
         placeholder={t('searchPlaceholder')}
-        className="mb-3"
+        className="mb-3 flex-shrink-0"
         aria-label={t('searchPlaceholder')}
       />
-      {products && products.length === 0 && <p className="text-muted-text">{t('empty')}</p>}
-      {products && products.length > 0 && filteredProducts?.length === 0 && (
-        <p className="text-muted-text">{t('noResults')}</p>
-      )}
-      {filteredProducts && filteredProducts.length > 0 && (
-        <div className="overflow-hidden rounded-md border border-border-soft">
-          <div className="flex justify-between bg-gray-50 px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-text">
-            <span>{t('fields.name')}</span>
-            <span className="flex gap-4">
-              <span>{t('fields.size')}</span>
-              <span>{t('fields.status')}</span>
-            </span>
-          </div>
-          <div className="flex flex-col">
-            {filteredProducts.map((product, index) => (
-              <button
-                key={product.id}
-                onClick={() => setEditing(product)}
-                className={cn(
-                  'flex items-center justify-between p-2 text-left text-sm hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-cream',
-                  index % 2 === 1 && 'bg-gray-50/50',
-                )}
-              >
-                <span>{product.name}</span>
-                <span className="flex items-center gap-4 text-muted-text">
-                  <span>{product.size}</span>
-                  {product.status === 'active' ? (
-                    <Badge tone={AVAILABILITY_TONE[product.availability]}>
-                      {t(`availability.${product.availability}`)}
-                    </Badge>
-                  ) : (
-                    <Badge tone={STATUS_TONE[product.status]}>{t(`status.${product.status}`)}</Badge>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {products && products.length === 0 && <p className="text-muted-text">{t('empty')}</p>}
+        {products && products.length > 0 && filteredProducts?.length === 0 && (
+          <p className="text-muted-text">{t('noResults')}</p>
+        )}
+        {filteredProducts && filteredProducts.length > 0 && (
+          <div className="overflow-hidden rounded-md border border-border-soft">
+            <div className="flex justify-between bg-gray-50 px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-text">
+              <span>{t('fields.name')}</span>
+              <span className="flex gap-4">
+                <span>{t('fields.size')}</span>
+                <span>{t('fields.status')}</span>
+              </span>
+            </div>
+            <div className="flex flex-col">
+              {filteredProducts.map((product, index) => (
+                <button
+                  key={product.id}
+                  onClick={() => setEditing(product)}
+                  className={cn(
+                    'flex items-center justify-between p-2 text-left text-sm hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-cream',
+                    index % 2 === 1 && 'bg-gray-50/50',
                   )}
-                </span>
-              </button>
-            ))}
+                >
+                  <span>{product.name}</span>
+                  <span className="flex items-center gap-4 text-muted-text">
+                    <span>{product.size}</span>
+                    {product.status === 'active' ? (
+                      <Badge tone={AVAILABILITY_TONE[product.availability]}>
+                        {t(`availability.${product.availability}`)}
+                      </Badge>
+                    ) : (
+                      <Badge tone={STATUS_TONE[product.status]}>{t(`status.${product.status}`)}</Badge>
+                    )}
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
       {editing !== undefined && (
         <ProductDrawer
           key={editing?.id ?? 'new'}

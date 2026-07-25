@@ -150,6 +150,20 @@ describe('ProductsPage', () => {
     expect(screen.getByLabelText('Cor')).toHaveValue('verde')
   })
 
+  it('keeps the header and search pinned outside the scrollable list region', () => {
+    vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [product], isLoading: false } as never)
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' }, isLoadingStaff: false, login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
+
+    const { container } = renderWithQueryClient(<ProductsPage />)
+
+    const root = container.firstElementChild as HTMLElement
+    expect(root.className).toContain('min-h-0')
+    expect(root.className).toContain('flex-col')
+    const scrollRegion = container.querySelector('.overflow-y-auto')
+    expect(scrollRegion).not.toBeNull()
+    expect(scrollRegion?.className).toContain('flex-1')
+  })
+
   it('opens the session-level remote-photo modal from a page-level trigger, with no product required', async () => {
     vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [], isLoading: false } as never)
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' }, isLoadingStaff: false, login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
