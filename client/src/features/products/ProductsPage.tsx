@@ -67,8 +67,8 @@ export function ProductsPage() {
           <p className="text-muted-text">{t('noResults')}</p>
         )}
         {filteredProducts && filteredProducts.length > 0 && (
-          <div className="overflow-hidden rounded-md border border-border-soft">
-            <div className="flex justify-between bg-gray-50 px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-text">
+          <div className="rounded-md border border-border-soft">
+            <div className="sticky top-0 z-10 flex justify-between bg-gray-50 px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-text">
               <span>{t('fields.name')}</span>
               <span className="flex gap-4">
                 <span>{t('fields.size')}</span>

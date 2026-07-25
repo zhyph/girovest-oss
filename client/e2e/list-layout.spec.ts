@@ -60,6 +60,38 @@ test('no route has page-level scroll, even with long lists (sticky header, inter
   await expectNoPageLevelScroll(page)
 })
 
+test('Products and Clients column header stays pinned while scrolling a long list', async ({ page }) => {
+  await login(page)
+
+  const cases: Array<{ path: string; marker: string }> = [
+    { path: '/produtos', marker: 'Vestido Layout E2E 40' },
+    { path: '/clientes', marker: 'Cliente Layout E2E 40' },
+  ]
+
+  for (const { path, marker } of cases) {
+    await page.goto(path)
+    await expect(page.getByText(marker)).toBeVisible()
+
+    const scrollRegion = page.locator('.overflow-y-auto')
+    const header = page.getByText('Nome', { exact: true })
+    const headerBoxBefore = await header.boundingBox()
+    expect(headerBoxBefore).not.toBeNull()
+
+    await scrollRegion.evaluate((el) => {
+      el.scrollTop = el.scrollHeight
+    })
+    await expect(async () => {
+      const headerBoxAfter = await header.boundingBox()
+      expect(headerBoxAfter).not.toBeNull()
+      // Must stay pinned near where it started, not scroll away with the list
+      // (a stale `overflow-hidden` ancestor previously broke `position: sticky`
+      // here, letting the header scroll off by tens of thousands of pixels
+      // while `toBeVisible()` alone still passed).
+      expect(Math.abs(headerBoxAfter!.y - headerBoxBefore!.y)).toBeLessThanOrEqual(2)
+    }).toPass()
+  }
+})
+
 test('ProductDrawer keeps Salvar within the viewport when the product has several photos', async ({ page }) => {
   await login(page)
   await page.goto('/produtos')
