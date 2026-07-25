@@ -25,13 +25,15 @@ test('save and add another keeps the drawer open and prefills the next product',
   await form.getByLabel('Categoria').fill('festa')
   await form.getByLabel('Tamanho').fill('M')
   await form.getByLabel('Cor').fill('azul')
-  await page.getByRole('button', { name: 'Salvar e adicionar outro' }).click()
+  await form.getByLabel('Salvar e adicionar outro').check()
+  await page.getByRole('button', { name: 'Salvar', exact: true }).click()
 
   await expect(form.getByLabel('Nome')).toHaveValue('')
   await expect(form.getByLabel('Categoria')).toHaveValue('festa')
   await expect(form.getByLabel('Cor')).toHaveValue('azul')
 
   await form.getByLabel('Nome').fill('Vestido Intake E2E 2')
+  await form.getByLabel('Salvar e adicionar outro').uncheck()
   await page.getByRole('button', { name: 'Salvar', exact: true }).click()
   await expect(page.getByText('Vestido Intake E2E 2')).toBeVisible()
 })
