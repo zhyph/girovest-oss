@@ -126,8 +126,9 @@ export function ProductsPage() {
         open={addingPhotosRemotely}
         onClose={() => {
           setAddingPhotosRemotely(false)
-          // Catches the tail case: a photo submitted moments before closing,
-          // before the next 5s poll tick would have fired.
+          // Tail-case safety net: useProductPhotoEvents' SSE push normally
+          // covers this, but a photo submitted during a brief reconnect/retry
+          // gap wouldn't be, so refresh once more on close regardless.
           void queryClient.invalidateQueries({ queryKey: PRODUCTS_KEY })
         }}
       />
