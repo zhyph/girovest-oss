@@ -1,6 +1,8 @@
 // Interactive menu for common local database tasks — seeding, sample data,
 // listing what exists, and wiping everything. Run with `npm run db:tools`.
 import 'dotenv/config'
+import fs from 'fs'
+import path from 'path'
 import * as p from '@clack/prompts'
 import bcrypt from 'bcrypt'
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
@@ -95,6 +97,11 @@ async function seedSampleData() {
   const spinner = p.spinner()
   spinner.start('Creating sample clients, products, and an allocation')
 
+  const photosDir = process.env.PRODUCT_PHOTOS_DIR ?? './product-photos'
+  fs.mkdirSync(photosDir, { recursive: true })
+  const seededFilename = 'seed-sample-photo.jpg'
+  fs.copyFileSync(path.resolve('fixtures/sample-product-photo.jpg'), path.join(photosDir, seededFilename))
+
   const client = await prisma.client.create({
     data: { name: 'Maria Silva', phone: '11999990001', email: 'maria@example.com' },
   })
@@ -112,7 +119,7 @@ async function seedSampleData() {
       depositAmount: 150,
     },
   })
-  await prisma.product.create({
+  const product2 = await prisma.product.create({
     data: {
       locationId,
       name: 'Vestido Vermelho Paixão',
@@ -122,6 +129,16 @@ async function seedSampleData() {
       rentalPrice: 320,
       depositAmount: 200,
     },
+  })
+
+  // Add photos with the seeded fixture
+  await prisma.product.update({
+    where: { id: product.id },
+    data: { photos: JSON.stringify([`/api/products/${product.id}/photos/${seededFilename}`]) },
+  })
+  await prisma.product.update({
+    where: { id: product2.id },
+    data: { photos: JSON.stringify([`/api/products/${product2.id}/photos/${seededFilename}`]) },
   })
 
   const staff = await prisma.staff.findFirst({ where: { locationId } })

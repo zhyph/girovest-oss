@@ -1,4 +1,6 @@
 import 'dotenv/config'
+import fs from 'fs'
+import path from 'path'
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
 import { PrismaClient } from './src/generated/prisma/client.js'
 
@@ -9,6 +11,11 @@ const staff = await prisma.staff.findUnique({ where: { login: 'e2e-staff' } })
 if (!staff) {
   throw new Error('e2e-staff not found — run `npx tsx seed-e2e.ts` first.')
 }
+
+const photosDir = process.env.PRODUCT_PHOTOS_DIR ?? './product-photos'
+fs.mkdirSync(photosDir, { recursive: true })
+const seededFilename = 'seed-sample-photo.jpg'
+fs.copyFileSync(path.resolve('fixtures/sample-product-photo.jpg'), path.join(photosDir, seededFilename))
 
 const product = await prisma.product.upsert({
   where: { id: 'e2e-calendar-load-product' },
@@ -22,7 +29,7 @@ const product = await prisma.product.upsert({
     color: 'azul',
     rentalPrice: 200,
     depositAmount: 100,
-    photos: JSON.stringify(['https://example.com/e2e-calendar-load-photo.jpg']),
+    photos: JSON.stringify([`/api/products/e2e-calendar-load-product/photos/${seededFilename}`]),
   },
 })
 
