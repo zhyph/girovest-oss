@@ -23,4 +23,15 @@ describe('AppLayout', () => {
     expect(shell).toBeInTheDocument()
     expect(container.querySelector('.flex.min-h-screen')).not.toBeInTheDocument()
   })
+
+  it('does not put overflow-y-auto on main (pages own their own scroll region now)', () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter><AppLayout /></MemoryRouter>
+      </QueryClientProvider>,
+    )
+    const main = document.querySelector('main')
+    expect(main?.className).not.toContain('overflow-y-auto')
+    expect(main?.className).toContain('flex-1')
+  })
 })
