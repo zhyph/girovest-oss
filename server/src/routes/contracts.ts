@@ -35,7 +35,10 @@ export function reachableSigningCandidates(): ReturnType<typeof detectLanCandida
 contractsRouter.get('/', async (req, res) => {
   if (!req.staff) throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Unauthorized')
   const locationId = await resolveLocationId(req.staff.staffId)
-  res.json(await listContracts(locationId))
+  const page = Number(req.query.page ?? 1)
+  const pageSize = Number(req.query.pageSize ?? 20)
+  const search = typeof req.query.search === 'string' ? req.query.search : ''
+  res.json(await listContracts(locationId, { page, pageSize, search }))
 })
 
 contractsRouter.get('/:id', async (req, res) => {

@@ -185,12 +185,28 @@ export async function cancelContract(id: string, locationId: string) {
   })
 }
 
-export async function listContracts(locationId: string) {
-  return prisma.contract.findMany({
-    where: { locationId },
-    orderBy: { createdAt: 'desc' },
-    include: { allocations: true, installments: true },
-  })
+export async function listContracts(
+  locationId: string,
+  { page = 1, pageSize = 20, search = '' }: { page?: number; pageSize?: number; search?: string } = {},
+) {
+  const searchMode = process.env.DB_PROVIDER === 'postgresql' ? { mode: 'insensitive' as const } : {}
+  const where = {
+    locationId,
+    ...(search
+      ? { client: { name: { contains: search, ...searchMode } } }
+      : {}),
+  }
+  const [contracts, total] = await Promise.all([
+    prisma.contract.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      include: { allocations: true, installments: true },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+    prisma.contract.count({ where }),
+  ])
+  return { contracts, total, page, pageSize }
 }
 
 export async function getContract(id: string, locationId: string) {
