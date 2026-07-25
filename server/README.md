@@ -146,6 +146,26 @@ photos on one product to test `ProductDrawer`'s footer-overflow fix. Requires
 causes a hard element-not-found failure, not just a thinner test.
 
 ```bash
+npx tsx seed-stress-scale.ts <photo-pool-dir>
+```
+
+One-off performance-investigation seed, not part of the regular e2e suite:
+1500 fixed-ID products (`stress-product-1..1500`, each with 1-3 real photo
+files copied from the given pool directory — not placeholders, since image
+count/size was itself a suspected bottleneck), 300 fixed-ID clients
+(`stress-client-1..300`), and 320 fixed-ID contracts + allocations all on one
+"busy day" (`stress-contract-1..320`, event date 2027-06-15, checkout window
+2027-06-12..2027-06-19), each tied to a distinct product/client so the
+Calendar's day view genuinely exercises 300+ distinct authenticated photo
+fetches rather than reusing one product's photo. `<photo-pool-dir>` must
+contain real `pool-1.jpg`..`pool-N.jpg` files (e.g. downloaded once via
+`curl -sL -o pool-$i.jpg "https://picsum.photos/seed/dress-$i/800/1000"`);
+the script cycles through the pool and copies each assignment to a fresh
+per-product filename, so file count and total photo storage scale exactly
+as they would with distinct real per-product photos. Requires `seed-e2e.ts`
+to have been run first.
+
+```bash
 npx tsx seed-staff.ts <login> <password> <name> <role: owner|staff> <locationId>
 ```
 
