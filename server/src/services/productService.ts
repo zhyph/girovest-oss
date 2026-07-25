@@ -160,6 +160,33 @@ export async function listProducts(): Promise<ProductDTO[]> {
   )
 }
 
+export async function listProductsForLocation(
+  locationId: string,
+  opts: { search?: string; limit?: number },
+): Promise<ProductDTO[]> {
+  const rows = await prisma.product.findMany({
+    where: {
+      locationId,
+      ...(opts.search
+        ? {
+            OR: [
+              { name: { contains: opts.search } },
+              { category: { contains: opts.search } },
+              { color: { contains: opts.search } },
+            ],
+          }
+        : {}),
+    },
+    orderBy: { createdAt: 'desc' },
+    take: opts.limit ?? 20,
+  })
+  const availability = await availabilityByProductId(rows.map((row) => row.id))
+  const withHistory = await historyByProductId(rows.map((row) => row.id))
+  return rows.map((row) =>
+    toDTO(row, availability.get(row.id) ?? 'available', withHistory.has(row.id)),
+  )
+}
+
 export async function getProduct(id: string): Promise<ProductDTO> {
   const row = await prisma.product.findUnique({ where: { id } })
   if (!row) {

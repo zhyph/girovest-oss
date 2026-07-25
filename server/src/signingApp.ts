@@ -8,8 +8,10 @@ import {
   checkTokenValidity as checkPhotoTokenValidity,
   submitPhotos,
 } from './services/productPhotoTokenService.js'
+import { listProductsForLocation } from './services/productService.js'
 import { getSigningPageHtml } from './signingPage.js'
 import { getProductPhotoPageHtml } from './productPhotoPage.js'
+import { prisma } from './db/client.js'
 
 export const signingApp = express()
 signingApp.disable('x-powered-by')
@@ -47,6 +49,15 @@ signingApp.get('/product-photos/:token', async (req, res) => {
   const status = await checkPhotoTokenValidity(req.params.token)
   res.set('Content-Type', 'text/html; charset=utf-8')
   res.send(getProductPhotoPageHtml(status))
+})
+
+signingApp.get('/product-photos/:token/products', async (req, res) => {
+  const photoToken = await prisma.productPhotoToken.findUnique({ where: { token: req.params.token } })
+  if (!photoToken || photoToken.expiresAt.getTime() < Date.now()) {
+    throw new AppError(ErrorCodes.NOT_FOUND, 404, 'Photo token not found or expired')
+  }
+  const search = typeof req.query.search === 'string' ? req.query.search : undefined
+  res.json(await listProductsForLocation(photoToken.locationId, { search }))
 })
 
 const submitPhotosSchema = z.object({

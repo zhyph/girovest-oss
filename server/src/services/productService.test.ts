@@ -1,7 +1,14 @@
 import { describe, it, expect, afterEach, beforeEach, beforeAll, afterAll } from 'vitest'
 import { prisma } from '../db/client.js'
 import { AppError } from '../errors/AppError.js'
-import { createProduct, listProducts, getProduct, updateProduct, deleteProduct } from './productService.js'
+import {
+  createProduct,
+  listProducts,
+  listProductsForLocation,
+  getProduct,
+  updateProduct,
+  deleteProduct,
+} from './productService.js'
 
 let locationId: string
 
@@ -164,5 +171,27 @@ describe.sequential('productService', () => {
 
     const [listed] = await listProducts()
     expect(listed.hasAllocationHistory).toBe(true)
+  })
+})
+
+describe('listProductsForLocation', () => {
+  it('returns only that location\'s products, newest first', async () => {
+    const locationA = await prisma.location.create({ data: { name: 'A', address: 'X' } })
+    const locationB = await prisma.location.create({ data: { name: 'B', address: 'Y' } })
+    const p1 = await createProduct({ locationId: locationA.id, name: 'First', category: 'c', size: 's', color: 'c', rentalPrice: 1, depositAmount: 1 })
+    const p2 = await createProduct({ locationId: locationA.id, name: 'Second', category: 'c', size: 's', color: 'c', rentalPrice: 1, depositAmount: 1 })
+    await createProduct({ locationId: locationB.id, name: 'Other location', category: 'c', size: 's', color: 'c', rentalPrice: 1, depositAmount: 1 })
+
+    const result = await listProductsForLocation(locationA.id, {})
+    expect(result.map((p) => p.id)).toEqual([p2.id, p1.id])
+  })
+
+  it('filters by search substring across name/category/color', async () => {
+    const location = await prisma.location.create({ data: { name: 'C', address: 'Z' } })
+    await createProduct({ locationId: location.id, name: 'Vestido Azul', category: 'festa', size: 'M', color: 'azul', rentalPrice: 1, depositAmount: 1 })
+    await createProduct({ locationId: location.id, name: 'Vestido Verde', category: 'gala', size: 'M', color: 'verde', rentalPrice: 1, depositAmount: 1 })
+
+    const result = await listProductsForLocation(location.id, { search: 'azul' })
+    expect(result.map((p) => p.name)).toEqual(['Vestido Azul'])
   })
 })

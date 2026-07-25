@@ -157,6 +157,63 @@ describe('POST /product-photos/:token/submit', () => {
 
     expect(response.status).toBe(404)
   })
+
+  it('rejects a productId belonging to a different location than the token', async () => {
+    const { token } = await issueProductPhotoSession(staffId, locationId)
+    const otherLocation = await prisma.location.create({ data: { name: 'Other', address: 'X' } })
+    const otherProduct = await prisma.product.create({
+      data: { locationId: otherLocation.id, name: 'X', category: 'x', size: 'x', color: 'x', rentalPrice: 1, depositAmount: 1 },
+    })
+
+    const response = await request(signingApp)
+      .post(`/product-photos/${token}/submit`)
+      .send({ productId: otherProduct.id, photos: ['data:image/jpeg;base64,abc'] })
+
+    expect(response.status).toBe(404)
+  })
+})
+
+describe('GET /product-photos/:token/products', () => {
+  it('returns the token\'s location\'s products, most recent first', async () => {
+    const secondProduct = await prisma.product.create({
+      data: { locationId, name: 'Second', category: 'festa', size: 'M', color: 'azul', rentalPrice: 1, depositAmount: 1 },
+    })
+    const { token } = await issueProductPhotoSession(staffId, locationId)
+
+    const response = await request(signingApp).get(`/product-photos/${token}/products`)
+
+    expect(response.status).toBe(200)
+    expect(response.body.map((p: { id: string }) => p.id)).toEqual([secondProduct.id, productId])
+  })
+
+  it('supports a ?search= query param', async () => {
+    await prisma.product.create({
+      data: { locationId, name: 'Vestido Verde', category: 'gala', size: 'M', color: 'verde', rentalPrice: 1, depositAmount: 1 },
+    })
+    const { token } = await issueProductPhotoSession(staffId, locationId)
+
+    const response = await request(signingApp).get(`/product-photos/${token}/products?search=verde`)
+
+    expect(response.status).toBe(200)
+    expect(response.body.map((p: { name: string }) => p.name)).toEqual(['Vestido Verde'])
+  })
+
+  it('returns 404 for an unknown or expired token', async () => {
+    const response = await request(signingApp).get('/product-photos/unknown-token/products')
+    expect(response.status).toBe(404)
+  })
+
+  it('never returns a product from a different location', async () => {
+    const otherLocation = await prisma.location.create({ data: { name: 'Other', address: 'X' } })
+    const otherProduct = await prisma.product.create({
+      data: { locationId: otherLocation.id, name: 'Other Product', category: 'x', size: 'x', color: 'x', rentalPrice: 1, depositAmount: 1 },
+    })
+    const { token } = await issueProductPhotoSession(staffId, locationId)
+
+    const response = await request(signingApp).get(`/product-photos/${token}/products`)
+
+    expect(response.body.map((p: { id: string }) => p.id)).not.toContain(otherProduct.id)
+  })
 })
 
 describe('exposed surface', () => {
