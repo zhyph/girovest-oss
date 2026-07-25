@@ -4,6 +4,7 @@ import path from 'path'
 import { prisma } from '../db/client.js'
 import { AppError } from '../errors/AppError.js'
 import { ErrorCodes } from '../errors/errorCodes.js'
+import { productPhotoEvents } from '../events/productPhotoEvents.js'
 
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000
 
@@ -36,7 +37,11 @@ export async function checkTokenValidity(token: string): Promise<'valid' | 'expi
 // token is intentionally reusable — no claim/consume step. Only expiry
 // invalidates it. See docs/superpowers/specs/2026-07-24-photo-intake-session-redesign.md
 // for why this tradeoff is accepted (LAN-only, shift-bound TTL).
-export async function submitPhotos(token: string, productId: string, photos: string[]): Promise<void> {
+export async function submitPhotos(
+  token: string,
+  productId: string,
+  photos: string[],
+): Promise<{ photos: string[] }> {
   const photoToken = await prisma.productPhotoToken.findUnique({ where: { token } })
   if (!photoToken) {
     throw new AppError(ErrorCodes.NOT_FOUND, 404, 'Photo token not found')
@@ -63,8 +68,13 @@ export async function submitPhotos(token: string, productId: string, photos: str
   }
 
   const existingPhotos = JSON.parse(product.photos) as string[]
+  const updatedPhotos = [...existingPhotos, ...writtenPaths]
   await prisma.product.update({
     where: { id: productId },
-    data: { photos: JSON.stringify([...existingPhotos, ...writtenPaths]) },
+    data: { photos: JSON.stringify(updatedPhotos) },
   })
+
+  productPhotoEvents.emit('photo', { productId, locationId: photoToken.locationId, photos: updatedPhotos })
+
+  return { photos: updatedPhotos }
 }

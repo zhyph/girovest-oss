@@ -9,6 +9,7 @@ import {
   checkTokenValidity,
   submitPhotos,
 } from './productPhotoTokenService.js'
+import { productPhotoEvents } from '../events/productPhotoEvents.js'
 
 const TINY_JPEG =
   'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACP/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AVN//2Q=='
@@ -98,5 +99,32 @@ describe('submitPhotos', () => {
     const staff = await prisma.staff.findFirstOrThrow()
     const product = await prisma.product.findFirstOrThrow({ where: { locationId: staff.locationId } })
     await expect(submitPhotos('unknown-token', product.id, [TINY_JPEG])).rejects.toThrow(AppError)
+  })
+
+  it('returns the product\'s full updated photos array', async () => {
+    const staff = await prisma.staff.findFirstOrThrow()
+    const product = await prisma.product.findFirstOrThrow()
+    const { token } = await issueProductPhotoSession(staff.id, staff.locationId)
+
+    const result = await submitPhotos(token, product.id, [TINY_JPEG])
+
+    expect(result.photos).toHaveLength(1)
+    expect(result.photos[0]).toMatch(new RegExp(`^/api/products/${product.id}/photos/[0-9a-f-]+\\.jpg$`))
+  })
+
+  it('emits a photo event with the product id, location id, and updated photos', async () => {
+    const staff = await prisma.staff.findFirstOrThrow()
+    const product = await prisma.product.findFirstOrThrow()
+    const { token } = await issueProductPhotoSession(staff.id, staff.locationId)
+
+    const received: unknown[] = []
+    const listener = (event: unknown) => received.push(event)
+    productPhotoEvents.on('photo', listener)
+    try {
+      const result = await submitPhotos(token, product.id, [TINY_JPEG])
+      expect(received).toEqual([{ productId: product.id, locationId: staff.locationId, photos: result.photos }])
+    } finally {
+      productPhotoEvents.off('photo', listener)
+    }
   })
 })
