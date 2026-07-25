@@ -38,52 +38,54 @@ export function DashboardPage() {
   )
 
   return (
-    <div>
-      <h1 className="mb-4 text-xl font-semibold">{t('title')}</h1>
-      {isLoading && (
-        <Card>
-          <CardBody>
-            <div className="text-center text-sm text-muted-text">{t('loading')}</div>
-          </CardBody>
-        </Card>
-      )}
-      {isError && (
-        <Card className="border-red-300 bg-red-50">
-          <CardBody>
-            <div className="text-sm text-red-700">{t('error')}</div>
-          </CardBody>
-        </Card>
-      )}
-      {!isLoading && !isError && (
-        <>
-          <div className="grid grid-cols-3 gap-4">
-            <StatTile label={t('goingOutToday')} value={goingOutToday.length} />
-            <StatTile label={t('dueBackToday')} value={dueBackToday.length} />
-            <StatTile label={t('overdue')} value={overdue.length} danger />
-          </div>
-          <Card className="mt-4">
+    <div className="flex h-full min-h-0 flex-col">
+      <h1 className="mb-4 flex-shrink-0 text-xl font-semibold">{t('title')}</h1>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {isLoading && (
+          <Card>
             <CardBody>
-              <div className="mb-2 text-xs uppercase tracking-wide text-muted-text">{t('upcoming')}</div>
-              {upcoming.length === 0 ? (
-                <p className="text-sm text-muted-text">{t('upcomingEmpty')}</p>
-              ) : (
-                <ul className="flex flex-col gap-1">
-                  {upcoming.map((allocation) => (
-                    <li key={allocation.id} className="flex justify-between text-sm">
-                      <span>
-                        {productNames.get(allocation.productId) ?? allocation.productId}
-                        {' — '}
-                        {clientNames.get(allocation.clientId) ?? allocation.clientId}
-                      </span>
-                      <span className="text-muted-text">{formatDate(parseDateOnly(allocation.checkoutDate), locale, { day: '2-digit', month: '2-digit' })}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <div className="text-center text-sm text-muted-text">{t('loading')}</div>
             </CardBody>
           </Card>
-        </>
-      )}
+        )}
+        {isError && (
+          <Card className="border-red-300 bg-red-50">
+            <CardBody>
+              <div className="text-sm text-red-700">{t('error')}</div>
+            </CardBody>
+          </Card>
+        )}
+        {!isLoading && !isError && (
+          <>
+            <div className="grid flex-shrink-0 grid-cols-3 gap-4">
+              <StatTile label={t('goingOutToday')} value={goingOutToday.length} />
+              <StatTile label={t('dueBackToday')} value={dueBackToday.length} />
+              <StatTile label={t('overdue')} value={overdue.length} danger />
+            </div>
+            <Card className="mt-4">
+              <CardBody>
+                <div className="mb-2 text-xs uppercase tracking-wide text-muted-text">{t('upcoming')}</div>
+                {upcoming.length === 0 ? (
+                  <p className="text-sm text-muted-text">{t('upcomingEmpty')}</p>
+                ) : (
+                  <ul className="flex flex-col gap-1">
+                    {upcoming.map((allocation) => (
+                      <li key={allocation.id} className="flex justify-between text-sm">
+                        <span>
+                          {productNames.get(allocation.productId) ?? allocation.productId}
+                          {' — '}
+                          {clientNames.get(allocation.clientId) ?? allocation.clientId}
+                        </span>
+                        <span className="text-muted-text">{formatDate(parseDateOnly(allocation.checkoutDate), locale, { day: '2-digit', month: '2-digit' })}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </CardBody>
+            </Card>
+          </>
+        )}
+      </div>
     </div>
   )
 }

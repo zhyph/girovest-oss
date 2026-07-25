@@ -12,6 +12,23 @@ function mockProductsAndClients() {
 }
 
 describe('DashboardPage', () => {
+  it('scrolls the upcoming list internally instead of the whole page', () => {
+    mockProductsAndClients()
+    vi.spyOn(useDashboardModule, 'useDashboard').mockReturnValue({
+      goingOutToday: [] as never,
+      dueBackToday: [] as never,
+      overdue: [] as never,
+      upcoming: [] as never,
+      isLoading: false,
+      isError: false,
+    })
+
+    const { container } = render(<DashboardPage />)
+    const root = container.firstElementChild as HTMLElement
+    expect(root.className).toContain('min-h-0')
+    expect(container.querySelector('.overflow-y-auto')).not.toBeNull()
+  })
+
   it('shows the three today counts', async () => {
     mockProductsAndClients()
     vi.spyOn(useDashboardModule, 'useDashboard').mockReturnValue({
