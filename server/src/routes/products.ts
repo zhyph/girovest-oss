@@ -14,6 +14,7 @@ import {
   deleteProduct,
 } from '../services/productService.js'
 import { issueProductPhotoSession } from '../services/productPhotoTokenService.js'
+import { mintSseTicket } from '../services/sseTicketService.js'
 import { reachableSigningCandidates } from './contracts.js'
 
 export const productsRouter = Router()
@@ -82,6 +83,13 @@ productsRouter.post('/photo-session', async (req, res) => {
     port: Number(process.env.PORT ?? 3000),
     candidates: reachableSigningCandidates(),
   })
+})
+
+productsRouter.post('/events/ticket', async (req, res) => {
+  if (!req.staff) throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Unauthorized')
+  const staff = await prisma.staff.findUniqueOrThrow({ where: { id: req.staff.staffId } })
+  const { ticket, expiresAt } = mintSseTicket(staff.id, staff.locationId)
+  res.status(201).json({ ticket, expiresAt })
 })
 
 // Filenames are always crypto.randomUUID() + '.jpg', generated only by

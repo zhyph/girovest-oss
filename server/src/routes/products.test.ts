@@ -54,6 +54,22 @@ describe('POST /api/products/photo-session', () => {
   })
 })
 
+describe('POST /api/products/events/ticket', () => {
+  it('mints a ticket for the authenticated staff', async () => {
+    const res = await request(app)
+      .post('/api/products/events/ticket')
+      .set('Authorization', `Bearer ${staffToken}`)
+    expect(res.status).toBe(201)
+    expect(res.body.ticket).toHaveLength(43)
+    expect(res.body.expiresAt).toBeGreaterThan(Date.now())
+  })
+
+  it('requires authentication', async () => {
+    const res = await request(app).post('/api/products/events/ticket')
+    expect(res.status).toBe(401)
+  })
+})
+
 describe('GET /:id/photos/:filename', () => {
   it('serves a photo file that was written to PRODUCT_PHOTOS_DIR', async () => {
     const filename = 'abc123.jpg'

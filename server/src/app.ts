@@ -5,6 +5,7 @@ import { authRouter } from './auth/authRoutes.js'
 import { setupRouter } from './routes/setup.js'
 import { clientsRouter } from './routes/clients.js'
 import { productsRouter } from './routes/products.js'
+import { productEventsRouter } from './routes/productEvents.js'
 import { allocationsRouter } from './routes/allocations.js'
 import { calendarRouter } from './routes/calendar.js'
 import { contractsRouter } from './routes/contracts.js'
@@ -22,6 +23,7 @@ app.get('/health', (_req, res) => {
 app.use('/api/setup', setupRouter)
 app.use('/api/auth', authRouter)
 app.use('/api/clients', clientsRouter)
+app.use('/api/products', productEventsRouter)
 app.use('/api/products', productsRouter)
 app.use('/api/allocations', allocationsRouter)
 app.use('/api/calendar', calendarRouter)

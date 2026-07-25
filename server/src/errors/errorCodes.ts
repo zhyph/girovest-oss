@@ -13,6 +13,7 @@ export const ErrorCodes = {
   SETUP_ALREADY_COMPLETE: 'SETUP_ALREADY_COMPLETE',
   SIGNING_TOKEN_INVALID: 'SIGNING_TOKEN_INVALID',
   PHOTO_TOKEN_INVALID: 'PHOTO_TOKEN_INVALID',
+  SSE_TICKET_INVALID: 'SSE_TICKET_INVALID',
 } as const
 
 export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes]
