@@ -99,7 +99,7 @@ async function seedSampleData() {
 
   const photosDir = process.env.PRODUCT_PHOTOS_DIR ?? './product-photos'
   fs.mkdirSync(photosDir, { recursive: true })
-  const seededFilename = 'seed-sample-photo.jpg'
+  const seededFilename = '11111111-1111-1111-1111-111111111111.jpg'
   fs.copyFileSync(path.resolve('fixtures/sample-product-photo.jpg'), path.join(photosDir, seededFilename))
 
   const client = await prisma.client.create({
