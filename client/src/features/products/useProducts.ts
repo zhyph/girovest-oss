@@ -38,9 +38,8 @@ export function useDeleteProduct() {
   })
 }
 
-export function useIssueProductPhotoToken() {
+export function useIssueProductPhotoSession() {
   return useMutation({
-    mutationFn: (productId: string) =>
-      apiFetch<PhotoTokenResponse>(`/api/products/${productId}/photo-token`, { method: 'POST' }),
+    mutationFn: () => apiFetch<PhotoTokenResponse>('/api/products/photo-session', { method: 'POST' }),
   })
 }

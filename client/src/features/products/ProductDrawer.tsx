@@ -11,14 +11,13 @@ import { useAuth } from '../../lib/useAuth.ts'
 import { useAuthenticatedImageUrl } from '../../lib/useAuthenticatedImageUrl.ts'
 import { productSchema, type Product, type ProductFormValues, type ProductStatus } from './productSchemas.ts'
 import { useCreateProduct, useUpdateProduct, useDeleteProduct } from './useProducts.ts'
-import { AddPhotosRemotelyModal } from './AddPhotosRemotelyModal.tsx'
 
 const STATUS_OPTIONS: ProductStatus[] = ['active', 'maintenance', 'retired']
 
 function PhotoThumbnail({ url }: { url: string }) {
   const isRemotePath = url.startsWith('/api/')
   const authenticatedUrl = useAuthenticatedImageUrl(isRemotePath ? url : null)
-  return <img src={isRemotePath ? (authenticatedUrl ?? '') : url} alt="" className="h-8 w-8 rounded object-cover" />
+  return <img src={isRemotePath ? (authenticatedUrl ?? '') : url} alt="" className="h-16 w-16 rounded object-cover" />
 }
 
 export function ProductDrawer({
@@ -41,7 +40,6 @@ export function ProductDrawer({
   const [status, setStatus] = useState<ProductStatus>(product?.status ?? 'active')
   const [photos, setPhotos] = useState<string[]>(product?.photos ?? [])
   const [newPhotoUrl, setNewPhotoUrl] = useState('')
-  const [addingPhotosRemotely, setAddingPhotosRemotely] = useState(false)
   const [addAnotherAfterSave, setAddAnotherAfterSave] = useState(false)
   const {
     register,
@@ -213,11 +211,6 @@ export function ProductDrawer({
               ))}
             </ul>
           )}
-          {product && (
-            <Button type="button" variant="secondary" onClick={() => setAddingPhotosRemotely(true)}>
-              {t('photoIntake.action')}
-            </Button>
-          )}
         </div>
         {!product && (
           <label className="flex items-center gap-2 text-sm">
@@ -266,13 +259,6 @@ export function ProductDrawer({
             </Button>
           </div>
         </Modal>
-      )}
-      {product && (
-        <AddPhotosRemotelyModal
-          productId={product.id}
-          open={addingPhotosRemotely}
-          onClose={() => setAddingPhotosRemotely(false)}
-        />
       )}
       </div>
     </>

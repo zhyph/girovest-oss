@@ -6,6 +6,7 @@ import { Badge } from '../../components/ui/badge.tsx'
 import { cn } from '../../lib/cn.ts'
 import { useProducts } from './useProducts.ts'
 import { ProductDrawer } from './ProductDrawer.tsx'
+import { AddPhotosSessionModal } from './AddPhotosSessionModal.tsx'
 import type { Product, ProductAvailability, ProductFormValues, ProductStatus } from './productSchemas.ts'
 
 const AVAILABILITY_TONE: Record<ProductAvailability, 'neutral' | 'success' | 'warning' | 'danger'> = {
@@ -25,6 +26,7 @@ export function ProductsPage() {
   const { data: products, isLoading } = useProducts()
   const [editing, setEditing] = useState<Product | null | undefined>(undefined)
   const [search, setSearch] = useState('')
+  const [addingPhotosRemotely, setAddingPhotosRemotely] = useState(false)
   // In-memory only, never persisted: cleared on page reload, updated only by a successful create.
   const [lastCreatedDefaults, setLastCreatedDefaults] = useState<Partial<ProductFormValues> | null>(null)
 
@@ -45,7 +47,12 @@ export function ProductsPage() {
     <div>
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-xl font-semibold">{t('title')}</h1>
-        <Button onClick={() => setEditing(null)}>{t('common:actions.create')}</Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => setAddingPhotosRemotely(true)}>
+            {t('photoIntake.sessionAction')}
+          </Button>
+          <Button onClick={() => setEditing(null)}>{t('common:actions.create')}</Button>
+        </div>
       </div>
       <Input
         value={search}
@@ -111,6 +118,7 @@ export function ProductsPage() {
           }
         />
       )}
+      <AddPhotosSessionModal open={addingPhotosRemotely} onClose={() => setAddingPhotosRemotely(false)} />
     </div>
   )
 }

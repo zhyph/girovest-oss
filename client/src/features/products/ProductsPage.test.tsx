@@ -149,4 +149,22 @@ describe('ProductsPage', () => {
     expect(screen.getByLabelText('Categoria')).toHaveValue('festa')
     expect(screen.getByLabelText('Cor')).toHaveValue('verde')
   })
+
+  it('opens the session-level remote-photo modal from a page-level trigger, with no product required', async () => {
+    vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [], isLoading: false } as never)
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' }, isLoadingStaff: false, login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
+    vi.spyOn(useProductsModule, 'useIssueProductPhotoSession').mockReturnValue({
+      mutateAsync: vi.fn().mockResolvedValue({
+        token: 't', expiresAt: new Date(Date.now() + 60_000).toISOString(), port: 3000,
+        candidates: [{ interfaceName: 'wlan0', address: '192.168.1.42' }],
+      }),
+      isPending: false,
+    } as never)
+
+    renderWithQueryClient(<ProductsPage />)
+
+    // No products exist at all, yet the trigger is present and works.
+    await userEvent.click(screen.getByRole('button', { name: 'Adicionar fotos remotamente' }))
+    expect(await screen.findByText('Fotos remotas')).toBeInTheDocument()
+  })
 })

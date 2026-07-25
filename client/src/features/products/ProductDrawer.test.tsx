@@ -27,10 +27,6 @@ function mockProductHooks(
   vi.spyOn(useProductsModule, 'useUpdateProduct').mockReturnValue({ mutateAsync: updateImpl } as never)
   vi.spyOn(useProductsModule, 'useDeleteProduct').mockReturnValue({ mutateAsync: deleteImpl } as never)
   vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [product] } as never)
-  vi.spyOn(useProductsModule, 'useIssueProductPhotoToken').mockReturnValue({
-    mutateAsync: vi.fn().mockResolvedValue({ token: 't', expiresAt: new Date().toISOString(), port: 3000, candidates: [] }),
-    isPending: false,
-  } as never)
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' },
     isLoadingStaff: false, login: vi.fn(), logout: vi.fn(), isLoggedIn: true,
@@ -220,5 +216,20 @@ describe('ProductDrawer', () => {
     mockProductHooks(vi.fn())
     renderWithToast(<ProductDrawer product={product} onClose={vi.fn()} />)
     expect(screen.queryByLabelText('Salvar e adicionar outro')).not.toBeInTheDocument()
+  })
+
+  it('does not show the per-product remote-photo trigger (moved to ProductsPage as a session-level action)', () => {
+    mockProductHooks(vi.fn())
+    renderWithToast(<ProductDrawer product={product} onClose={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: 'Adicionar fotos remotamente' })).not.toBeInTheDocument()
+  })
+
+  it('renders photo thumbnails large enough to be visually inspected, not icon-sized', () => {
+    mockProductHooks(vi.fn())
+    const { container } = renderWithToast(
+      <ProductDrawer product={{ ...product, photos: ['https://example.com/a.jpg'] }} onClose={vi.fn()} />,
+    )
+    const thumbnail = container.querySelector('img[src="https://example.com/a.jpg"]')
+    expect(thumbnail).toHaveClass('h-16', 'w-16')
   })
 })

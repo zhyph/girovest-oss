@@ -3,26 +3,21 @@ import { useTranslation } from 'react-i18next'
 import QRCode from 'qrcode'
 import { Dialog, DialogContent, DialogTitle } from '../../components/ui/dialog.tsx'
 import { Button } from '../../components/ui/button.tsx'
-import { useProducts, useIssueProductPhotoToken } from './useProducts.ts'
+import { useIssueProductPhotoSession } from './useProducts.ts'
 import type { PhotoTokenResponse } from './productSchemas.ts'
-
-const POLL_INTERVAL_MS = 3000
 
 function buildPhotoUrl(tokenResponse: PhotoTokenResponse, address: string): string {
   return `http://${address}:${tokenResponse.port}/product-photos/${tokenResponse.token}`
 }
 
-interface AddPhotosRemotelyModalProps {
-  productId: string
+interface AddPhotosSessionModalProps {
   open: boolean
   onClose: () => void
 }
 
-export function AddPhotosRemotelyModal({ productId, open, onClose }: AddPhotosRemotelyModalProps) {
+export function AddPhotosSessionModal({ open, onClose }: AddPhotosSessionModalProps) {
   const { t } = useTranslation('products')
-  const issueToken = useIssueProductPhotoToken()
-  const { data: products } = useProducts({ refetchInterval: open ? POLL_INTERVAL_MS : false })
-  const product = products?.find((p) => p.id === productId)
+  const issueToken = useIssueProductPhotoSession()
 
   const [tokenResponse, setTokenResponse] = useState<PhotoTokenResponse | null>(null)
   const [selectedAddress, setSelectedAddress] = useState<string>('')
@@ -31,7 +26,7 @@ export function AddPhotosRemotelyModal({ productId, open, onClose }: AddPhotosRe
   async function generateToken() {
     setTokenResponse(null)
     setQrDataUrl('')
-    const response = await issueToken.mutateAsync(productId)
+    const response = await issueToken.mutateAsync()
     setTokenResponse(response)
     setSelectedAddress(response.candidates[0]?.address ?? '')
   }
@@ -43,15 +38,20 @@ export function AddPhotosRemotelyModal({ productId, open, onClose }: AddPhotosRe
       setTokenResponse(null)
       setQrDataUrl('')
     }
-    // Deliberately scoped to [open, productId] only, same reasoning as
-    // SignRemotelyModal — must not reissue on every poll-triggered re-render.
-  }, [open, productId])
+    // This session token isn't scoped to a product, so there's no per-product
+    // identity to guard against reissuing on re-render like the old modal did
+    // — the only thing that should trigger a fresh token is opening the modal.
+  }, [open])
 
   useEffect(() => {
     if (!tokenResponse || !selectedAddress) {
       setQrDataUrl('')
       return
     }
+    // toDataURL calls for different addresses can resolve out of order
+    // (e.g. the network picker changes quickly) — without this guard, a
+    // stale, slower call could resolve after a newer one and overwrite
+    // the QR code with one for an address that's no longer selected.
     let cancelled = false
     void QRCode.toDataURL(buildPhotoUrl(tokenResponse, selectedAddress)).then((dataUrl) => {
       if (!cancelled) setQrDataUrl(dataUrl)
@@ -101,9 +101,7 @@ export function AddPhotosRemotelyModal({ productId, open, onClose }: AddPhotosRe
             {isExpired ? (
               <p className="text-sm text-red-600">{t('photoIntake.expired')}</p>
             ) : (
-              <p className="text-sm text-muted-text">
-                {t('photoIntake.waiting')} ({product?.photos?.length ?? 0})
-              </p>
+              <p className="text-sm text-muted-text">{t('photoIntake.waiting')}</p>
             )}
 
             <Button type="button" variant="secondary" onClick={() => void generateToken()} disabled={issueToken.isPending}>
