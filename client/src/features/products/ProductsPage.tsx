@@ -28,11 +28,16 @@ export function ProductsPage() {
   const [editing, setEditing] = useState<Product | null | undefined>(undefined)
   const [search, setSearch] = useState('')
   const [addingPhotosRemotely, setAddingPhotosRemotely] = useState(false)
-  // Staff may be sending photos from a phone while this stays open — the
-  // submission happens on a separate unauthenticated app with no shared
-  // query client, so this tab has no way to learn about it except by
-  // polling. Matches the phone-side product picker's own 5s poll interval.
-  const { data: products, isLoading } = useProducts({ refetchInterval: addingPhotosRemotely ? 5000 : false })
+  // The photo session token is reusable for a full 12h shift by design —
+  // staff scan once, close this modal, and keep sending photos from the
+  // phone independently, so polling can't be gated to the modal staying
+  // open. Submission happens on a separate unauthenticated app with no
+  // shared query client, so this is the only way this tab learns about it.
+  // Tighter interval while the modal is open and being actively watched
+  // (matches the phone-side product picker's own 5s poll); a looser
+  // background interval the rest of the time — React Query already pauses
+  // refetchInterval while the tab is unfocused, so this isn't unbounded.
+  const { data: products, isLoading } = useProducts({ refetchInterval: addingPhotosRemotely ? 5000 : 20000 })
   // In-memory only, never persisted: cleared on page reload, updated only by a successful create.
   const [lastCreatedDefaults, setLastCreatedDefaults] = useState<Partial<ProductFormValues> | null>(null)
 
