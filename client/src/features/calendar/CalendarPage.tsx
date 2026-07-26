@@ -1,11 +1,26 @@
-import { useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../../components/ui/button.tsx'
+import { RouteFallback } from '../../components/RouteFallback.tsx'
 import { useProducts } from '../products/useProducts.ts'
 import { useClients } from '../clients/useClients.ts'
 import { useCalendarTab, type CalendarTab } from './useCalendar.ts'
 import { AgendaView } from './AgendaView.tsx'
-import { MonthView } from './MonthView.tsx'
+
+// Month is now the default view (below), so MonthView's chunk is needed on
+// essentially every /calendario entry. Kick its dynamic import off at module
+// scope, as soon as CalendarPage's own chunk evaluates, instead of when React
+// first renders <MonthView/>: rendering-time would serialize the two chunk
+// fetches into a request waterfall. MonthView (react-big-calendar and its
+// stylesheet) still emits as a separate chunk, so it stays out of the
+// initial bundle.
+const monthViewImport = import('./MonthView.tsx')
+// Handle rejection on a branch so a failed fetch during the gap before React
+// first renders <MonthView/> is not an unhandled rejection; lazy() reuses the
+// same promise, so a real failure still surfaces through
+// Suspense/ChunkErrorBoundary when the view renders.
+monthViewImport.catch(() => {})
+const MonthView = lazy(() => monthViewImport.then((m) => ({ default: m.MonthView })))
 
 const tabDateField: Record<CalendarTab, 'checkoutDate' | 'dueDate'> = {
   'going-out': 'checkoutDate',
@@ -70,19 +85,21 @@ export function CalendarPage() {
             clientNames={clientNames}
           />
         ) : (
-          <MonthView
-            allocations={allocations ?? []}
-            dateField={tabDateField[tab]}
-            productNames={productNames}
-            products={productsById}
-            clientNames={clientNames}
-            date={anchor}
-            onNavigate={setAnchor}
-            onSelectDay={(date) => {
-              setAnchor(date)
-              setView('agenda')
-            }}
-          />
+          <Suspense fallback={<RouteFallback />}>
+            <MonthView
+              allocations={allocations ?? []}
+              dateField={tabDateField[tab]}
+              productNames={productNames}
+              products={productsById}
+              clientNames={clientNames}
+              date={anchor}
+              onNavigate={setAnchor}
+              onSelectDay={(date) => {
+                setAnchor(date)
+                setView('agenda')
+              }}
+            />
+          </Suspense>
         )}
       </div>
     </div>

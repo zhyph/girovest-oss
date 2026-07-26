@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import QRCode from 'qrcode'
 import { Dialog, DialogContent, DialogTitle } from '../../components/ui/dialog.tsx'
 import { Button } from '../../components/ui/button.tsx'
+import { showErrorToast } from '../../lib/toast.ts'
 import { useIssueProductPhotoSession } from './useProducts.ts'
 import type { PhotoTokenResponse } from './productSchemas.ts'
 
@@ -53,9 +53,17 @@ export function AddPhotosSessionModal({ open, onClose }: AddPhotosSessionModalPr
     // stale, slower call could resolve after a newer one and overwrite
     // the QR code with one for an address that's no longer selected.
     let cancelled = false
-    void QRCode.toDataURL(buildPhotoUrl(tokenResponse, selectedAddress)).then((dataUrl) => {
-      if (!cancelled) setQrDataUrl(dataUrl)
-    })
+    // Loaded on demand — the QR encoder is only needed once a token/address
+    // pair actually exists to render, not on every page/modal that imports
+    // this file.
+    void import('qrcode')
+      .then(({ default: QRCode }) => QRCode.toDataURL(buildPhotoUrl(tokenResponse, selectedAddress)))
+      .then((dataUrl) => {
+        if (!cancelled) setQrDataUrl(dataUrl)
+      })
+      .catch(() => {
+        if (!cancelled) showErrorToast(t('common:errors.UNKNOWN', { ns: 'common' }))
+      })
     return () => {
       cancelled = true
     }

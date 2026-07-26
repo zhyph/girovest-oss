@@ -19,10 +19,12 @@
     "close": "Fechar",
     "pickDate": "Escolher data no calendário",
     "openMenu": "Abrir menu",
-    "retry": "Tentar novamente"
+    "retry": "Tentar novamente",
+    "reload": "Recarregar"
   },
   "errors": {
-    "UNKNOWN": "Algo deu errado. Tente novamente."
+    "UNKNOWN": "Algo deu errado. Tente novamente.",
+    "chunkLoadFailed": "Não foi possível carregar esta parte do aplicativo."
   },
   "profileLoadError": "Não foi possível carregar seu perfil.",
   "confirmDelete": {

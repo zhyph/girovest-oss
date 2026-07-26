@@ -9,12 +9,14 @@ import * as api from './lib/api.ts'
 import { setToken, clearToken } from './lib/auth.ts'
 
 describe('App', () => {
-  it('renders the login screen when logged out', () => {
+  it('renders the login screen when logged out', async () => {
     render(<App />)
     // "Entrar" appears both as the page title and the submit button text,
     // so assert on the button specifically rather than getByText (which
-    // would throw on finding two matches).
-    expect(screen.getByRole('button', { name: 'Entrar' })).toBeInTheDocument()
+    // would throw on finding two matches). LoginPage is now a lazy-loaded
+    // route chunk, so its first render is behind the router's Suspense
+    // fallback — wait for it instead of asserting synchronously.
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Entrar' })).toBeInTheDocument())
   })
 })
 

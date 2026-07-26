@@ -6,26 +6,36 @@ import { useAuth } from '../lib/useAuth.ts'
 import { cn } from '../lib/cn.ts'
 import { Button } from '../components/ui/button.tsx'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetClose, SheetBody } from '../components/ui/sheet.tsx'
+import { preloadPage, type PageLoaderKey } from './lazyPages.ts'
 
-const links = [
-  { to: '/', labelKey: 'nav.dashboard', icon: LayoutDashboard },
-  { to: '/clientes', labelKey: 'nav.clients', icon: Users },
-  { to: '/produtos', labelKey: 'nav.products', icon: Shirt },
-  { to: '/contratos', labelKey: 'nav.contracts', icon: ClipboardList },
-  { to: '/calendario', labelKey: 'nav.calendar', icon: Calendar },
-  { to: '/configuracoes', labelKey: 'nav.settings', icon: Settings },
+const links: { to: string; labelKey: string; icon: typeof LayoutDashboard; page: PageLoaderKey }[] = [
+  { to: '/', labelKey: 'nav.dashboard', icon: LayoutDashboard, page: 'dashboard' },
+  { to: '/clientes', labelKey: 'nav.clients', icon: Users, page: 'clients' },
+  { to: '/produtos', labelKey: 'nav.products', icon: Shirt, page: 'products' },
+  { to: '/contratos', labelKey: 'nav.contracts', icon: ClipboardList, page: 'contracts' },
+  { to: '/calendario', labelKey: 'nav.calendar', icon: Calendar, page: 'calendar' },
+  { to: '/configuracoes', labelKey: 'nav.settings', icon: Settings, page: 'settings' },
 ]
 
 function NavLinks({ alwaysShowLabels, onNavigate }: { alwaysShowLabels?: boolean; onNavigate?: () => void }) {
   const { t } = useTranslation('common')
   return (
     <>
-      {links.map(({ to, labelKey, icon: Icon }) => (
+      {links.map(({ to, labelKey, icon: Icon, page }) => (
         <NavLink
           key={to}
           to={to}
           end={to === '/'}
           onClick={onNavigate}
+          // The router wraps navigation in a React transition (so the
+          // current page stays up instead of flashing to a Suspense
+          // fallback), which means there's no built-in loading feedback
+          // while a route's chunk fetches. Kicking the fetch off on
+          // hover/focus — before the click that actually navigates —
+          // means the chunk is usually already there by the time it's
+          // needed.
+          onMouseEnter={() => preloadPage(page)}
+          onFocus={() => preloadPage(page)}
           className={({ isActive }) =>
             cn(
               'flex items-center gap-2 rounded-md px-2 py-2 text-sm whitespace-nowrap',

@@ -1,32 +1,50 @@
+import { Suspense } from 'react'
 import { Routes, Route } from 'react-router'
-import { LoginPage } from '../features/auth/LoginPage.tsx'
-import { SetupPage } from '../features/setup/SetupPage.tsx'
+import { ChunkErrorBoundary } from '../components/ChunkErrorBoundary.tsx'
+import { RouteFallback } from '../components/RouteFallback.tsx'
 import { ProtectedRoute } from './ProtectedRoute.tsx'
 import { AppLayout } from './AppLayout.tsx'
-import { DashboardPage } from '../features/dashboard/DashboardPage.tsx'
-import { ClientsPage } from '../features/clients/ClientsPage.tsx'
-import { ProductsPage } from '../features/products/ProductsPage.tsx'
-import { ContractsPage } from '../features/contracts/ContractsPage.tsx'
-import { CalendarPage } from '../features/calendar/CalendarPage.tsx'
-import { SettingsPage } from '../features/settings/SettingsPage.tsx'
-import { ContractPrintPage } from '../features/contracts/ContractPrintPage.tsx'
+import { LoginPage, SetupPage, DashboardPage, ClientsPage, ProductsPage, ContractsPage, CalendarPage, SettingsPage, ContractPrintPage } from './lazyPages.ts'
 
 export function AppRouter() {
   return (
-    <Routes>
-      <Route path="/configurar-loja" element={<SetupPage />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route element={<ProtectedRoute />}>
-        <Route element={<AppLayout />}>
-          <Route index element={<DashboardPage />} />
-          <Route path="/clientes" element={<ClientsPage />} />
-          <Route path="/produtos" element={<ProductsPage />} />
-          <Route path="/contratos" element={<ContractsPage />} />
-          <Route path="/calendario" element={<CalendarPage />} />
-          <Route path="/configuracoes" element={<SettingsPage />} />
+    <ChunkErrorBoundary>
+      <Routes>
+        <Route
+          path="/configurar-loja"
+          element={
+            <Suspense fallback={<RouteFallback />}>
+              <SetupPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/login"
+          element={
+            <Suspense fallback={<RouteFallback />}>
+              <LoginPage />
+            </Suspense>
+          }
+        />
+        <Route element={<ProtectedRoute />}>
+          <Route element={<AppLayout />}>
+            <Route index element={<DashboardPage />} />
+            <Route path="/clientes" element={<ClientsPage />} />
+            <Route path="/produtos" element={<ProductsPage />} />
+            <Route path="/contratos" element={<ContractsPage />} />
+            <Route path="/calendario" element={<CalendarPage />} />
+            <Route path="/configuracoes" element={<SettingsPage />} />
+          </Route>
+          <Route
+            path="/contratos/:id/imprimir"
+            element={
+              <Suspense fallback={<RouteFallback />}>
+                <ContractPrintPage />
+              </Suspense>
+            }
+          />
         </Route>
-        <Route path="/contratos/:id/imprimir" element={<ContractPrintPage />} />
-      </Route>
-    </Routes>
+      </Routes>
+    </ChunkErrorBoundary>
   )
 }

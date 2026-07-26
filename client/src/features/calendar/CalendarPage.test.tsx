@@ -61,12 +61,27 @@ describe('CalendarPage', () => {
     expect(screen.queryByRole('button', { name: 'Ver mês' })).not.toBeInTheDocument()
   })
 
-  it('toggles to agenda view and back', async () => {
-    mockHooks()
-    render(<CalendarPage />)
-    await userEvent.click(screen.getByRole('button', { name: 'Ver agenda' }))
-    expect(screen.getByRole('button', { name: 'Ver mês' })).toBeInTheDocument()
-  })
+  it(
+    'renders the lazy month grid by default, toggles to agenda and back',
+    async () => {
+      mockHooks()
+      render(<CalendarPage />)
+      // Month is now the default view and MonthView is lazy-loaded — wait
+      // for its chunk to resolve and render react-big-calendar's toolbar
+      // through the Suspense boundary, instead of only asserting on
+      // CalendarPage's own toggle button (which flips regardless of whether
+      // MonthView mounted). The generous timeout is for transforming
+      // react-big-calendar's module graph on first import under Vitest, not
+      // for the dynamic import itself.
+      expect(await screen.findByRole('button', { name: 'Hoje' }, { timeout: 9000 })).toBeInTheDocument()
+      await userEvent.click(screen.getByRole('button', { name: 'Ver agenda' }))
+      expect(screen.getByRole('button', { name: 'Ver mês' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Hoje' })).not.toBeInTheDocument()
+      await userEvent.click(screen.getByRole('button', { name: 'Ver mês' }))
+      expect(await screen.findByRole('button', { name: 'Hoje' }, { timeout: 9000 })).toBeInTheDocument()
+    },
+    15000,
+  )
 
   it('renders the product name looked up from useProducts when the productId matches', () => {
     vi.spyOn(useCalendarModule, 'useCalendarTab').mockReturnValue({

@@ -1,5 +1,7 @@
+import { Suspense } from 'react'
 import { Outlet } from 'react-router'
 import { useTranslation } from 'react-i18next'
+import { RouteFallback } from '../components/RouteFallback.tsx'
 import { Sidebar } from './Sidebar.tsx'
 import { Button } from '../components/ui/button.tsx'
 import { useAuth } from '../lib/useAuth.ts'
@@ -54,7 +56,9 @@ export function AppLayout() {
       <Sidebar />
       <main className="min-h-0 flex-1">
         <div className="mx-auto flex h-full max-w-4xl flex-col p-6">
-          <Outlet />
+          <Suspense fallback={<RouteFallback />}>
+            <Outlet />
+          </Suspense>
         </div>
       </main>
     </div>
