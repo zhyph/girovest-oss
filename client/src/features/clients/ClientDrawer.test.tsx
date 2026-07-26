@@ -30,9 +30,9 @@ describe('ClientDrawer', () => {
   it('closes when the backdrop is clicked', async () => {
     const onClose = vi.fn()
     mockClientHooks()
-    const { container } = renderWithToast(<ClientDrawer client={null} onClose={onClose} />)
+    renderWithToast(<ClientDrawer client={null} onClose={onClose} />)
 
-    await userEvent.click(container.querySelector('[aria-hidden="true"]')!)
+    await userEvent.click(document.querySelector('[data-slot="sheet-overlay"]')!)
 
     expect(onClose).toHaveBeenCalledOnce()
   })
@@ -62,11 +62,14 @@ describe('ClientDrawer', () => {
     renderWithToast(<ClientDrawer client={client} onClose={vi.fn()} />)
 
     await userEvent.click(screen.getByRole('button', { name: 'Excluir' }))
-    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByText('Excluir Maria Silva?')).toBeInTheDocument()
     expect(deleteImpl).not.toHaveBeenCalled()
 
+    // Escape dismisses the confirmation dialog on top; the drawer underneath
+    // (itself now a proper dialog) stays open rather than also closing.
     await userEvent.keyboard('{Escape}')
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.queryByText('Excluir Maria Silva?')).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Editar cliente' })).toBeInTheDocument()
     expect(deleteImpl).not.toHaveBeenCalled()
   })
 

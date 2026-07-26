@@ -27,7 +27,7 @@ function renderWithQueryClient(ui: React.ReactElement) {
 describe('ProductsPage', () => {
   it('lists products with their status', () => {
     vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [product], isLoading: false } as never)
-    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' }, isLoadingStaff: false, login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' }, isLoadingStaff: false, isErrorStaff: false, refetchStaff: vi.fn(), login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
 
     renderWithQueryClient(<ProductsPage />)
 
@@ -37,7 +37,7 @@ describe('ProductsPage', () => {
 
   it('opens the drawer in edit mode when a row is clicked', async () => {
     vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [product], isLoading: false } as never)
-    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' }, isLoadingStaff: false, login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' }, isLoadingStaff: false, isErrorStaff: false, refetchStaff: vi.fn(), login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
 
     renderWithQueryClient(<ProductsPage />)
     await userEvent.click(screen.getByText('Vestido Azul'))
@@ -47,7 +47,7 @@ describe('ProductsPage', () => {
   it('badges a rented product as Alugado instead of the always-Disponível status field', () => {
     const rented = { ...product, id: 'p2', name: 'Vestido Rosa', availability: 'rented' as const }
     vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [rented], isLoading: false } as never)
-    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' }, isLoadingStaff: false, login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' }, isLoadingStaff: false, isErrorStaff: false, refetchStaff: vi.fn(), login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
 
     renderWithQueryClient(<ProductsPage />)
 
@@ -55,15 +55,19 @@ describe('ProductsPage', () => {
     expect(screen.queryByText('Disponível')).not.toBeInTheDocument()
   })
 
-  it('remounts the drawer with fresh values when switching rows without closing it', async () => {
+  it('remounts the drawer with fresh values when reopening it for a different row', async () => {
     const other = { ...product, id: 'p2', name: 'Vestido Rosa' }
     vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [product, other], isLoading: false } as never)
-    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' }, isLoadingStaff: false, login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' }, isLoadingStaff: false, isErrorStaff: false, refetchStaff: vi.fn(), login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
 
     renderWithQueryClient(<ProductsPage />)
     await userEvent.click(screen.getByText('Vestido Azul'))
     expect(screen.getByLabelText('Nome')).toHaveValue('Vestido Azul')
 
+    // The drawer is a real modal now (Critical #2 fix) — a background row
+    // can't be clicked while it's open, so close it first, same as a real
+    // user would, then reopen for the other row.
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
     await userEvent.click(screen.getByText('Vestido Rosa'))
     expect(screen.getByLabelText('Nome')).toHaveValue('Vestido Rosa')
   })
@@ -71,7 +75,7 @@ describe('ProductsPage', () => {
   it('filters the list by name, category, or color as the search box is typed into', async () => {
     const other = { ...product, id: 'p2', name: 'Vestido Rosa', category: 'festa', color: 'rosa' }
     vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [product, other], isLoading: false } as never)
-    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' }, isLoadingStaff: false, login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' }, isLoadingStaff: false, isErrorStaff: false, refetchStaff: vi.fn(), login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
 
     renderWithQueryClient(<ProductsPage />)
     expect(screen.getByText('Vestido Azul')).toBeInTheDocument()
@@ -85,7 +89,7 @@ describe('ProductsPage', () => {
 
   it('shows a no-results message when the search matches nothing', async () => {
     vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [product], isLoading: false } as never)
-    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' }, isLoadingStaff: false, login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' }, isLoadingStaff: false, isErrorStaff: false, refetchStaff: vi.fn(), login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
 
     renderWithQueryClient(<ProductsPage />)
     await userEvent.type(screen.getByPlaceholderText('Buscar por nome, categoria ou cor...'), 'zzz')
@@ -95,7 +99,7 @@ describe('ProductsPage', () => {
 
   it('remembers the last created product\'s category/size/color and prefills a fresh Novo later in the session', async () => {
     vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [product], isLoading: false } as never)
-    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' }, isLoadingStaff: false, login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' }, isLoadingStaff: false, isErrorStaff: false, refetchStaff: vi.fn(), login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
     vi.spyOn(useProductsModule, 'useCreateProduct').mockReturnValue({ mutateAsync: vi.fn().mockResolvedValue(undefined), isPending: false } as never)
     vi.spyOn(useProductsModule, 'useUpdateProduct').mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
     vi.spyOn(useProductsModule, 'useDeleteProduct').mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
@@ -124,7 +128,7 @@ describe('ProductsPage', () => {
 
   it('does not update the remembered defaults when the drawer is closed without saving', async () => {
     vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [product], isLoading: false } as never)
-    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' }, isLoadingStaff: false, login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' }, isLoadingStaff: false, isErrorStaff: false, refetchStaff: vi.fn(), login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
     vi.spyOn(useProductsModule, 'useCreateProduct').mockReturnValue({ mutateAsync: vi.fn().mockResolvedValue(undefined), isPending: false } as never)
     vi.spyOn(useProductsModule, 'useUpdateProduct').mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
     vi.spyOn(useProductsModule, 'useDeleteProduct').mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
@@ -152,7 +156,7 @@ describe('ProductsPage', () => {
 
   it('keeps the header and search pinned outside the scrollable list region', () => {
     vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [product], isLoading: false } as never)
-    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' }, isLoadingStaff: false, login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' }, isLoadingStaff: false, isErrorStaff: false, refetchStaff: vi.fn(), login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
 
     const { container } = renderWithQueryClient(<ProductsPage />)
 
@@ -166,7 +170,7 @@ describe('ProductsPage', () => {
 
   it('opens the session-level remote-photo modal from a page-level trigger, with no product required', async () => {
     vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [], isLoading: false } as never)
-    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' }, isLoadingStaff: false, login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' }, isLoadingStaff: false, isErrorStaff: false, refetchStaff: vi.fn(), login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
     vi.spyOn(useProductsModule, 'useIssueProductPhotoSession').mockReturnValue({
       mutateAsync: vi.fn().mockResolvedValue({
         token: 't', expiresAt: new Date(Date.now() + 60_000).toISOString(), port: 3000,

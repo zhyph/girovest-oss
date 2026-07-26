@@ -1,5 +1,7 @@
 {
   "title": "Clientes",
+  "newTitle": "Novo cliente",
+  "editTitle": "Editar cliente",
   "searchPlaceholder": "Buscar por nome, telefone ou e-mail...",
   "fields": {
     "name": "Nome",

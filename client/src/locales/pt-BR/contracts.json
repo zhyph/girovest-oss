@@ -70,6 +70,13 @@
   "validation": {
     "clientRequired": "Cliente é obrigatório",
     "eventDateRequired": "Data do evento é obrigatória",
+    "eventDateInvalid": "Esta data não existe",
+    "checkoutDateRequired": "Data de retirada é obrigatória",
+    "checkoutDateInvalid": "Esta data não existe",
+    "dueDateRequired": "Data de devolução é obrigatória",
+    "dueDateInvalid": "Esta data não existe",
+    "installmentDueDateRequired": "Vencimento é obrigatório",
+    "installmentDueDateInvalid": "Esta data não existe",
     "paymentMethodRequired": "Forma de pagamento é obrigatória"
   },
   "unavailableProduct": "Este produto não está disponível para essas datas.",

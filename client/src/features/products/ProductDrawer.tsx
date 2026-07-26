@@ -2,10 +2,12 @@ import { useState } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
+import { X } from 'lucide-react'
 import { Button } from '../../components/ui/button.tsx'
 import { Input } from '../../components/ui/input.tsx'
 import { CurrencyInput } from '../../components/ui/currency-input.tsx'
 import { Modal } from '../../components/ui/modal.tsx'
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from '../../components/ui/sheet.tsx'
 import { showErrorToast } from '../../lib/toast.ts'
 import { useAuth } from '../../lib/useAuth.ts'
 import { AuthenticatedPhoto } from '../../components/ui/authenticated-photo.tsx'
@@ -116,32 +118,39 @@ export function ProductDrawer({
     }
   }
 
+  const drawerTitle = product ? t('editTitle') : t('newTitle')
+
   return (
-    <>
-      <div className="fixed inset-0 z-40 bg-ink/40 opacity-100 transition-opacity duration-200 starting:opacity-0" onClick={onClose} aria-hidden="true" />
-      <div className="fixed inset-y-0 right-0 z-50 flex w-80 translate-x-0 flex-col overflow-hidden border-l border-border-soft bg-white shadow-lg transition-transform duration-200 ease-out starting:translate-x-full">
+    <Sheet open onOpenChange={(next) => !next && onClose()}>
+      <SheetContent className="w-80" aria-describedby={undefined}>
+        <SheetHeader>
+          <SheetTitle>{drawerTitle}</SheetTitle>
+          <SheetClose aria-label={t('common:actions.close', { ns: 'common' })}>
+            <X size={18} />
+          </SheetClose>
+        </SheetHeader>
       <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col p-4">
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
         <input type="hidden" {...register('locationId')} />
         <label className="flex flex-col gap-1 text-sm">
           {t('fields.name')}
-          <Input {...register('name')} />
-          {errors.name && <span className="text-xs text-red-600">{t('validation.nameRequired')}</span>}
+          <Input {...register('name')} aria-invalid={errors.name ? true : undefined} aria-describedby={errors.name ? 'product-name-error' : undefined} />
+          {errors.name && <span id="product-name-error" className="text-xs text-red-600">{t('validation.nameRequired')}</span>}
         </label>
         <label className="flex flex-col gap-1 text-sm">
           {t('fields.category')}
-          <Input {...register('category')} />
-          {errors.category && <span className="text-xs text-red-600">{t('validation.categoryRequired')}</span>}
+          <Input {...register('category')} aria-invalid={errors.category ? true : undefined} aria-describedby={errors.category ? 'product-category-error' : undefined} />
+          {errors.category && <span id="product-category-error" className="text-xs text-red-600">{t('validation.categoryRequired')}</span>}
         </label>
         <label className="flex flex-col gap-1 text-sm">
           {t('fields.size')}
-          <Input {...register('size')} />
-          {errors.size && <span className="text-xs text-red-600">{t('validation.sizeRequired')}</span>}
+          <Input {...register('size')} aria-invalid={errors.size ? true : undefined} aria-describedby={errors.size ? 'product-size-error' : undefined} />
+          {errors.size && <span id="product-size-error" className="text-xs text-red-600">{t('validation.sizeRequired')}</span>}
         </label>
         <label className="flex flex-col gap-1 text-sm">
           {t('fields.color')}
-          <Input {...register('color')} />
-          {errors.color && <span className="text-xs text-red-600">{t('validation.colorRequired')}</span>}
+          <Input {...register('color')} aria-invalid={errors.color ? true : undefined} aria-describedby={errors.color ? 'product-color-error' : undefined} />
+          {errors.color && <span id="product-color-error" className="text-xs text-red-600">{t('validation.colorRequired')}</span>}
         </label>
         <label className="flex flex-col gap-1 text-sm">
           {t('fields.rentalPrice')}
@@ -260,7 +269,7 @@ export function ProductDrawer({
           </div>
         </Modal>
       )}
-      </div>
-    </>
+      </SheetContent>
+    </Sheet>
   )
 }

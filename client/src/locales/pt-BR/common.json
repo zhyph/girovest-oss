@@ -16,11 +16,15 @@
     "delete": "Excluir",
     "create": "Novo",
     "logout": "Sair",
-    "close": "Fechar"
+    "close": "Fechar",
+    "pickDate": "Escolher data no calendário",
+    "openMenu": "Abrir menu",
+    "retry": "Tentar novamente"
   },
   "errors": {
     "UNKNOWN": "Algo deu errado. Tente novamente."
   },
+  "profileLoadError": "Não foi possível carregar seu perfil.",
   "confirmDelete": {
     "title": "Excluir {{name}}?",
     "message": "Esta ação não pode ser desfeita."

@@ -8,6 +8,7 @@ import { Input } from '../../components/ui/input.tsx'
 import { PhoneInput } from '../../components/ui/phone-input.tsx'
 import { MaskedTextInput } from '../../components/ui/masked-text-input.tsx'
 import { Modal } from '../../components/ui/modal.tsx'
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose, SheetBody } from '../../components/ui/sheet.tsx'
 import { showErrorToast } from '../../lib/toast.ts'
 import { useLocale } from '../../lib/LocaleContext.tsx'
 import { getClientFieldTemplate } from '../../lib/clientFieldTemplates.ts'
@@ -93,15 +94,23 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
     }
   }
 
+  const drawerTitle = client ? t('editTitle') : t('newTitle')
+
   return (
-    <>
-      <div className="fixed inset-0 z-40 bg-ink/40 opacity-100 transition-opacity duration-200 starting:opacity-0" onClick={onClose} aria-hidden="true" />
-      <div className="fixed inset-y-0 right-0 z-50 w-96 translate-x-0 overflow-y-auto border-l border-border-soft bg-white p-4 shadow-lg transition-transform duration-200 ease-out starting:translate-x-full">
+    <Sheet open onOpenChange={(next) => !next && onClose()}>
+      <SheetContent className="w-96" aria-describedby={undefined}>
+        <SheetHeader>
+          <SheetTitle>{drawerTitle}</SheetTitle>
+          <SheetClose aria-label={t('common:actions.close', { ns: 'common' })}>
+            <X size={18} />
+          </SheetClose>
+        </SheetHeader>
+        <SheetBody>
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3">
         <label className="flex flex-col gap-1 text-sm">
           {t('fields.name')}
-          <Input {...register('name')} />
-          {errors.name && <span className="text-xs text-red-600">{t('validation.nameRequired')}</span>}
+          <Input {...register('name')} aria-invalid={errors.name ? true : undefined} aria-describedby={errors.name ? 'client-name-error' : undefined} />
+          {errors.name && <span id="client-name-error" className="text-xs text-red-600">{t('validation.nameRequired')}</span>}
         </label>
         <label className="flex flex-col gap-1 text-sm">
           {t('fields.phone')}
@@ -116,8 +125,14 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
         </label>
         <label className="flex flex-col gap-1 text-sm">
           {t('fields.email')}
-          <Input type="email" inputMode="email" {...register('email')} />
-          {errors.email && <span className="text-xs text-red-600">{t('validation.emailInvalid')}</span>}
+          <Input
+            type="email"
+            inputMode="email"
+            {...register('email')}
+            aria-invalid={errors.email ? true : undefined}
+            aria-describedby={errors.email ? 'client-email-error' : undefined}
+          />
+          {errors.email && <span id="client-email-error" className="text-xs text-red-600">{t('validation.emailInvalid')}</span>}
         </label>
         <label className="flex flex-col gap-1 text-sm">
           {t('fields.notes')}
@@ -125,13 +140,17 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
         </label>
         <div className="flex flex-col gap-2">
           <span className="text-sm font-medium">{t('identityDocuments.title')}</span>
-          {identityDocuments.fields.map((field, index) => (
+          {identityDocuments.fields.map((field, index) => {
+            const isDefaultField = template.identityDocuments[index]?.label === field.label
+            return (
             <div key={field.id} className="flex items-end gap-2">
               <label className="flex w-24 shrink-0 flex-col gap-1 text-sm">
                 {t('identityDocuments.label')}
                 <Input
                   {...register(`identityDocuments.${index}.label`)}
                   aria-label={t('identityDocuments.labelFieldAria')}
+                  readOnly={isDefaultField}
+                  className={isDefaultField ? 'cursor-default bg-gray-50 text-muted-text' : undefined}
                 />
               </label>
               <label className="flex flex-1 flex-col gap-1 text-sm">
@@ -159,7 +178,7 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
                 <X size={16} />
               </Button>
             </div>
-          ))}
+          )})}
           <Button
             type="button"
             variant="secondary"
@@ -170,13 +189,17 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
         </div>
         <div className="flex flex-col gap-2">
           <span className="text-sm font-medium">{t('addressLines.title')}</span>
-          {addressLines.fields.map((field, index) => (
+          {addressLines.fields.map((field, index) => {
+            const isDefaultField = template.addressLines[index]?.label === field.label
+            return (
             <div key={field.id} className="flex items-end gap-2">
               <label className="flex w-24 shrink-0 flex-col gap-1 text-sm">
                 {t('addressLines.label')}
                 <Input
                   {...register(`addressLines.${index}.label`)}
                   aria-label={t('addressLines.labelFieldAria')}
+                  readOnly={isDefaultField}
+                  className={isDefaultField ? 'cursor-default bg-gray-50 text-muted-text' : undefined}
                 />
               </label>
               <label className="flex flex-1 flex-col gap-1 text-sm">
@@ -204,7 +227,7 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
                 <X size={16} />
               </Button>
             </div>
-          ))}
+          )})}
           <Button
             type="button"
             variant="secondary"
@@ -253,7 +276,8 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
           </div>
         </Modal>
       )}
-      </div>
-    </>
+        </SheetBody>
+      </SheetContent>
+    </Sheet>
   )
 }

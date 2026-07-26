@@ -1,14 +1,34 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQueryClient } from '@tanstack/react-query'
+import { Shirt } from 'lucide-react'
 import { Button } from '../../components/ui/button.tsx'
 import { Input } from '../../components/ui/input.tsx'
 import { Badge } from '../../components/ui/badge.tsx'
+import { AuthenticatedPhoto } from '../../components/ui/authenticated-photo.tsx'
 import { cn } from '../../lib/cn.ts'
 import { useProducts, PRODUCTS_KEY } from './useProducts.ts'
 import { ProductDrawer } from './ProductDrawer.tsx'
 import { AddPhotosSessionModal } from './AddPhotosSessionModal.tsx'
 import type { Product, ProductAvailability, ProductFormValues, ProductStatus } from './productSchemas.ts'
+
+function ProductThumbnail({ product }: { product: Product }) {
+  const firstPhoto = product.photos?.[0]
+  if (!firstPhoto) {
+    return (
+      <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md bg-brand-50 text-brand-300">
+        <Shirt size={18} />
+      </span>
+    )
+  }
+  return (
+    <AuthenticatedPhoto
+      url={firstPhoto}
+      alt=""
+      className="h-9 w-9 flex-shrink-0 rounded-md object-cover"
+    />
+  )
+}
 
 const AVAILABILITY_TONE: Record<ProductAvailability, 'neutral' | 'success' | 'warning' | 'danger'> = {
   available: 'success',
@@ -56,13 +76,15 @@ export function ProductsPage() {
           <Button onClick={() => setEditing(null)}>{t('common:actions.create')}</Button>
         </div>
       </div>
-      <Input
-        value={search}
-        onChange={(event) => setSearch(event.target.value)}
-        placeholder={t('searchPlaceholder')}
-        className="mb-3 flex-shrink-0"
-        aria-label={t('searchPlaceholder')}
-      />
+      {products && products.length > 0 && (
+        <Input
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder={t('searchPlaceholder')}
+          className="mb-3 flex-shrink-0"
+          aria-label={t('searchPlaceholder')}
+        />
+      )}
       <div className="min-h-0 flex-1 overflow-y-auto">
         {products && products.length === 0 && <p className="text-muted-text">{t('empty')}</p>}
         {products && products.length > 0 && filteredProducts?.length === 0 && (
@@ -87,7 +109,10 @@ export function ProductsPage() {
                     index % 2 === 1 && 'bg-gray-50/50',
                   )}
                 >
-                  <span>{product.name}</span>
+                  <span className="flex min-w-0 items-center gap-3">
+                    <ProductThumbnail product={product} />
+                    <span className="truncate">{product.name}</span>
+                  </span>
                   <span className="flex items-center gap-4 text-muted-text">
                     <span>{product.size}</span>
                     {product.status === 'active' ? (

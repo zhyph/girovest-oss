@@ -67,6 +67,8 @@ export function useAuth() {
   return {
     staff: staffQuery.data,
     isLoadingStaff: staffQuery.isLoading,
+    isErrorStaff: staffQuery.isError,
+    refetchStaff: staffQuery.refetch,
     login,
     logout,
     isLoggedIn: Boolean(getToken()),

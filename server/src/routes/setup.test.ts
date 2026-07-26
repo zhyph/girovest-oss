@@ -58,7 +58,7 @@ describe('POST /api/setup', () => {
       shopAddress: 'Rua Nova, 100',
       ownerName: 'Dona Ana',
       ownerLogin: 'dona-ana',
-      ownerPassword: 'senha-forte-123',
+      ownerPassword: 'fake-password-1234',
     })
 
     expect(response.status).toBe(201)
@@ -75,7 +75,7 @@ describe('POST /api/setup', () => {
       shopAddress: 'Rua Nova, 100',
       ownerName: 'Dona Ana',
       ownerLogin: 'dona-ana-2',
-      ownerPassword: 'senha-forte-123',
+      ownerPassword: 'fake-password-1234',
     })
 
     const response = await request(app).post('/api/setup').send({
@@ -83,7 +83,7 @@ describe('POST /api/setup', () => {
       shopAddress: 'Rua Outra, 1',
       ownerName: 'Outra Dona',
       ownerLogin: 'outra-dona',
-      ownerPassword: 'senha-forte-123',
+      ownerPassword: 'fake-password-1234',
     })
 
     expect(response.status).toBe(409)

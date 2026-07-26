@@ -1,20 +1,23 @@
 import { z } from 'zod'
+import { isValidIsoDate } from '../../lib/date.ts'
+
+const isoDateString = z.string().min(1).refine(isValidIsoDate, { message: 'INVALID_DATE' })
 
 export const contractItemSchema = z.object({
   productId: z.string().min(1),
-  checkoutDate: z.string().min(1),
-  dueDate: z.string().min(1),
+  checkoutDate: isoDateString,
+  dueDate: isoDateString,
   priceCharged: z.number().nonnegative(),
 })
 
 export const contractInstallmentSchema = z.object({
-  dueDate: z.string().min(1),
+  dueDate: isoDateString,
   amount: z.number().nonnegative(),
 })
 
 export const newContractSchema = z.object({
   clientId: z.string().min(1),
-  eventDate: z.string().min(1),
+  eventDate: isoDateString,
   paymentMethod: z.string().min(1),
   items: z.array(contractItemSchema).min(1),
   installments: z.array(contractInstallmentSchema),

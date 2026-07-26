@@ -7,6 +7,7 @@ import { prisma } from '../db/client.js'
 import { createContract, cancelContract, listContracts, getContract } from '../services/contractService.js'
 import { issueSigningToken } from '../services/signingService.js'
 import { detectLanCandidates } from '../network/lanNetwork.js'
+import { isoDate } from '../lib/zodDate.js'
 
 export const contractsRouter = Router()
 contractsRouter.use(requireAuth)
@@ -49,19 +50,19 @@ contractsRouter.get('/:id', async (req, res) => {
 
 const itemSchema = z.object({
   productId: z.string().min(1),
-  checkoutDate: z.coerce.date(),
-  dueDate: z.coerce.date(),
+  checkoutDate: isoDate,
+  dueDate: isoDate,
   priceCharged: z.number().nonnegative(),
 })
 
 const installmentSchema = z.object({
-  dueDate: z.coerce.date(),
+  dueDate: isoDate,
   amount: z.number().nonnegative(),
 })
 
 const createSchema = z.object({
   clientId: z.string().min(1),
-  eventDate: z.coerce.date(),
+  eventDate: isoDate,
   paymentMethod: z.string().min(1),
   items: z.array(itemSchema).min(1),
   installments: z.array(installmentSchema),

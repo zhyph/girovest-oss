@@ -22,7 +22,7 @@ function monthRange(anchor: Date) {
 export function CalendarPage() {
   const { t } = useTranslation('calendarScreen')
   const [tab, setTab] = useState<CalendarTab>('going-out')
-  const [view, setView] = useState<'agenda' | 'month'>('agenda')
+  const [view, setView] = useState<'agenda' | 'month'>('month')
   const [anchor, setAnchor] = useState(new Date())
   const { from, to } = monthRange(anchor)
   const { data: allocations } = useCalendarTab(tab, from, to)

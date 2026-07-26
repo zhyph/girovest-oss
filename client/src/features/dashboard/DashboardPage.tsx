@@ -1,6 +1,9 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router'
+import { AlertTriangle } from 'lucide-react'
 import { Card, CardBody } from '../../components/ui/card.tsx'
+import { Button } from '../../components/ui/button.tsx'
 import CountUp from '../../components/CountUp.tsx'
 import { parseDateOnly, formatDate } from '../../lib/date.ts'
 import { useLocale } from '../../lib/LocaleContext.tsx'
@@ -9,11 +12,15 @@ import { useProducts } from '../products/useProducts.ts'
 import { useDashboard } from './useDashboard.ts'
 
 function StatTile({ label, value, danger }: { label: string; value: number; danger?: boolean }) {
+  const isUrgent = danger && value > 0
   return (
-    <Card className={danger && value > 0 ? 'border-red-300 bg-red-50' : undefined}>
+    <Card className={isUrgent ? 'border-red-300 bg-red-50' : undefined}>
       <CardBody>
-        <div className="text-xs uppercase tracking-wide text-muted-text">{label}</div>
-        <div className="text-2xl font-semibold">
+        <div className={isUrgent ? 'flex items-center gap-1.5 text-xs font-semibold tracking-wide text-red-700 uppercase' : 'text-xs uppercase tracking-wide text-muted-text'}>
+          {isUrgent && <AlertTriangle size={13} />}
+          {label}
+        </div>
+        <div className={isUrgent ? 'text-2xl font-semibold text-red-700' : 'text-2xl font-semibold'}>
           <CountUp to={value} duration={0.6} />
         </div>
       </CardBody>
@@ -24,6 +31,7 @@ function StatTile({ label, value, danger }: { label: string; value: number; dang
 export function DashboardPage() {
   const { t } = useTranslation('dashboard')
   const { locale } = useLocale()
+  const navigate = useNavigate()
   const { goingOutToday, dueBackToday, overdue, upcoming, isLoading, isError } = useDashboard()
   const { data: products } = useProducts()
   const { data: clients } = useClients()
@@ -37,9 +45,29 @@ export function DashboardPage() {
     [clients],
   )
 
+  const isBrandNewShop = !isLoading && !isError && clients?.length === 0 && products?.length === 0
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <h1 className="mb-4 flex-shrink-0 text-xl font-semibold">{t('title')}</h1>
+      {isBrandNewShop && (
+        <Card className="mb-4 flex-shrink-0 border-brand-100 bg-brand-50">
+          <CardBody className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold text-brand-700">{t('gettingStarted.title')}</div>
+              <p className="text-sm text-muted-text">{t('gettingStarted.description')}</p>
+            </div>
+            <div className="flex flex-shrink-0 gap-2">
+              <Button variant="secondary" size="sm" onClick={() => navigate('/clientes')}>
+                {t('gettingStarted.addClient')}
+              </Button>
+              <Button size="sm" onClick={() => navigate('/produtos')}>
+                {t('gettingStarted.addProduct')}
+              </Button>
+            </div>
+          </CardBody>
+        </Card>
+      )}
       {isLoading && (
         <Card className="flex-shrink-0">
           <CardBody>

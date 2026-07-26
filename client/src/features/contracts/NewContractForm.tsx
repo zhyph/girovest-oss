@@ -6,6 +6,7 @@ import { X } from 'lucide-react'
 import { Button } from '../../components/ui/button.tsx'
 import { CurrencyInput } from '../../components/ui/currency-input.tsx'
 import { DateInput } from '../../components/ui/date-input.tsx'
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose, SheetBody } from '../../components/ui/sheet.tsx'
 import { showErrorToast } from '../../lib/toast.ts'
 import { useLocale } from '../../lib/LocaleContext.tsx'
 import { getMissingRequiredFields } from '../../lib/clientReadiness.ts'
@@ -25,6 +26,8 @@ function ItemRow({
   activeProducts,
   onRemove,
   showRemove,
+  checkoutDateError,
+  dueDateError,
 }: {
   index: number
   control: ReturnType<typeof useForm<NewContractFormValues>>['control']
@@ -32,6 +35,8 @@ function ItemRow({
   activeProducts: { id: string; name: string }[]
   onRemove: () => void
   showRemove: boolean
+  checkoutDateError?: string
+  dueDateError?: string
 }) {
   const { t } = useTranslation('contracts')
   const productId = useWatchField(control, `items.${index}.productId`)
@@ -68,9 +73,15 @@ function ItemRow({
             name={`items.${index}.checkoutDate`}
             control={control}
             render={({ field }) => (
-              <DateInput value={field.value} onChange={field.onChange} aria-label={t('fields.checkoutDate')} />
+              <DateInput
+                value={field.value}
+                onChange={field.onChange}
+                aria-label={t('fields.checkoutDate')}
+                aria-invalid={checkoutDateError ? true : undefined}
+              />
             )}
           />
+          {checkoutDateError && <span className="text-xs text-red-600">{checkoutDateError}</span>}
         </label>
         <label className="flex flex-1 flex-col gap-1 text-sm">
           {t('fields.dueDate')}
@@ -78,9 +89,15 @@ function ItemRow({
             name={`items.${index}.dueDate`}
             control={control}
             render={({ field }) => (
-              <DateInput value={field.value} onChange={field.onChange} aria-label={t('fields.dueDate')} />
+              <DateInput
+                value={field.value}
+                onChange={field.onChange}
+                aria-label={t('fields.dueDate')}
+                aria-invalid={dueDateError ? true : undefined}
+              />
             )}
           />
+          {dueDateError && <span className="text-xs text-red-600">{dueDateError}</span>}
         </label>
       </div>
       <label className="flex flex-col gap-1 text-sm">
@@ -153,8 +170,15 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
 
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-ink/40 opacity-100 transition-opacity duration-200 starting:opacity-0" onClick={onClose} aria-hidden="true" />
-      <div className="fixed inset-y-0 right-0 z-50 w-[36rem] translate-x-0 overflow-y-auto border-l border-border-soft bg-white p-4 shadow-lg transition-transform duration-200 ease-out starting:translate-x-full">
+    <Sheet open onOpenChange={(next) => !next && onClose()}>
+      <SheetContent className="w-[36rem]" aria-describedby={undefined}>
+        <SheetHeader>
+          <SheetTitle>{t('newContract')}</SheetTitle>
+          <SheetClose aria-label={t('common:actions.close', { ns: 'common' })}>
+            <X size={18} />
+          </SheetClose>
+        </SheetHeader>
+        <SheetBody>
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3">
           <label className="flex flex-col gap-1 text-sm">
             {t('fields.client')}
@@ -180,10 +204,19 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
               name="eventDate"
               control={control}
               render={({ field }) => (
-                <DateInput value={field.value} onChange={field.onChange} aria-label={t('fields.eventDate')} />
+                <DateInput
+                  value={field.value}
+                  onChange={field.onChange}
+                  aria-label={t('fields.eventDate')}
+                  aria-invalid={errors.eventDate ? true : undefined}
+                />
               )}
             />
-            {errors.eventDate && <span className="text-xs text-red-600">{t('validation.eventDateRequired')}</span>}
+            {errors.eventDate && (
+              <span className="text-xs text-red-600">
+                {t(errors.eventDate.type === 'custom' ? 'validation.eventDateInvalid' : 'validation.eventDateRequired')}
+              </span>
+            )}
           </label>
           <div className="flex flex-col gap-2">
             <span className="text-sm font-medium">{t('items.title')}</span>
@@ -196,6 +229,16 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
                 activeProducts={activeProducts}
                 onRemove={() => items.remove(index)}
                 showRemove={items.fields.length > 1}
+                checkoutDateError={
+                  errors.items?.[index]?.checkoutDate
+                    ? t(errors.items[index]?.checkoutDate?.type === 'custom' ? 'validation.checkoutDateInvalid' : 'validation.checkoutDateRequired')
+                    : undefined
+                }
+                dueDateError={
+                  errors.items?.[index]?.dueDate
+                    ? t(errors.items[index]?.dueDate?.type === 'custom' ? 'validation.dueDateInvalid' : 'validation.dueDateRequired')
+                    : undefined
+                }
               />
             ))}
             <Button
@@ -230,9 +273,23 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
                     name={`installments.${index}.dueDate`}
                     control={control}
                     render={({ field: dateField }) => (
-                      <DateInput value={dateField.value} onChange={dateField.onChange} aria-label={t('fields.installmentDueDate')} />
+                      <DateInput
+                        value={dateField.value}
+                        onChange={dateField.onChange}
+                        aria-label={t('fields.installmentDueDate')}
+                        aria-invalid={errors.installments?.[index]?.dueDate ? true : undefined}
+                      />
                     )}
                   />
+                  {errors.installments?.[index]?.dueDate && (
+                    <span className="text-xs text-red-600">
+                      {t(
+                        errors.installments[index]?.dueDate?.type === 'custom'
+                          ? 'validation.installmentDueDateInvalid'
+                          : 'validation.installmentDueDateRequired',
+                      )}
+                    </span>
+                  )}
                 </label>
                 <label className="flex flex-1 flex-col gap-1 text-sm">
                   {t('fields.installmentAmount')}
@@ -272,8 +329,10 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
             </Button>
           </div>
         </form>
-      </div>
-      {completingClient && <ClientDrawer client={completingClient} onClose={() => setCompletingClient(null)} />}
+        </SheetBody>
+      </SheetContent>
+    </Sheet>
+    {completingClient && <ClientDrawer client={completingClient} onClose={() => setCompletingClient(null)} />}
     </>
   )
 }

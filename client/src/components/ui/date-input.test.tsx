@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import '../../i18n.ts'
 import { DateInput } from './date-input.tsx'
 
 describe('DateInput', () => {
@@ -27,8 +28,27 @@ describe('DateInput', () => {
     expect(onChange).toHaveBeenLastCalledWith('2026-08-23')
   })
 
-  it('is a plain text input (no native date picker, no OS-locale display)', () => {
+  it('keeps the labelled field a plain masked text input (no OS-locale display)', () => {
     render(<DateInput value="" onChange={vi.fn()} aria-label="Data" />)
     expect(screen.getByLabelText('Data')).toHaveAttribute('type', 'text')
+  })
+
+  it('offers a native date picker as a secondary, hidden affordance behind the calendar button', () => {
+    const { container } = render(<DateInput value="2026-08-23" onChange={vi.fn()} aria-label="Data" />)
+
+    // The visible, labelled field the user types into is still the masked
+    // text input above — this hidden native input exists only so the
+    // calendar button can trigger the OS/browser date picker.
+    const nativeDateInput = container.querySelector('input[type="date"]')
+    expect(nativeDateInput).not.toBeNull()
+    expect(nativeDateInput).toHaveAttribute('aria-hidden', 'true')
+    expect(nativeDateInput).toHaveValue('2026-08-23')
+    expect(nativeDateInput).not.toBe(screen.getByLabelText('Data'))
+  })
+
+  it('shows a calendar button that is not part of the tab order (masked field already takes full keyboard entry)', () => {
+    render(<DateInput value="" onChange={vi.fn()} aria-label="Data" />)
+    const pickerButton = screen.getByRole('button', { name: 'Escolher data no calendário' })
+    expect(pickerButton).toHaveAttribute('tabindex', '-1')
   })
 })

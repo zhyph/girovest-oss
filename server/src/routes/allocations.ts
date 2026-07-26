@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { requireAuth } from '../auth/authMiddleware.js'
 import { AppError } from '../errors/AppError.js'
 import { ErrorCodes } from '../errors/errorCodes.js'
+import { isoDate } from '../lib/zodDate.js'
 import {
   checkOutAllocation,
   returnAllocation,
@@ -27,7 +28,7 @@ const checkOutSchema = z.object({
 const returnSchema = z.object({
   conditionNotesIn: z.string().optional(),
   depositReturned: z.number().nonnegative().optional(),
-  actualReturnDate: z.coerce.date().optional(),
+  actualReturnDate: isoDate.optional(),
 })
 
 allocationsRouter.post('/:id/check-out', async (req, res) => {
@@ -51,8 +52,8 @@ allocationsRouter.post('/:id/cancel', async (req, res) => {
 })
 
 const availabilityRangeSchema = z.object({
-  checkoutDate: z.coerce.date(),
-  dueDate: z.coerce.date(),
+  checkoutDate: isoDate,
+  dueDate: isoDate,
 })
 
 allocationsRouter.get('/products/:productId/availability', async (req, res) => {

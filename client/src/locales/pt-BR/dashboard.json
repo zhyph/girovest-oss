@@ -1,5 +1,11 @@
 {
   "title": "Painel — hoje",
+  "gettingStarted": {
+    "title": "Vamos começar",
+    "description": "Cadastre um cliente e um produto para criar seu primeiro contrato.",
+    "addClient": "Adicionar cliente",
+    "addProduct": "Adicionar produto"
+  },
   "goingOutToday": "Saindo hoje",
   "dueBackToday": "Voltando hoje",
   "overdue": "Atrasados",

@@ -54,18 +54,18 @@ function makeProduct(overrides: Partial<Product> = {}): Product {
 }
 
 describe('CalendarPage', () => {
-  it('defaults to the agenda view with the Saindo tab active', () => {
+  it('defaults to the month view with the Saindo tab active', () => {
     mockHooks()
     render(<CalendarPage />)
-    expect(screen.getByRole('button', { name: 'Ver mês' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Ver agenda' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Ver agenda' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Ver mês' })).not.toBeInTheDocument()
   })
 
-  it('toggles to month view and back', async () => {
+  it('toggles to agenda view and back', async () => {
     mockHooks()
     render(<CalendarPage />)
-    await userEvent.click(screen.getByRole('button', { name: 'Ver mês' }))
-    expect(screen.getByRole('button', { name: 'Ver agenda' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Ver agenda' }))
+    expect(screen.getByRole('button', { name: 'Ver mês' })).toBeInTheDocument()
   })
 
   it('renders the product name looked up from useProducts when the productId matches', () => {

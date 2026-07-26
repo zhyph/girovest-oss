@@ -1,5 +1,11 @@
 {
   "title": "Configurar loja",
+  "intro": "Configure sua loja para começar a gerenciar clientes, produtos e contratos de aluguel.",
+  "createdSuccess": "Loja \"{{shopName}}\" criada. Bem-vinda!",
+  "sections": {
+    "shop": "Sobre a loja",
+    "account": "Sua conta"
+  },
   "shopNameField": "Nome da loja",
   "shopAddressField": "Endereço",
   "ownerNameField": "Seu nome",

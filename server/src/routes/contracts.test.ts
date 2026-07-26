@@ -25,6 +25,7 @@ afterEach(async () => {
   await prisma.installment.deleteMany()
   await prisma.allocation.deleteMany()
   await prisma.contract.deleteMany()
+  await prisma.product.deleteMany()
   await prisma.client.deleteMany()
   await prisma.staff.deleteMany()
   await prisma.location.deleteMany()
@@ -97,5 +98,53 @@ describe('GET /api/contracts', () => {
 
     expect(response.body.total).toBe(0)
     expect(response.body.contracts).toHaveLength(0)
+  })
+})
+
+describe('POST /api/contracts', () => {
+  it('rejects an eventDate that is not a real calendar day instead of silently rolling it over', async () => {
+    const product = await prisma.product.create({
+      data: {
+        locationId, name: 'Vestido', category: 'Festa', size: 'M', color: 'Azul',
+        rentalPrice: 100, depositAmount: 50,
+      },
+    })
+
+    const response = await request(app)
+      .post('/api/contracts')
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({
+        clientId,
+        eventDate: '2026-02-31',
+        paymentMethod: 'PIX',
+        items: [{ productId: product.id, checkoutDate: '2026-02-28', dueDate: '2026-03-02', priceCharged: 100 }],
+        installments: [],
+      })
+
+    expect(response.status).toBe(400)
+    const created = await prisma.contract.count()
+    expect(created).toBe(0)
+  })
+
+  it('rejects an impossible checkoutDate/dueDate on a line item the same way', async () => {
+    const product = await prisma.product.create({
+      data: {
+        locationId, name: 'Vestido', category: 'Festa', size: 'M', color: 'Azul',
+        rentalPrice: 100, depositAmount: 50,
+      },
+    })
+
+    const response = await request(app)
+      .post('/api/contracts')
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({
+        clientId,
+        eventDate: '2026-10-03',
+        paymentMethod: 'PIX',
+        items: [{ productId: product.id, checkoutDate: '2026-04-31', dueDate: '2026-10-05', priceCharged: 100 }],
+        installments: [],
+      })
+
+    expect(response.status).toBe(400)
   })
 })

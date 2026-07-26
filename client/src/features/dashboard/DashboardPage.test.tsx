@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { MemoryRouter } from 'react-router'
 import '../../i18n.ts'
 import { DashboardPage } from './DashboardPage.tsx'
 import * as useDashboardModule from './useDashboard.ts'
@@ -9,6 +10,10 @@ import * as useClientsModule from '../clients/useClients.ts'
 function mockProductsAndClients() {
   vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [], isLoading: false } as never)
   vi.spyOn(useClientsModule, 'useClients').mockReturnValue({ data: [], isLoading: false } as never)
+}
+
+function renderDashboard() {
+  return render(<DashboardPage />, { wrapper: MemoryRouter })
 }
 
 describe('DashboardPage', () => {
@@ -23,7 +28,7 @@ describe('DashboardPage', () => {
       isError: false,
     })
 
-    const { container } = render(<DashboardPage />)
+    const { container } = renderDashboard()
     const root = container.firstElementChild as HTMLElement
     expect(root.className).toContain('min-h-0')
 
@@ -51,7 +56,7 @@ describe('DashboardPage', () => {
       isError: false,
     })
 
-    render(<DashboardPage />)
+    renderDashboard()
 
     expect(screen.getByText('Saindo hoje')).toBeInTheDocument()
     // Stat values render via CountUp, an animated counter (spring-based, not
@@ -72,7 +77,7 @@ describe('DashboardPage', () => {
       isError: false,
     })
 
-    render(<DashboardPage />)
+    renderDashboard()
 
     expect(screen.getByText('Carregando...')).toBeInTheDocument()
     expect(screen.queryByText('Saindo hoje')).not.toBeInTheDocument()
@@ -91,7 +96,7 @@ describe('DashboardPage', () => {
       isError: true,
     })
 
-    render(<DashboardPage />)
+    renderDashboard()
 
     expect(screen.getByText('Erro ao carregar dados do painel. Tente novamente.')).toBeInTheDocument()
     expect(screen.queryByText('Saindo hoje')).not.toBeInTheDocument()
@@ -115,7 +120,7 @@ describe('DashboardPage', () => {
       isError: false,
     })
 
-    render(<DashboardPage />)
+    renderDashboard()
 
     expect(screen.getByText('Próximas alocações')).toBeInTheDocument()
     expect(screen.getByText('Vestido Azul — Maria Silva')).toBeInTheDocument()
@@ -132,7 +137,7 @@ describe('DashboardPage', () => {
       isError: false,
     })
 
-    render(<DashboardPage />)
+    renderDashboard()
 
     expect(screen.getByText('Nada programado para os próximos dias.')).toBeInTheDocument()
   })

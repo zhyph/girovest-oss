@@ -1,5 +1,7 @@
 {
   "title": "Produtos",
+  "newTitle": "Novo produto",
+  "editTitle": "Editar produto",
   "searchPlaceholder": "Buscar por nome, categoria ou cor...",
   "fields": {
     "name": "Nome",

@@ -29,7 +29,7 @@ function mockProductHooks(
   vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [product] } as never)
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' },
-    isLoadingStaff: false, login: vi.fn(), logout: vi.fn(), isLoggedIn: true,
+    isLoadingStaff: false, isErrorStaff: false, refetchStaff: vi.fn(), login: vi.fn(), logout: vi.fn(), isLoggedIn: true,
   })
 }
 
@@ -37,9 +37,9 @@ describe('ProductDrawer', () => {
   it('closes when the backdrop is clicked', async () => {
     const onClose = vi.fn()
     mockProductHooks()
-    const { container } = renderWithToast(<ProductDrawer product={null} onClose={onClose} />)
+    renderWithToast(<ProductDrawer product={null} onClose={onClose} />)
 
-    await userEvent.click(container.querySelector('[aria-hidden="true"]')!)
+    await userEvent.click(document.querySelector('[data-slot="sheet-overlay"]')!)
 
     expect(onClose).toHaveBeenCalledOnce()
   })
@@ -69,11 +69,14 @@ describe('ProductDrawer', () => {
     renderWithToast(<ProductDrawer product={product} onClose={vi.fn()} />)
 
     await userEvent.click(screen.getByRole('button', { name: 'Excluir' }))
-    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByText('Excluir Vestido Azul?')).toBeInTheDocument()
     expect(deleteImpl).not.toHaveBeenCalled()
 
+    // Escape dismisses the confirmation dialog on top; the drawer underneath
+    // (itself now a proper dialog) stays open rather than also closing.
     await userEvent.keyboard('{Escape}')
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.queryByText('Excluir Vestido Azul?')).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Editar produto' })).toBeInTheDocument()
     expect(deleteImpl).not.toHaveBeenCalled()
   })
 
@@ -226,10 +229,10 @@ describe('ProductDrawer', () => {
 
   it('renders photo thumbnails large enough to be visually inspected, not icon-sized', () => {
     mockProductHooks(vi.fn())
-    const { container } = renderWithToast(
+    renderWithToast(
       <ProductDrawer product={{ ...product, photos: ['https://example.com/a.jpg'] }} onClose={vi.fn()} />,
     )
-    const thumbnail = container.querySelector('img[src="https://example.com/a.jpg"]')
+    const thumbnail = document.querySelector('img[src="https://example.com/a.jpg"]')
     expect(thumbnail).toHaveClass('h-16', 'w-16')
   })
 

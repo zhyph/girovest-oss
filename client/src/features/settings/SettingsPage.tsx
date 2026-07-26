@@ -65,7 +65,7 @@ export function SettingsPage() {
                   {...register(`clauses.${index}.text`)}
                   aria-label={t('clauses.textFieldAria')}
                   rows={2}
-                  className="h-auto min-h-[3.5rem] w-full rounded-md border border-border-soft bg-white px-3 py-2 text-sm text-ink transition-colors hover:border-brand-300 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30"
+                  className="min-h-[3.5rem] w-full resize-y rounded-md border border-border-soft bg-white px-3 py-2 text-sm text-ink transition-colors [field-sizing:content] hover:border-brand-300 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30"
                 />
                 <Button
                   type="button"

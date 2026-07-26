@@ -32,13 +32,15 @@ export function ClientsPage() {
         <h1 className="text-xl font-semibold">{t('title')}</h1>
         <Button onClick={() => setEditing(null)}>{t('common:actions.create', { ns: 'common' })}</Button>
       </div>
-      <Input
-        value={search}
-        onChange={(event) => setSearch(event.target.value)}
-        placeholder={t('searchPlaceholder')}
-        className="mb-3 flex-shrink-0"
-        aria-label={t('searchPlaceholder')}
-      />
+      {clients && clients.length > 0 && (
+        <Input
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder={t('searchPlaceholder')}
+          className="mb-3 flex-shrink-0"
+          aria-label={t('searchPlaceholder')}
+        />
+      )}
       <div className="min-h-0 flex-1 overflow-y-auto">
         {clients && clients.length === 0 && <p className="text-muted-text">{t('empty')}</p>}
         {clients && clients.length > 0 && filteredClients?.length === 0 && (

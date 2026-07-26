@@ -22,7 +22,7 @@ describe('LoginPage', () => {
   it('submits the entered credentials to login()', async () => {
     const login = vi.fn().mockResolvedValue(undefined)
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
-      staff: undefined, isLoadingStaff: false, login, logout: vi.fn(), isLoggedIn: false,
+      staff: undefined, isLoadingStaff: false, isErrorStaff: false, refetchStaff: vi.fn(), login, logout: vi.fn(), isLoggedIn: false,
     })
     vi.spyOn(useSetupModule, 'useSetupStatus').mockReturnValue({
       data: { needsSetup: false },
@@ -39,7 +39,7 @@ describe('LoginPage', () => {
   it('shows a translated error message when login rejects', async () => {
     const login = vi.fn().mockRejectedValue({ code: 'INVALID_CREDENTIALS', message: 'nope' })
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
-      staff: undefined, isLoadingStaff: false, login, logout: vi.fn(), isLoggedIn: false,
+      staff: undefined, isLoadingStaff: false, isErrorStaff: false, refetchStaff: vi.fn(), login, logout: vi.fn(), isLoggedIn: false,
     })
     vi.spyOn(useSetupModule, 'useSetupStatus').mockReturnValue({
       data: { needsSetup: false },
@@ -57,6 +57,8 @@ describe('LoginPage', () => {
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
       staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' },
       isLoadingStaff: false,
+      isErrorStaff: false,
+      refetchStaff: vi.fn(),
       login: vi.fn(),
       logout: vi.fn(),
       isLoggedIn: true,

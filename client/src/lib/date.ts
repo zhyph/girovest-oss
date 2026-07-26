@@ -14,3 +14,19 @@ export function parseDateOnly(value: string): Date {
 export function formatDate(date: Date, locale: string, options: Intl.DateTimeFormatOptions): string {
   return new Intl.DateTimeFormat(locale, options).format(date)
 }
+
+/**
+ * A regex-shaped YYYY-MM-DD string isn't necessarily a real calendar day —
+ * `new Date(2026, 1, 31)` silently rolls over to March 3rd rather than
+ * throwing, so the only reliable check is constructing the date and
+ * confirming its components round-trip unchanged.
+ */
+export function isValidIsoDate(iso: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso)
+  if (!match) return false
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const date = new Date(year, month - 1, day)
+  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day
+}
