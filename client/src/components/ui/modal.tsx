@@ -15,7 +15,7 @@ export function Modal({
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
       <DialogContent showCloseButton={false} className="max-w-sm gap-0 p-5">
-        <DialogTitle className="mb-3 text-base font-semibold text-ink">{title}</DialogTitle>
+        <DialogTitle className="mb-3 text-base font-semibold text-foreground">{title}</DialogTitle>
         {children}
       </DialogContent>
     </Dialog>

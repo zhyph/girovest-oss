@@ -39,7 +39,7 @@ function NavLinks({ alwaysShowLabels, onNavigate }: { alwaysShowLabels?: boolean
           className={({ isActive }) =>
             cn(
               'flex items-center gap-2 rounded-md px-2 py-2 text-sm whitespace-nowrap',
-              isActive ? 'bg-brand-50 text-brand-700' : 'text-ink hover:bg-brand-50',
+              isActive ? 'bg-secondary text-secondary-foreground' : 'text-foreground hover:bg-secondary',
             )
           }
         >
@@ -78,27 +78,27 @@ export function Sidebar() {
 
   return (
     <>
-      <div className="flex flex-shrink-0 items-center justify-between border-b border-border-soft bg-white px-2 py-2 lg:hidden">
+      <div className="flex flex-shrink-0 items-center justify-between border-b border-border bg-card px-2 py-2 lg:hidden">
         <Button variant="ghost" size="icon" onClick={() => setMobileOpen(true)} aria-label={t('actions.openMenu')}>
           <Menu size={20} />
         </Button>
-        <span className="truncate text-base font-semibold text-brand-600">{shopName}</span>
+        <span className="truncate text-base font-semibold text-primary">{shopName}</span>
         <span className="w-10" aria-hidden="true" />
       </div>
 
       <nav
         className={cn(
-          'group hidden w-16 shrink-0 flex-col gap-1 overflow-hidden border-r border-border-soft bg-white p-3',
+          'group hidden w-16 shrink-0 flex-col gap-1 overflow-hidden border-r border-border bg-card p-3',
           'transition-[width] duration-150 hover:w-48 focus-within:w-48 lg:flex lg:w-48',
         )}
       >
-        <div className="mb-3 truncate px-2 text-lg font-semibold whitespace-nowrap text-brand-600">
+        <div className="mb-3 truncate px-2 text-lg font-semibold whitespace-nowrap text-primary">
           <span className="hidden group-hover:inline group-focus-within:inline lg:inline">{shopName}</span>
         </div>
         <NavLinks />
         {staff && (
-          <div className="mt-auto flex flex-col gap-2 border-t border-border-soft px-2 pt-3">
-            <div className="truncate text-xs whitespace-nowrap text-muted-text">
+          <div className="mt-auto flex flex-col gap-2 border-t border-border px-2 pt-3">
+            <div className="truncate text-xs whitespace-nowrap text-muted-foreground">
               <span className="hidden group-hover:inline group-focus-within:inline lg:inline">{staff.name}</span>
             </div>
             <Button variant="ghost" size="sm" className="justify-start gap-2 whitespace-nowrap px-0" onClick={logout}>
@@ -123,8 +123,8 @@ export function Sidebar() {
           <SheetBody className="flex flex-col gap-1">
             <NavLinks alwaysShowLabels onNavigate={() => setMobileOpen(false)} />
             {staff && (
-              <div className="mt-auto flex flex-col gap-2 border-t border-border-soft pt-3">
-                <div className="truncate text-xs text-muted-text">{staff.name}</div>
+              <div className="mt-auto flex flex-col gap-2 border-t border-border pt-3">
+                <div className="truncate text-xs text-muted-foreground">{staff.name}</div>
                 <Button variant="ghost" size="sm" className="justify-start gap-2" onClick={logout}>
                   <LogOut size={16} className="shrink-0" />
                   {t('actions.logout')}

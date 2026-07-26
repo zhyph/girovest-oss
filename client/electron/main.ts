@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme } from 'electron'
 import { spawn, type ChildProcess } from 'child_process'
 import crypto from 'crypto'
 import fs from 'fs'
@@ -227,6 +227,10 @@ function createWindow() {
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
+    // Match the renderer theme's --background (src/index.css) so opening or
+    // resizing the window doesn't flash white before the first paint when
+    // the app renders dark.
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#241c1b' : '#faf6f0',
     webPreferences: {
       preload: path.join(import.meta.dirname, '../preload/index.cjs'),
     },
@@ -252,6 +256,16 @@ if (app) {
   // after whenReady()) is a no-op and userData silently lands in the wrong
   // directory (girovest-client instead of girovest).
   app.setName('girovest')
+
+  // Keep native chrome (menus, dialogs, and the window backgroundColor
+  // above for windows created later) in step with the in-app theme choice.
+  // The renderer sends this on boot and on every change via the preload
+  // bridge; 'system' resets Electron to following the OS preference.
+  ipcMain.on('theme:set', (_event, preference: unknown) => {
+    if (preference === 'light' || preference === 'dark' || preference === 'system') {
+      nativeTheme.themeSource = preference
+    }
+  })
 
   app.whenReady().then(async () => {
     const started = await startServer()

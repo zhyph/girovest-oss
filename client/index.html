@@ -5,6 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>Girovest</title>
+    <script>
+      // Pre-paint theme bootstrap: apply a stored explicit theme choice
+      // before the app bundle loads, so a user override never flashes the
+      // OS-default theme. Kept in sync afterwards by src/lib/useTheme.ts.
+      try {
+        var storedTheme = localStorage.getItem('theme')
+        if (storedTheme === 'dark' || storedTheme === 'light') {
+          document.documentElement.classList.add(storedTheme)
+        }
+      } catch (error) {
+        /* partitioned/sandboxed storage: fall through to the OS preference */
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

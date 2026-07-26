@@ -6,13 +6,17 @@ import { X } from 'lucide-react'
 import { Button } from '../../components/ui/button.tsx'
 import { PhoneInput } from '../../components/ui/phone-input.tsx'
 import { showErrorToast, showSuccessToast } from '../../lib/toast.ts'
+import { useTheme, type ThemePreference } from '../../lib/useTheme.ts'
 import { locationSettingsSchema, type LocationSettingsFormValues } from './settingsSchemas.ts'
 import { useLocationSettings, useUpdateLocationSettings } from './useLocationSettings.ts'
+
+const THEME_OPTIONS: ThemePreference[] = ['system', 'light', 'dark']
 
 export function SettingsPage() {
   const { t } = useTranslation('settings')
   const { data: settings, isLoading } = useLocationSettings()
   const updateSettings = useUpdateLocationSettings()
+  const { theme, setTheme } = useTheme()
 
   const { handleSubmit, control, register, reset } = useForm<LocationSettingsFormValues>({
     resolver: zodResolver(locationSettingsSchema),
@@ -47,6 +51,23 @@ export function SettingsPage() {
       <h1 className="mb-4 flex-shrink-0 text-xl font-semibold">{t('title')}</h1>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2" role="group" aria-labelledby="appearance-label">
+            <span id="appearance-label" className="text-sm font-medium">{t('appearance.title')}</span>
+            <div className="flex gap-2">
+              {THEME_OPTIONS.map((option) => (
+                <Button
+                  key={option}
+                  type="button"
+                  variant={theme === option ? 'primary' : 'secondary'}
+                  size="sm"
+                  aria-pressed={theme === option}
+                  onClick={() => setTheme(option)}
+                >
+                  {t(`appearance.options.${option}`)}
+                </Button>
+              ))}
+            </div>
+          </div>
           <label className="flex max-w-xs flex-col gap-1 text-sm">
             {t('fields.phone')}
             <Controller
@@ -65,7 +86,7 @@ export function SettingsPage() {
                   {...register(`clauses.${index}.text`)}
                   aria-label={t('clauses.textFieldAria')}
                   rows={2}
-                  className="min-h-[3.5rem] w-full resize-y rounded-md border border-border-soft bg-white px-3 py-2 text-sm text-ink transition-colors [field-sizing:content] hover:border-brand-300 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30"
+                  className="min-h-[3.5rem] w-full resize-y rounded-md border border-input bg-card px-3 py-2 text-sm text-foreground transition-colors [field-sizing:content] hover:border-input-hover focus:outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
                 />
                 <Button
                   type="button"

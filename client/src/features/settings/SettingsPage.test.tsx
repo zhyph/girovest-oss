@@ -1,7 +1,8 @@
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '../../i18n.ts'
+import { setThemePreference } from '../../lib/useTheme.ts'
 import { SettingsPage } from './SettingsPage.tsx'
 import * as useLocationSettingsModule from './useLocationSettings.ts'
 import { Toaster } from '../../components/ui/sonner.tsx'
@@ -32,7 +33,40 @@ function mockSettingsHooks(updateImpl: (...args: never[]) => Promise<unknown> = 
   } as never)
 }
 
+// The theme store is module-level, so an explicit choice made in one test
+// would leak into the next; 'system' resets the store, the stored key, and
+// the root class in one call.
+afterEach(() => {
+  setThemePreference('system')
+})
+
 describe('SettingsPage', () => {
+  it('renders the three appearance options with the current selection pressed', () => {
+    mockSettingsHooks()
+    renderWithToast(<SettingsPage />)
+
+    const group = screen.getByRole('group', { name: 'Aparência' })
+    const systemButton = within(group).getByRole('button', { name: 'Sistema' })
+    const lightButton = within(group).getByRole('button', { name: 'Claro' })
+    const darkButton = within(group).getByRole('button', { name: 'Escuro' })
+
+    expect(systemButton).toHaveAttribute('aria-pressed', 'true')
+    expect(lightButton).toHaveAttribute('aria-pressed', 'false')
+    expect(darkButton).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('applies the root class, persists the choice, and moves aria-pressed on selection', async () => {
+    mockSettingsHooks()
+    renderWithToast(<SettingsPage />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Escuro' }))
+
+    expect(document.documentElement.classList.contains('dark')).toBe(true)
+    expect(localStorage.getItem('theme')).toBe('dark')
+    expect(screen.getByRole('button', { name: 'Escuro' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Sistema' })).toHaveAttribute('aria-pressed', 'false')
+  })
+
   it('shows the current phone and clause rows', () => {
     mockSettingsHooks()
     renderWithToast(<SettingsPage />)

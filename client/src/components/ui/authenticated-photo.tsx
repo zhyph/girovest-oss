@@ -13,7 +13,7 @@ export function AuthenticatedPhoto({ url, alt, className }: AuthenticatedPhotoPr
   const isRemotePath = url.startsWith('/api/')
   const authenticatedUrl = useAuthenticatedImageUrl(isRemotePath ? url : null)
   if (isRemotePath && !authenticatedUrl) {
-    return <div className={className + ' bg-gray-100'} />
+    return <div className={className + ' bg-muted'} />
   }
   return <img src={isRemotePath ? authenticatedUrl! : url} alt={alt} className={className} />
 }

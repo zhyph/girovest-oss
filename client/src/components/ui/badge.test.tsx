@@ -10,6 +10,6 @@ describe('Badge', () => {
 
   it('applies the tone-specific color classes', () => {
     render(<Badge tone="danger">Atrasado</Badge>)
-    expect(screen.getByText('Atrasado')).toHaveClass('bg-red-100', 'text-red-700')
+    expect(screen.getByText('Atrasado')).toHaveClass('bg-destructive-subtle', 'text-destructive-subtle-foreground')
   })
 })

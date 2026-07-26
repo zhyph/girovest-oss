@@ -41,10 +41,10 @@ export const DateInput = forwardRef<HTMLInputElement, DateInputProps>(
             onChange(digitsToIso(nextDigits))
           }}
           className={cn(
-            'h-10 w-full rounded-md border border-border-soft bg-white py-2 pr-9 pl-3 text-sm text-ink placeholder:text-muted-text transition-colors',
-            'hover:border-brand-300',
-            'focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30',
-            'aria-invalid:border-red-400 aria-invalid:focus:border-red-500 aria-invalid:focus:ring-red-500/30',
+            'h-10 w-full rounded-md border border-input bg-card py-2 pr-9 pl-3 text-sm text-foreground placeholder:text-muted-foreground transition-colors',
+            'hover:border-input-hover',
+            'focus:outline-none focus:border-ring focus:ring-2 focus:ring-ring/30',
+            'aria-invalid:border-destructive aria-invalid:focus:border-destructive aria-invalid:focus:ring-destructive/30',
             'disabled:cursor-not-allowed disabled:opacity-50',
             className,
           )}
@@ -55,7 +55,7 @@ export const DateInput = forwardRef<HTMLInputElement, DateInputProps>(
           tabIndex={-1}
           aria-label={t('actions.pickDate')}
           onClick={() => nativeDateRef.current?.showPicker?.()}
-          className="absolute top-1/2 right-1 -translate-y-1/2 rounded p-1.5 text-muted-text transition-colors hover:text-brand-600"
+          className="absolute top-1/2 right-1 -translate-y-1/2 rounded p-1.5 text-muted-foreground transition-colors hover:text-primary"
         >
           <CalendarIcon size={16} />
         </button>

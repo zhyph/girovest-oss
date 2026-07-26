@@ -35,9 +35,9 @@ export const MaskedTextInput = forwardRef<HTMLInputElement, MaskedTextInputProps
           onChange(formatted)
         }}
         className={cn(
-          'h-10 w-full rounded-md border border-border-soft bg-white px-3 text-sm text-ink placeholder:text-muted-text transition-colors',
-          'hover:border-brand-300',
-          'focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30',
+          'h-10 w-full rounded-md border border-input bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground transition-colors',
+          'hover:border-input-hover',
+          'focus:outline-none focus:border-ring focus:ring-2 focus:ring-ring/30',
           'disabled:cursor-not-allowed disabled:opacity-50',
           className,
         )}

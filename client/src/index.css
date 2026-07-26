@@ -24,31 +24,177 @@
   --shadow-soft: 0 1px 2px 0 rgb(54 42 40 / 0.05), 0 10px 25px -10px rgb(122 47 64 / 0.18);
 }
 
+/*
+ * Semantic color tokens.
+ *
+ * Theming architecture:
+ *  1. `:root, html.light` below holds the light values, declared exactly
+ *     once. Bare `:root` makes them the no-JS fallback for every browser, so
+ *     the correct theme always paints on first load with zero script
+ *     execution; the `html.light` selector in the same list re-declares them
+ *     at (0,1,1) specificity so an explicit light choice also wins over the
+ *     OS dark preference (see 3).
+ *  2. `html.dark` re-declares the variables with dark values at (0,1,1),
+ *     beating the bare `:root` light block — an explicit dark choice wins
+ *     regardless of OS preference.
+ *  3. The `prefers-color-scheme: dark` media query applies the same dark
+ *     values via `html:not(.light)` — also (0,1,1). With no root class it
+ *     beats the (0,1,0) `:root` light block, so an OS-level dark preference
+ *     applies automatically with no JS; with `class="light"` it simply
+ *     doesn't match, so the `html.light` light block holds.
+ *  4. Both dark blocks map onto the `--palette-dark-*` literals declared
+ *     once on `:root` below, so they cannot drift apart.
+ *  5. The root class itself is applied pre-paint by a tiny inline script in
+ *     index.html (reads localStorage) and kept in sync afterwards by the
+ *     store in src/lib/useTheme.ts.
+ *  6. Every downstream token (`@theme inline` below) and every component
+ *     reads colors through these variable names, never through a literal
+ *     hex value or a `dark:` utility. To add another theme later (e.g. a
+ *     "sepia" or high-contrast variant), add one more `html.theme-name`
+ *     block that redeclares the same variable names with new values —
+ *     nothing else needs to change.
+ *
+ * Contrast: every foreground/background pairing below (background,
+ * card, popover, primary, secondary, muted, accent, destructive,
+ * destructive-subtle, success, warning) is verified at >= 4.5:1 (WCAG AA
+ * for text) in both themes. `input`, `input-hover` and `ring` are non-text
+ * UI-component boundaries and are verified at >= 3:1 against `background`
+ * in both themes. `border` is a decorative divider (card/dialog edges) with
+ * no contrast requirement under WCAG 1.4.11 and is intentionally subtle.
+ * Headroom notes: in light, `--primary` on white is 4.57:1 and
+ * `--muted-foreground` on `--muted` is 4.56:1 — both clear AA, neither
+ * survives a nudge, treat them as pinned.
+ */
 :root {
+  /*
+   * Dark palette literals, declared once so the two dark blocks below (the
+   * explicit `html.dark` override and the OS-preference media query) share
+   * a single source of truth. Components never read these directly — only
+   * the semantic tokens.
+   */
+  --palette-dark-background: #241c1b;
+  --palette-dark-foreground: #f3e9e2;
+  --palette-dark-card: #2e2422;
+  --palette-dark-card-foreground: #f3e9e2;
+  --palette-dark-popover: #2e2422;
+  --palette-dark-popover-foreground: #f3e9e2;
+  --palette-dark-primary: #e39aab;
+  --palette-dark-primary-foreground: #241c1b;
+  --palette-dark-secondary: #3a2830;
+  --palette-dark-secondary-foreground: #f3d9de;
+  --palette-dark-muted: #332725;
+  --palette-dark-muted-foreground: #c9b8b0;
+  --palette-dark-accent: #3a2830;
+  --palette-dark-accent-foreground: #f3d9de;
+  --palette-dark-destructive: #e5828a;
+  --palette-dark-destructive-foreground: #241c1b;
+  --palette-dark-destructive-subtle: #422220;
+  --palette-dark-destructive-subtle-foreground: #f3b6ba;
+  --palette-dark-success: #1c3322;
+  --palette-dark-success-foreground: #b7e3c0;
+  --palette-dark-warning: #3a2c10;
+  --palette-dark-warning-foreground: #f0d18a;
+  --palette-dark-border: #4a3a37;
+  --palette-dark-input: #da9aa8;
+  --palette-dark-input-hover: #e8b6c1;
+  --palette-dark-ring: #e39aab;
+}
+
+:root,
+html.light {
   color-scheme: light;
 
-  /* shadcn/ui semantic tokens, mapped onto the warm-boutique palette above so
-     generated components inherit the same visual identity instead of the
-     default stone neutrals. */
   --background: #faf6f0; /* cream */
   --foreground: #362a28; /* ink */
   --card: #ffffff;
   --card-foreground: #362a28;
   --popover: #ffffff;
   --popover-foreground: #362a28;
-  --primary: #b85c6e; /* brand-500 */
+  --primary: #b6586b; /* brand-500, darkened ~1% lightness for AA on white text */
   --primary-foreground: #ffffff;
   --secondary: #fbeef1; /* brand-50 */
   --secondary-foreground: #7a2f40; /* brand-700 */
   --muted: #f4ece4;
-  --muted-foreground: #8c7a72; /* muted */
+  --muted-foreground: #776861; /* darkened from brand muted-text for AA */
   --accent: #fbeef1; /* brand-50 */
   --accent-foreground: #7a2f40; /* brand-700 */
   --destructive: #b3261e;
-  --border: #e9dcd3; /* border-soft */
-  --input: #e9dcd3;
+  --destructive-foreground: #ffffff;
+  --destructive-subtle: #fbe7e5; /* opaque pale red, weight-matched to success/warning */
+  --destructive-subtle-foreground: #8c1d18; /* 7.67:1 on destructive-subtle */
+  --success: #e3f3e6;
+  --success-foreground: #1e5c2e;
+  --warning: #fbedd0;
+  --warning-foreground: #7a4b06;
+  --border: #e9dcd3; /* border-soft — decorative, not a UI-component boundary */
+  --input: #b85c6e; /* brand-500 — resting form-control border, 3:1+ on background */
+  --input-hover: #9c4356; /* brand-600 — hovered form-control border, one step heavier than --input */
   --ring: #b85c6e; /* brand-500 */
   --radius: 0.5rem;
+}
+
+html.dark {
+  color-scheme: dark;
+
+  --background: var(--palette-dark-background);
+  --foreground: var(--palette-dark-foreground);
+  --card: var(--palette-dark-card);
+  --card-foreground: var(--palette-dark-card-foreground);
+  --popover: var(--palette-dark-popover);
+  --popover-foreground: var(--palette-dark-popover-foreground);
+  --primary: var(--palette-dark-primary);
+  --primary-foreground: var(--palette-dark-primary-foreground);
+  --secondary: var(--palette-dark-secondary);
+  --secondary-foreground: var(--palette-dark-secondary-foreground);
+  --muted: var(--palette-dark-muted);
+  --muted-foreground: var(--palette-dark-muted-foreground);
+  --accent: var(--palette-dark-accent);
+  --accent-foreground: var(--palette-dark-accent-foreground);
+  --destructive: var(--palette-dark-destructive);
+  --destructive-foreground: var(--palette-dark-destructive-foreground);
+  --destructive-subtle: var(--palette-dark-destructive-subtle);
+  --destructive-subtle-foreground: var(--palette-dark-destructive-subtle-foreground);
+  --success: var(--palette-dark-success);
+  --success-foreground: var(--palette-dark-success-foreground);
+  --warning: var(--palette-dark-warning);
+  --warning-foreground: var(--palette-dark-warning-foreground);
+  --border: var(--palette-dark-border);
+  --input: var(--palette-dark-input);
+  --input-hover: var(--palette-dark-input-hover);
+  --ring: var(--palette-dark-ring);
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not(.light) {
+    color-scheme: dark;
+
+    --background: var(--palette-dark-background);
+    --foreground: var(--palette-dark-foreground);
+    --card: var(--palette-dark-card);
+    --card-foreground: var(--palette-dark-card-foreground);
+    --popover: var(--palette-dark-popover);
+    --popover-foreground: var(--palette-dark-popover-foreground);
+    --primary: var(--palette-dark-primary);
+    --primary-foreground: var(--palette-dark-primary-foreground);
+    --secondary: var(--palette-dark-secondary);
+    --secondary-foreground: var(--palette-dark-secondary-foreground);
+    --muted: var(--palette-dark-muted);
+    --muted-foreground: var(--palette-dark-muted-foreground);
+    --accent: var(--palette-dark-accent);
+    --accent-foreground: var(--palette-dark-accent-foreground);
+    --destructive: var(--palette-dark-destructive);
+    --destructive-foreground: var(--palette-dark-destructive-foreground);
+    --destructive-subtle: var(--palette-dark-destructive-subtle);
+    --destructive-subtle-foreground: var(--palette-dark-destructive-subtle-foreground);
+    --success: var(--palette-dark-success);
+    --success-foreground: var(--palette-dark-success-foreground);
+    --warning: var(--palette-dark-warning);
+    --warning-foreground: var(--palette-dark-warning-foreground);
+    --border: var(--palette-dark-border);
+    --input: var(--palette-dark-input);
+    --input-hover: var(--palette-dark-input-hover);
+    --ring: var(--palette-dark-ring);
+  }
 }
 
 @theme inline {
@@ -67,16 +213,24 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-subtle: var(--destructive-subtle);
+  --color-destructive-subtle-foreground: var(--destructive-subtle-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
+  --color-input-hover: var(--input-hover);
   --color-ring: var(--ring);
 }
 
 body {
   margin: 0;
   font-family: system-ui, -apple-system, sans-serif;
-  background-color: var(--color-cream);
-  color: var(--color-ink);
+  background-color: var(--color-background);
+  color: var(--color-foreground);
 }
 
 @page {

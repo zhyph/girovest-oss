@@ -1,5 +1,13 @@
 {
   "title": "Configurações",
+  "appearance": {
+    "title": "Aparência",
+    "options": {
+      "system": "Sistema",
+      "light": "Claro",
+      "dark": "Escuro"
+    }
+  },
   "fields": {
     "phone": "Telefone"
   },

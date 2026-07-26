@@ -4,10 +4,10 @@ import { cn } from '../../lib/cn.ts'
 type BadgeTone = 'neutral' | 'success' | 'warning' | 'danger'
 
 const toneClasses: Record<BadgeTone, string> = {
-  neutral: 'bg-gray-100 text-gray-700',
-  success: 'bg-green-100 text-green-700',
-  warning: 'bg-amber-100 text-amber-700',
-  danger: 'bg-red-100 text-red-700',
+  neutral: 'bg-muted text-muted-foreground',
+  success: 'bg-success text-success-foreground',
+  warning: 'bg-warning text-warning-foreground',
+  danger: 'bg-destructive-subtle text-destructive-subtle-foreground',
 }
 
 export function Badge({
