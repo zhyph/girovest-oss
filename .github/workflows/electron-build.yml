@@ -80,9 +80,16 @@ jobs:
           GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
 
       - uses: actions/upload-artifact@v7
+        # Tag builds already ship these installers as release assets on the
+        # public releases repo (free); duplicating them as run artifacts at
+        # the default 90-day retention is what exhausted the account's 0.5 GB
+        # Actions storage quota. Keep artifacts only for manual dispatch runs,
+        # which don't publish anywhere else, and expire them fast.
+        if: github.event_name == 'workflow_dispatch'
         with:
           name: girovest-${{ matrix.os }}
           path: |
             client/release/*.exe
             client/release/*.AppImage
           if-no-files-found: error
+          retention-days: 3
