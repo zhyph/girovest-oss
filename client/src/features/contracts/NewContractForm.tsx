@@ -6,6 +6,7 @@ import { X } from 'lucide-react'
 import { Button } from '../../components/ui/button.tsx'
 import { CurrencyInput } from '../../components/ui/currency-input.tsx'
 import { DateInput } from '../../components/ui/date-input.tsx'
+import { Select } from '../../components/ui/select.tsx'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose, SheetBody } from '../../components/ui/sheet.tsx'
 import { showErrorToast } from '../../lib/toast.ts'
 import { useLocale } from '../../lib/LocaleContext.tsx'
@@ -45,20 +46,16 @@ function ItemRow({
   const availability = useProductAvailability(productId, checkoutDate, dueDate)
 
   return (
-    <div className="flex flex-col gap-2 rounded-md border border-border-soft p-2">
+    <div className="flex flex-col gap-2 rounded-md border border-border p-2">
       <div className="flex items-end gap-2">
         <label className="flex flex-1 flex-col gap-1 text-sm">
           {t('fields.product')}
-          <select
-            {...register(`items.${index}.productId`)}
-            aria-label={t('fields.product')}
-            className="h-10 rounded-md border border-border-soft px-2"
-          >
+          <Select {...register(`items.${index}.productId`)} aria-label={t('fields.product')}>
             <option value="">—</option>
             {activeProducts.map((product) => (
               <option key={product.id} value={product.id}>{product.name}</option>
             ))}
-          </select>
+          </Select>
         </label>
         {showRemove && (
           <Button type="button" variant="ghost" size="icon" onClick={onRemove} aria-label={t('items.remove')}>
@@ -81,7 +78,7 @@ function ItemRow({
               />
             )}
           />
-          {checkoutDateError && <span className="text-xs text-red-600">{checkoutDateError}</span>}
+          {checkoutDateError && <span className="text-xs text-destructive">{checkoutDateError}</span>}
         </label>
         <label className="flex flex-1 flex-col gap-1 text-sm">
           {t('fields.dueDate')}
@@ -97,7 +94,7 @@ function ItemRow({
               />
             )}
           />
-          {dueDateError && <span className="text-xs text-red-600">{dueDateError}</span>}
+          {dueDateError && <span className="text-xs text-destructive">{dueDateError}</span>}
         </label>
       </div>
       <label className="flex flex-col gap-1 text-sm">
@@ -111,7 +108,7 @@ function ItemRow({
         />
       </label>
       {productId && checkoutDate && dueDate && availability.data?.available === false && (
-        <span className="text-xs text-red-600">{t('unavailableProduct')}</span>
+        <span className="text-xs text-destructive">{t('unavailableProduct')}</span>
       )}
     </div>
   )
@@ -182,16 +179,16 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3">
           <label className="flex flex-col gap-1 text-sm">
             {t('fields.client')}
-            <select {...register('clientId')} aria-label={t('fields.client')} className="h-10 rounded-md border border-border-soft px-2">
+            <Select {...register('clientId')} aria-label={t('fields.client')}>
               <option value="">—</option>
               {clients?.map((client) => (
                 <option key={client.id} value={client.id}>{client.name}</option>
               ))}
-            </select>
-            {errors.clientId && <span className="text-xs text-red-600">{t('validation.clientRequired')}</span>}
+            </Select>
+            {errors.clientId && <span className="text-xs text-destructive">{t('validation.clientRequired')}</span>}
           </label>
           {selectedClient && missingFields.length > 0 && (
-            <div className="flex items-center justify-between gap-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs">
+            <div className="flex items-center justify-between gap-2 rounded-md border border-warning-border bg-warning p-2 text-xs text-warning-foreground">
               <span>{t('clientReadiness.missing', { fields: missingFields.join(', ') })}</span>
               <Button type="button" size="sm" variant="secondary" onClick={() => setCompletingClient(selectedClient)}>
                 {t('clientReadiness.complete')}
@@ -213,7 +210,7 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
               )}
             />
             {errors.eventDate && (
-              <span className="text-xs text-red-600">
+              <span className="text-xs text-destructive">
                 {t(errors.eventDate.type === 'custom' ? 'validation.eventDateInvalid' : 'validation.eventDateRequired')}
               </span>
             )}
@@ -251,17 +248,13 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
           </div>
           <label className="flex flex-col gap-1 text-sm">
             {t('fields.paymentMethod')}
-            <select
-              {...register('paymentMethod')}
-              aria-label={t('fields.paymentMethod')}
-              className="h-10 rounded-md border border-border-soft px-2"
-            >
+            <Select {...register('paymentMethod')} aria-label={t('fields.paymentMethod')}>
               <option value="">—</option>
               {paymentMethods.map((method) => (
                 <option key={method} value={method}>{method}</option>
               ))}
-            </select>
-            {errors.paymentMethod && <span className="text-xs text-red-600">{t('validation.paymentMethodRequired')}</span>}
+            </Select>
+            {errors.paymentMethod && <span className="text-xs text-destructive">{t('validation.paymentMethodRequired')}</span>}
           </label>
           <div className="flex flex-col gap-2">
             <span className="text-sm font-medium">{t('installments.title')}</span>
@@ -282,7 +275,7 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
                     )}
                   />
                   {errors.installments?.[index]?.dueDate && (
-                    <span className="text-xs text-red-600">
+                    <span className="text-xs text-destructive">
                       {t(
                         errors.installments[index]?.dueDate?.type === 'custom'
                           ? 'validation.installmentDueDateInvalid'

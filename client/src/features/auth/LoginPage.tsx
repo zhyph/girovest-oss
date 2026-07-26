@@ -39,7 +39,7 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-cream">
+    <div className="flex min-h-screen items-center justify-center">
       <Card className="w-80">
         <CardHeader>
           <h1 className="text-lg font-semibold">{t('auth:loginTitle')}</h1>
@@ -59,7 +59,7 @@ export function LoginPage() {
               />
             </label>
             {errorCode && (
-              <p className="text-sm text-red-600">
+              <p className="text-sm text-destructive">
                 {t(`auth:errors.${errorCode}`, { defaultValue: t('common:errors.UNKNOWN') })}
               </p>
             )}

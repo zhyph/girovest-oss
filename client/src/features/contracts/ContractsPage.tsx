@@ -107,7 +107,7 @@ export function RowActions({ allocation }: { allocation: Allocation }) {
           onClose={() => setShowCancelConfirm(false)}
           title={t('common:confirmCancelAllocation.title', { ns: 'common' })}
         >
-          <p className="mb-4 text-sm text-ink">{t('common:confirmCancelAllocation.message', { ns: 'common' })}</p>
+          <p className="mb-4 text-sm text-foreground">{t('common:confirmCancelAllocation.message', { ns: 'common' })}</p>
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={() => setShowCancelConfirm(false)}>
               {t('common:actions.cancel', { ns: 'common' })}
@@ -180,7 +180,7 @@ function ContractCancelAction({ contract }: { contract: Contract }) {
         {t('cancelContract.action')}
       </Button>
       <Modal open={showConfirm} onClose={() => setShowConfirm(false)} title={t('cancelContract.confirmTitle')}>
-        <p className="mb-4 text-sm text-ink">{t('cancelContract.confirmMessage')}</p>
+        <p className="mb-4 text-sm text-foreground">{t('cancelContract.confirmMessage')}</p>
         <div className="flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={() => setShowConfirm(false)}>
             {t('common:actions.cancel', { ns: 'common' })}
@@ -268,24 +268,24 @@ export function ContractsPage() {
       )}
       <div className="min-h-0 flex-1 overflow-y-auto">
         {contracts && contracts.length === 0 && (
-          <p className="text-muted-text">{search ? t('noResults') : t('empty')}</p>
+          <p className="text-muted-foreground">{search ? t('noResults') : t('empty')}</p>
         )}
         <div className="flex flex-col gap-3">
           {contracts?.map((contract) => (
-            <div key={contract.id} className="rounded-md border border-border-soft p-3">
+            <div key={contract.id} className="rounded-md border border-border p-3">
               <div className="mb-2 flex items-center justify-between">
                 <div className="flex flex-col">
                   <span className="font-medium">
                     #{contract.number} — <span>{clientNames.get(contract.clientId) ?? contract.clientId}</span>
                   </span>
-                  <span className="text-xs text-muted-text">
+                  <span className="text-xs text-muted-foreground">
                     {formatDate(parseDateOnly(contract.eventDate), locale, { day: '2-digit', month: '2-digit', year: 'numeric' })}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Link
                     to={`/contratos/${contract.id}/imprimir`}
-                    className="inline-flex h-8 items-center justify-center rounded-md border border-border-soft bg-white px-3 text-sm font-medium text-ink transition-colors hover:border-brand-300 hover:bg-brand-50"
+                    className="inline-flex h-8 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-medium text-foreground transition-colors hover:border-ring hover:bg-secondary"
                   >
                     {t('print.action')}
                   </Link>
@@ -297,13 +297,13 @@ export function ContractsPage() {
                 {contract.allocations.map((allocation) => (
                   <div
                     key={allocation.id}
-                    className="flex items-center justify-between gap-3 rounded-md border border-border-soft p-2 text-sm"
+                    className="flex items-center justify-between gap-3 rounded-md border border-border p-2 text-sm"
                   >
                     <div className="flex min-w-0 flex-col gap-0.5">
                       <span className="truncate font-medium">
                         {productNames.get(allocation.productId) ?? allocation.productId}
                       </span>
-                      <span className="text-xs text-muted-text">
+                      <span className="text-xs text-muted-foreground">
                         {formatDate(parseDateOnly(allocation.checkoutDate), locale, { day: '2-digit', month: '2-digit', year: 'numeric' })} –{' '}
                         {formatDate(parseDateOnly(allocation.dueDate), locale, { day: '2-digit', month: '2-digit', year: 'numeric' })}
                       </span>
@@ -329,7 +329,7 @@ export function ContractsPage() {
           >
             {t('pagination.previous')}
           </Button>
-          <span className="text-muted-text">
+          <span className="text-muted-foreground">
             {t('pagination.pageOf', { page: currentPage, total: totalPages })}
           </span>
           <Button

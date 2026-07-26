@@ -16,6 +16,14 @@ export function ContractPrintView({ contract }: ContractPrintViewProps) {
   const total = contract.allocations.reduce((sum, allocation) => sum + allocation.priceCharged, 0)
 
   return (
+    // Deliberate exception to the semantic-token rule: a printed/signed
+    // contract is a fixed paper document, not a themed UI surface. The
+    // ON-SCREEN PREVIEW always renders as dark ink on the cream sheet
+    // (static `text-ink`/`text-muted-text`/`border-border-soft`/`border-ink`
+    // literals from the @theme block, on the `bg-cream` wrapper in
+    // ContractPrintPage), even in dark mode. On actual paper only the ink
+    // does the work: browsers do not print background colors unless the
+    // user enables "Background graphics".
     <article className="flex flex-col gap-6 print:gap-3 text-sm print:text-xs text-ink">
       <header className="flex flex-col gap-1 border-b border-border-soft pb-4 print:pb-2">
         <h1 className="text-lg font-semibold">{contract.location.name}</h1>

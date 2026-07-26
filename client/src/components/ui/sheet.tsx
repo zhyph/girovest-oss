@@ -15,7 +15,7 @@ function SheetOverlay({ className, ...props }: React.ComponentProps<typeof Dialo
     <DialogPrimitive.Overlay
       data-slot="sheet-overlay"
       className={cn(
-        'fixed inset-0 z-40 bg-ink/40 opacity-100 transition-opacity duration-200 starting:opacity-0',
+        'fixed inset-0 z-40 bg-overlay opacity-100 transition-opacity duration-200 starting:opacity-0',
         className,
       )}
       {...props}
@@ -40,7 +40,7 @@ function SheetContent({
       <DialogPrimitive.Content
         data-slot="sheet-content"
         className={cn(
-          'fixed z-50 flex flex-col overflow-hidden border-border-soft bg-white shadow-lg outline-none',
+          'fixed z-50 flex flex-col overflow-hidden border-border bg-card text-card-foreground shadow-lg outline-none',
           'transition-transform duration-200 ease-out',
           SIDE_CLASSES[side],
           className,
@@ -58,7 +58,7 @@ function SheetHeader({ className, ...props }: React.ComponentProps<'div'>) {
     <div
       data-slot="sheet-header"
       className={cn(
-        'flex flex-shrink-0 items-center justify-between gap-2 border-b border-border-soft px-4 py-3',
+        'flex flex-shrink-0 items-center justify-between gap-2 border-b border-border px-4 py-3',
         className,
       )}
       {...props}
@@ -70,7 +70,7 @@ function SheetTitle({ className, ...props }: React.ComponentProps<typeof DialogP
   return (
     <DialogPrimitive.Title
       data-slot="sheet-title"
-      className={cn('text-base font-semibold text-ink', className)}
+      className={cn('text-base font-semibold', className)}
       {...props}
     />
   )
@@ -91,8 +91,8 @@ function SheetClose({ className, ...props }: React.ComponentProps<typeof DialogP
     <DialogPrimitive.Close
       data-slot="sheet-close"
       className={cn(
-        'rounded-md p-1.5 text-muted-text transition-colors hover:bg-brand-50 hover:text-ink',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2',
+        'rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-secondary-foreground',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card',
         className,
       )}
       {...props}

@@ -48,10 +48,10 @@ export function SetupPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-cream px-4">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-6 px-4">
       <div className="text-center">
-        <div className="text-2xl font-semibold text-brand-600">{t('common:appName', { ns: 'common' })}</div>
-        <p className="mt-1 max-w-xs text-sm text-muted-text">{t('setup:intro')}</p>
+        <div className="text-2xl font-semibold text-primary">{t('common:appName', { ns: 'common' })}</div>
+        <p className="mt-1 max-w-xs text-sm text-muted-foreground">{t('setup:intro')}</p>
       </div>
       <Card className="w-96">
         <CardHeader>
@@ -60,7 +60,7 @@ export function SetupPage() {
         <CardBody>
           <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5">
             <fieldset className="flex flex-col gap-3">
-              <legend className="mb-1 text-xs font-semibold tracking-wide text-muted-text uppercase">
+              <legend className="mb-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                 {t('setup:sections.shop')}
               </legend>
               <label className="flex flex-col gap-1 text-sm">
@@ -71,7 +71,7 @@ export function SetupPage() {
                   aria-describedby={errors.shopName ? 'shopName-error' : undefined}
                 />
                 {errors.shopName && (
-                  <span id="shopName-error" className="text-xs text-red-600">
+                  <span id="shopName-error" className="text-xs text-destructive">
                     {t('setup:validation.shopNameRequired')}
                   </span>
                 )}
@@ -84,14 +84,14 @@ export function SetupPage() {
                   aria-describedby={errors.shopAddress ? 'shopAddress-error' : undefined}
                 />
                 {errors.shopAddress && (
-                  <span id="shopAddress-error" className="text-xs text-red-600">
+                  <span id="shopAddress-error" className="text-xs text-destructive">
                     {t('setup:validation.shopAddressRequired')}
                   </span>
                 )}
               </label>
             </fieldset>
-            <fieldset className="flex flex-col gap-3 border-t border-border-soft pt-4">
-              <legend className="mb-1 text-xs font-semibold tracking-wide text-muted-text uppercase">
+            <fieldset className="flex flex-col gap-3 border-t border-border pt-4">
+              <legend className="mb-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                 {t('setup:sections.account')}
               </legend>
               <label className="flex flex-col gap-1 text-sm">
@@ -102,7 +102,7 @@ export function SetupPage() {
                   aria-describedby={errors.ownerName ? 'ownerName-error' : undefined}
                 />
                 {errors.ownerName && (
-                  <span id="ownerName-error" className="text-xs text-red-600">
+                  <span id="ownerName-error" className="text-xs text-destructive">
                     {t('setup:validation.ownerNameRequired')}
                   </span>
                 )}
@@ -115,7 +115,7 @@ export function SetupPage() {
                   aria-describedby={errors.ownerLogin ? 'ownerLogin-error' : undefined}
                 />
                 {errors.ownerLogin && (
-                  <span id="ownerLogin-error" className="text-xs text-red-600">
+                  <span id="ownerLogin-error" className="text-xs text-destructive">
                     {t('setup:validation.ownerLoginRequired')}
                   </span>
                 )}
@@ -129,14 +129,14 @@ export function SetupPage() {
                   aria-describedby={errors.ownerPassword ? 'ownerPassword-error' : undefined}
                 />
                 {errors.ownerPassword && (
-                  <span id="ownerPassword-error" className="text-xs text-red-600">
+                  <span id="ownerPassword-error" className="text-xs text-destructive">
                     {t('setup:validation.ownerPasswordTooShort')}
                   </span>
                 )}
               </label>
             </fieldset>
             {errorCode && (
-              <p className="text-sm text-red-600">
+              <p className="text-sm text-destructive">
                 {t(`setup:errors.${errorCode}`, { defaultValue: t('common:errors.UNKNOWN') })}
               </p>
             )}

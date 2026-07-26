@@ -26,7 +26,7 @@ export class ChunkErrorBoundary extends Component<ChunkErrorBoundaryProps, Chunk
     if (this.state.hasError) {
       return (
         <div className="flex h-screen flex-col items-center justify-center gap-4 p-6 text-center">
-          <p className="text-sm text-muted-text">{i18n.t('common:errors.chunkLoadFailed')}</p>
+          <p className="text-sm text-muted-foreground">{i18n.t('common:errors.chunkLoadFailed')}</p>
           <Button type="button" onClick={() => window.location.reload()}>
             {i18n.t('common:actions.reload')}
           </Button>

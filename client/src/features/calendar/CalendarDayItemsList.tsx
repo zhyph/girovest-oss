@@ -44,7 +44,7 @@ export function CalendarDayItemsList({
               key={allocation.id}
               type="button"
               onClick={() => product && setDetailProduct(product)}
-              className="flex items-center justify-between gap-2 rounded-md border border-border-soft p-2 text-left text-sm hover:bg-brand-50"
+              className="flex items-center justify-between gap-2 rounded-md border border-border p-2 text-left text-sm hover:bg-secondary"
             >
               <div className="flex items-center gap-2">
                 {photo && (
@@ -52,12 +52,12 @@ export function CalendarDayItemsList({
                 )}
                 <div className="flex flex-col">
                   <span>{product?.name ?? allocation.productId}</span>
-                  <span className="text-xs text-muted-text">
+                  <span className="text-xs text-muted-foreground">
                     {clientNames.get(allocation.clientId) ?? allocation.clientId}
                   </span>
                 </div>
               </div>
-              <span className="text-muted-text">
+              <span className="text-muted-foreground">
                 {formatDate(parseDateOnly(allocation[dateField]), locale, { day: '2-digit', month: '2-digit' })}
               </span>
             </button>
@@ -75,7 +75,7 @@ export function CalendarDayItemsList({
           >
             {t('pagination.previous')}
           </Button>
-          <span className="text-muted-text">
+          <span className="text-muted-foreground">
             {t('pagination.pageOf', { page: currentPage + 1, total: totalPages })}
           </span>
           <Button

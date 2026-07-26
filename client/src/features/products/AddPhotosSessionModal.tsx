@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Dialog, DialogContent, DialogTitle } from '../../components/ui/dialog.tsx'
 import { Button } from '../../components/ui/button.tsx'
+import { Select } from '../../components/ui/select.tsx'
 import { showErrorToast } from '../../lib/toast.ts'
 import { useIssueProductPhotoSession } from './useProducts.ts'
 import type { PhotoTokenResponse } from './productSchemas.ts'
@@ -74,42 +75,38 @@ export function AddPhotosSessionModal({ open, onClose }: AddPhotosSessionModalPr
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
       <DialogContent className="max-w-md gap-4" showCloseButton={false}>
-        <DialogTitle className="text-base font-semibold text-ink">{t('photoIntake.modalTitle')}</DialogTitle>
+        <DialogTitle className="text-base font-semibold text-foreground">{t('photoIntake.modalTitle')}</DialogTitle>
 
         {tokenResponse && tokenResponse.candidates.length === 0 ? (
           <div className="flex flex-col items-center gap-3">
-            <p className="text-sm text-ink">{t('photoIntake.noLan')}</p>
+            <p className="text-sm text-foreground">{t('photoIntake.noLan')}</p>
             <Button type="button" variant="secondary" onClick={() => void generateToken()} disabled={issueToken.isPending}>
               {t('photoIntake.regenerate')}
             </Button>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-3">
-            <p className="text-sm text-muted-text">{t('photoIntake.instructions')}</p>
+            <p className="text-sm text-muted-foreground">{t('photoIntake.instructions')}</p>
 
             {tokenResponse && tokenResponse.candidates.length > 1 && (
               <label className="flex w-full flex-col gap-1 text-sm">
                 {t('photoIntake.pickNetwork')}
-                <select
-                  className="h-10 rounded-md border border-border-soft bg-white px-3 text-sm"
-                  value={selectedAddress}
-                  onChange={(event) => setSelectedAddress(event.target.value)}
-                >
+                <Select value={selectedAddress} onChange={(event) => setSelectedAddress(event.target.value)}>
                   {tokenResponse.candidates.map((candidate) => (
                     <option key={candidate.address} value={candidate.address}>
                       {candidate.interfaceName} ({candidate.address})
                     </option>
                   ))}
-                </select>
+                </Select>
               </label>
             )}
 
             {qrDataUrl && <img src={qrDataUrl} alt={t('photoIntake.qrAlt')} className="h-48 w-48" />}
 
             {isExpired ? (
-              <p className="text-sm text-red-600">{t('photoIntake.expired')}</p>
+              <p className="text-sm text-destructive">{t('photoIntake.expired')}</p>
             ) : (
-              <p className="text-sm text-muted-text">{t('photoIntake.waiting')}</p>
+              <p className="text-sm text-muted-foreground">{t('photoIntake.waiting')}</p>
             )}
 
             <Button type="button" variant="secondary" onClick={() => void generateToken()} disabled={issueToken.isPending}>

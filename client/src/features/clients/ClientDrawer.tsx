@@ -110,7 +110,7 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
         <label className="flex flex-col gap-1 text-sm">
           {t('fields.name')}
           <Input {...register('name')} aria-invalid={errors.name ? true : undefined} aria-describedby={errors.name ? 'client-name-error' : undefined} />
-          {errors.name && <span id="client-name-error" className="text-xs text-red-600">{t('validation.nameRequired')}</span>}
+          {errors.name && <span id="client-name-error" className="text-xs text-destructive">{t('validation.nameRequired')}</span>}
         </label>
         <label className="flex flex-col gap-1 text-sm">
           {t('fields.phone')}
@@ -121,7 +121,7 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
               <PhoneInput value={field.value} onChange={field.onChange} id="phone" aria-label={t('fields.phone')} />
             )}
           />
-          {errors.phone && <span className="text-xs text-red-600">{t('validation.phoneRequired')}</span>}
+          {errors.phone && <span className="text-xs text-destructive">{t('validation.phoneRequired')}</span>}
         </label>
         <label className="flex flex-col gap-1 text-sm">
           {t('fields.email')}
@@ -132,7 +132,7 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
             aria-invalid={errors.email ? true : undefined}
             aria-describedby={errors.email ? 'client-email-error' : undefined}
           />
-          {errors.email && <span id="client-email-error" className="text-xs text-red-600">{t('validation.emailInvalid')}</span>}
+          {errors.email && <span id="client-email-error" className="text-xs text-destructive">{t('validation.emailInvalid')}</span>}
         </label>
         <label className="flex flex-col gap-1 text-sm">
           {t('fields.notes')}
@@ -150,7 +150,7 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
                   {...register(`identityDocuments.${index}.label`)}
                   aria-label={t('identityDocuments.labelFieldAria')}
                   readOnly={isDefaultField}
-                  className={isDefaultField ? 'cursor-default bg-gray-50 text-muted-text' : undefined}
+                  className={isDefaultField ? 'cursor-default bg-muted text-muted-foreground' : undefined}
                 />
               </label>
               <label className="flex flex-1 flex-col gap-1 text-sm">
@@ -199,7 +199,7 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
                   {...register(`addressLines.${index}.label`)}
                   aria-label={t('addressLines.labelFieldAria')}
                   readOnly={isDefaultField}
-                  className={isDefaultField ? 'cursor-default bg-gray-50 text-muted-text' : undefined}
+                  className={isDefaultField ? 'cursor-default bg-muted text-muted-foreground' : undefined}
                 />
               </label>
               <label className="flex flex-1 flex-col gap-1 text-sm">
@@ -265,7 +265,7 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
           onClose={() => setConfirmingDelete(false)}
           title={t('common:confirmDelete.title', { ns: 'common', name: client.name })}
         >
-          <p className="mb-4 text-sm text-ink">{t('common:confirmDelete.message', { ns: 'common' })}</p>
+          <p className="mb-4 text-sm text-foreground">{t('common:confirmDelete.message', { ns: 'common' })}</p>
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={() => setConfirmingDelete(false)}>
               {t('common:actions.cancel', { ns: 'common' })}

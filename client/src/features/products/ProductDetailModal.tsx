@@ -24,31 +24,31 @@ export function ProductDetailModal({
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
       <DialogContent showCloseButton={false} className="max-w-lg">
-        <DialogTitle className="mb-3 text-base font-semibold text-ink">{product.name}</DialogTitle>
+        <DialogTitle className="mb-3 text-base font-semibold text-foreground">{product.name}</DialogTitle>
         <dl className="grid grid-cols-2 gap-2 text-sm">
           <div>
-            <dt className="text-xs text-muted-text">{t('fields.category')}</dt>
+            <dt className="text-xs text-muted-foreground">{t('fields.category')}</dt>
             <dd>{product.category}</dd>
           </div>
           <div>
-            <dt className="text-xs text-muted-text">{t('fields.size')}</dt>
+            <dt className="text-xs text-muted-foreground">{t('fields.size')}</dt>
             <dd>{product.size}</dd>
           </div>
           <div>
-            <dt className="text-xs text-muted-text">{t('fields.color')}</dt>
+            <dt className="text-xs text-muted-foreground">{t('fields.color')}</dt>
             <dd>{product.color}</dd>
           </div>
           <div>
-            <dt className="text-xs text-muted-text">{t('fields.rentalPrice')}</dt>
+            <dt className="text-xs text-muted-foreground">{t('fields.rentalPrice')}</dt>
             <dd>{formatCurrency(product.rentalPrice, locale, currency)}</dd>
           </div>
           <div>
-            <dt className="text-xs text-muted-text">{t('fields.depositAmount')}</dt>
+            <dt className="text-xs text-muted-foreground">{t('fields.depositAmount')}</dt>
             <dd>{formatCurrency(product.depositAmount, locale, currency)}</dd>
           </div>
         </dl>
         {product.description && (
-          <p className="mt-3 text-sm text-ink">{product.description}</p>
+          <p className="mt-3 text-sm text-foreground">{product.description}</p>
         )}
         {product.photos && product.photos.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">

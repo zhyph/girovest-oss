@@ -37,7 +37,7 @@ export function AgendaView({
   const { t } = useTranslation('calendarScreen')
 
   if (allocations.length === 0) {
-    return <p className="text-muted-text">{t('empty')}</p>
+    return <p className="text-muted-foreground">{t('empty')}</p>
   }
 
   const sorted = [...allocations].sort(
@@ -57,7 +57,7 @@ export function AgendaView({
     <div className="flex flex-col gap-4">
       {GROUP_ORDER.filter((group) => grouped.has(group)).map((group) => (
         <div key={group} className="flex flex-col gap-2">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-text">{t(`groups.${group}`)}</h2>
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t(`groups.${group}`)}</h2>
           <CalendarDayItemsList
             allocations={grouped.get(group)!}
             products={products}

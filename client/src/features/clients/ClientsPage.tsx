@@ -42,13 +42,13 @@ export function ClientsPage() {
         />
       )}
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {clients && clients.length === 0 && <p className="text-muted-text">{t('empty')}</p>}
+        {clients && clients.length === 0 && <p className="text-muted-foreground">{t('empty')}</p>}
         {clients && clients.length > 0 && filteredClients?.length === 0 && (
-          <p className="text-muted-text">{t('noResults')}</p>
+          <p className="text-muted-foreground">{t('noResults')}</p>
         )}
         {filteredClients && filteredClients.length > 0 && (
-          <div className="rounded-md border border-border-soft">
-            <div className="sticky top-0 z-10 flex justify-between bg-gray-50 px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-text">
+          <div className="rounded-md border border-border">
+            <div className="sticky top-0 z-10 flex justify-between bg-muted px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               <span>{t('fields.name')}</span>
               <span>{t('fields.phone')}</span>
             </div>
@@ -58,12 +58,12 @@ export function ClientsPage() {
                   key={client.id}
                   onClick={() => setEditing(client)}
                   className={cn(
-                    'flex justify-between p-2 text-left text-sm hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-cream',
-                    index % 2 === 1 && 'bg-gray-50/50',
+                    'flex justify-between p-2 text-left text-sm hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                    index % 2 === 1 && 'bg-muted/50',
                   )}
                 >
                   <span>{client.name}</span>
-                  <span className="text-muted-text">{client.phone}</span>
+                  <span className="text-muted-foreground">{client.phone}</span>
                 </button>
               ))}
             </div>

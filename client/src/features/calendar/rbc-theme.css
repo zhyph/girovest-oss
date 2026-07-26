@@ -1,0 +1,116 @@
+/*
+ * Semantic-token overrides for react-big-calendar's bundled light-only
+ * stylesheet. Imported by MonthView.tsx immediately AFTER the library CSS,
+ * so these rules win by source order at equal specificity, and they ride
+ * the same lazy calendar chunk.
+ *
+ * Every color reads a semantic custom property declared in src/index.css,
+ * so the light and dark palettes (and any future theme) apply here with no
+ * further work. Only month-view + toolbar surfaces are themed - the month
+ * view is the only view the app renders (views={['month']}).
+ *
+ * Contrast notes (verified against the palettes in index.css):
+ *  - event chips: --primary-foreground on --primary is an AA-verified pair.
+ *  - today highlight: --secondary vs the --card cell background is a
+ *    deliberate subtle tint in both themes; the bold date number
+ *    (.rbc-date-cell.rbc-now, library rule) carries the emphasis.
+ *  - off-range days: --muted-foreground text on --muted cells matches the
+ *    AA-verified muted pairing, and both differ visibly from in-range
+ *    (--foreground on --card) in both themes.
+ */
+
+/* Grid container and cell chrome */
+.rbc-month-view {
+  border-color: var(--border);
+  background-color: var(--card);
+}
+.rbc-header {
+  border-bottom-color: var(--border);
+  color: var(--muted-foreground);
+}
+.rbc-header + .rbc-header {
+  border-left-color: var(--border);
+}
+.rbc-month-row + .rbc-month-row {
+  border-top-color: var(--border);
+}
+.rbc-day-bg + .rbc-day-bg {
+  border-left-color: var(--border);
+}
+
+/* Day states */
+.rbc-off-range {
+  color: var(--muted-foreground);
+}
+.rbc-off-range-bg {
+  background-color: var(--muted);
+}
+.rbc-today {
+  background-color: var(--secondary);
+}
+.rbc-selected-cell {
+  background-color: color-mix(in srgb, var(--foreground) 10%, transparent);
+}
+
+/* Event chips */
+.rbc-event {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+}
+.rbc-event.rbc-selected {
+  background-color: color-mix(in srgb, var(--primary) 85%, var(--foreground));
+}
+.rbc-event:focus {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+
+/* "+N more" link */
+.rbc-show-more {
+  background-color: transparent;
+  color: var(--primary);
+}
+.rbc-show-more:hover,
+.rbc-show-more:focus {
+  color: color-mix(in srgb, var(--primary) 80%, var(--foreground));
+}
+
+/* Toolbar buttons (mirrors the app Button "secondary" variant) */
+.rbc-toolbar button {
+  color: var(--foreground);
+  background-color: var(--card);
+  border-color: var(--border);
+}
+.rbc-toolbar button:hover,
+.rbc-toolbar button:focus {
+  color: var(--foreground);
+  background-color: var(--secondary);
+  border-color: var(--ring);
+}
+.rbc-toolbar button:active,
+.rbc-toolbar button.rbc-active {
+  color: var(--foreground);
+  background-color: var(--accent);
+  border-color: var(--ring);
+  box-shadow: none;
+}
+.rbc-toolbar button:active:hover,
+.rbc-toolbar button:active:focus,
+.rbc-toolbar button.rbc-active:hover,
+.rbc-toolbar button.rbc-active:focus {
+  color: var(--foreground);
+  background-color: var(--accent);
+  border-color: var(--ring);
+}
+
+/* Overflow popup (unreachable while doShowMoreDrillDown is off and
+   onShowMore opens our own Dialog, but themed so it can never regress
+   to a white flash if that wiring changes) */
+.rbc-overlay {
+  background-color: var(--popover);
+  border-color: var(--border);
+  color: var(--popover-foreground);
+}
+.rbc-overlay-header {
+  border-bottom-color: var(--border);
+}

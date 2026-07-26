@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useQueryClient } from '@tanstack/react-query'
 import { Dialog, DialogContent, DialogTitle } from '../../components/ui/dialog.tsx'
 import { Button } from '../../components/ui/button.tsx'
+import { Select } from '../../components/ui/select.tsx'
 import { showErrorToast } from '../../lib/toast.ts'
 import { useContract, useIssueSigningToken, CONTRACTS_KEY } from './useContracts.ts'
 import type { SigningTokenResponse } from './contractSchemas.ts'
@@ -95,44 +96,40 @@ export function SignRemotelyModal({ contractId, open, onClose }: SignRemotelyMod
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
       <DialogContent className="max-w-md gap-4" showCloseButton={false}>
-        <DialogTitle className="text-base font-semibold text-ink">{t('sign.modalTitle')}</DialogTitle>
+        <DialogTitle className="text-base font-semibold text-foreground">{t('sign.modalTitle')}</DialogTitle>
 
         {isSigned ? (
-          <p className="text-sm text-ink">{t('sign.signed')}</p>
+          <p className="text-sm text-foreground">{t('sign.signed')}</p>
         ) : tokenResponse && tokenResponse.candidates.length === 0 ? (
           <div className="flex flex-col items-center gap-3">
-            <p className="text-sm text-ink">{t('sign.noLan')}</p>
+            <p className="text-sm text-foreground">{t('sign.noLan')}</p>
             <Button type="button" variant="secondary" onClick={() => void generateToken()} disabled={issueSigningToken.isPending}>
               {t('sign.regenerate')}
             </Button>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-3">
-            <p className="text-sm text-muted-text">{t('sign.instructions')}</p>
+            <p className="text-sm text-muted-foreground">{t('sign.instructions')}</p>
 
             {tokenResponse && tokenResponse.candidates.length > 1 && (
               <label className="flex w-full flex-col gap-1 text-sm">
                 {t('sign.pickNetwork')}
-                <select
-                  className="h-10 rounded-md border border-border-soft bg-white px-3 text-sm"
-                  value={selectedAddress}
-                  onChange={(event) => setSelectedAddress(event.target.value)}
-                >
+                <Select value={selectedAddress} onChange={(event) => setSelectedAddress(event.target.value)}>
                   {tokenResponse.candidates.map((candidate) => (
                     <option key={candidate.address} value={candidate.address}>
                       {candidate.interfaceName} ({candidate.address})
                     </option>
                   ))}
-                </select>
+                </Select>
               </label>
             )}
 
             {qrDataUrl && <img src={qrDataUrl} alt={t('sign.qrAlt')} className="h-48 w-48" />}
 
             {isExpired ? (
-              <p className="text-sm text-red-600">{t('sign.expired')}</p>
+              <p className="text-sm text-destructive">{t('sign.expired')}</p>
             ) : (
-              <p className="text-sm text-muted-text">{t('sign.waiting')}</p>
+              <p className="text-sm text-muted-foreground">{t('sign.waiting')}</p>
             )}
 
             <Button type="button" variant="secondary" onClick={() => void generateToken()} disabled={issueSigningToken.isPending}>

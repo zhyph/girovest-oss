@@ -16,13 +16,20 @@ export function ContractPrintPage() {
 
   return (
     <div className="mx-auto max-w-3xl p-6">
+      {/* Toolbar stays OUTSIDE the cream sheet below: its themed buttons sit
+          on the app background, never on the static paper surface. */}
       <div className="mb-4 flex justify-end gap-2 print:hidden">
         <Button variant="secondary" onClick={() => navigate(-1)}>
           {t('print.back')}
         </Button>
         <Button onClick={() => window.print()}>{t('print.action')}</Button>
       </div>
-      <ContractPrintView contract={contract} />
+      {/* Deliberate palette-literal exception (see ContractPrintView): the
+          cream "paper" sheet wraps only the document. On paper the padding
+          is dropped so the @page margins rule the layout. */}
+      <div className="rounded-md bg-cream p-6 print:rounded-none print:bg-transparent print:p-0">
+        <ContractPrintView contract={contract} />
+      </div>
     </div>
   )
 }

@@ -60,7 +60,16 @@
  * for text) in both themes. `input`, `input-hover` and `ring` are non-text
  * UI-component boundaries and are verified at >= 3:1 against `background`
  * in both themes. `border` is a decorative divider (card/dialog edges) with
- * no contrast requirement under WCAG 1.4.11 and is intentionally subtle.
+ * no contrast requirement under WCAG 1.4.11 and is intentionally subtle;
+ * `warning-border` (the edge of the warning panel, one step heavier than
+ * the `warning` fill) and `overlay` (the modal/drawer scrim) are likewise
+ * decorative, not UI-component boundaries.
+ *
+ * `--overlay` is the single scrim color behind every dialog AND every
+ * sheet/drawer, so modals and drawers dim the app identically. Light mode
+ * dims with translucent ink (a warm shadow that fits the linen palette);
+ * dark mode dims with translucent black, because ink at 40% barely reads
+ * against the already-dark background.
  * Headroom notes: in light, `--primary` on white is 4.57:1 and
  * `--muted-foreground` on `--muted` is 4.56:1 — both clear AA, neither
  * survives a nudge, treat them as pinned.
@@ -94,7 +103,9 @@
   --palette-dark-success-foreground: #b7e3c0;
   --palette-dark-warning: #3a2c10;
   --palette-dark-warning-foreground: #f0d18a;
+  --palette-dark-warning-border: #6b5423;
   --palette-dark-border: #4a3a37;
+  --palette-dark-overlay: rgb(0 0 0 / 0.6);
   --palette-dark-input: #da9aa8;
   --palette-dark-input-hover: #e8b6c1;
   --palette-dark-ring: #e39aab;
@@ -126,7 +137,9 @@ html.light {
   --success-foreground: #1e5c2e;
   --warning: #fbedd0;
   --warning-foreground: #7a4b06;
+  --warning-border: #e7c27b; /* one step heavier than the warning fill — decorative edge */
   --border: #e9dcd3; /* border-soft — decorative, not a UI-component boundary */
+  --overlay: rgb(54 42 40 / 0.4); /* ink at 40% — shared dialog/sheet scrim */
   --input: #b85c6e; /* brand-500 — resting form-control border, 3:1+ on background */
   --input-hover: #9c4356; /* brand-600 — hovered form-control border, one step heavier than --input */
   --ring: #b85c6e; /* brand-500 */
@@ -158,7 +171,9 @@ html.dark {
   --success-foreground: var(--palette-dark-success-foreground);
   --warning: var(--palette-dark-warning);
   --warning-foreground: var(--palette-dark-warning-foreground);
+  --warning-border: var(--palette-dark-warning-border);
   --border: var(--palette-dark-border);
+  --overlay: var(--palette-dark-overlay);
   --input: var(--palette-dark-input);
   --input-hover: var(--palette-dark-input-hover);
   --ring: var(--palette-dark-ring);
@@ -190,7 +205,9 @@ html.dark {
     --success-foreground: var(--palette-dark-success-foreground);
     --warning: var(--palette-dark-warning);
     --warning-foreground: var(--palette-dark-warning-foreground);
+    --warning-border: var(--palette-dark-warning-border);
     --border: var(--palette-dark-border);
+    --overlay: var(--palette-dark-overlay);
     --input: var(--palette-dark-input);
     --input-hover: var(--palette-dark-input-hover);
     --ring: var(--palette-dark-ring);
@@ -220,7 +237,9 @@ html.dark {
   --color-success-foreground: var(--success-foreground);
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
+  --color-warning-border: var(--warning-border);
   --color-border: var(--border);
+  --color-overlay: var(--overlay);
   --color-input: var(--input);
   --color-input-hover: var(--input-hover);
   --color-ring: var(--ring);

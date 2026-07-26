@@ -23,8 +23,8 @@ export function AppLayout() {
   // empty user block for an instant.
   if (isLoadingStaff) {
     return (
-      <div className="flex h-screen items-center justify-center bg-cream">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-200 border-t-brand-500" />
+      <div className="flex h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-secondary border-t-primary" />
       </div>
     )
   }
@@ -37,8 +37,8 @@ export function AppLayout() {
   // error too (e.g. a disabled query), so there's always a way out.
   if (isErrorStaff || !staff) {
     return (
-      <div className="flex h-screen flex-col items-center justify-center gap-4 bg-cream px-4 text-center">
-        <p className="text-sm text-muted-text">{t('profileLoadError')}</p>
+      <div className="flex h-screen flex-col items-center justify-center gap-4 px-4 text-center">
+        <p className="text-sm text-muted-foreground">{t('profileLoadError')}</p>
         <div className="flex gap-2">
           <Button variant="secondary" onClick={() => refetchStaff()}>
             {t('actions.retry')}

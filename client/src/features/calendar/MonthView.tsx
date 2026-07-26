@@ -3,6 +3,9 @@ import { Calendar, dateFnsLocalizer } from 'react-big-calendar'
 import { format, parse, startOfWeek, getDay } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
+// Must come after the library stylesheet: the overrides win by order at
+// equal specificity, and both ride this lazy chunk together.
+import './rbc-theme.css'
 import { Dialog, DialogContent, DialogTitle } from '../../components/ui/dialog.tsx'
 import { parseDateOnly, formatDate } from '../../lib/date.ts'
 import { useLocale } from '../../lib/LocaleContext.tsx'
@@ -78,7 +81,7 @@ export function MonthView({
       />
       <Dialog open={showMoreDay !== null} onOpenChange={(open) => !open && setShowMoreDay(null)}>
         <DialogContent showCloseButton={true} className="flex max-h-[85vh] max-w-2xl flex-col overflow-hidden">
-          <DialogTitle className="mb-3 flex-shrink-0 text-base font-semibold text-ink">
+          <DialogTitle className="mb-3 flex-shrink-0 text-base font-semibold text-foreground">
             {showMoreDay && formatDate(showMoreDay.date, locale, { day: '2-digit', month: '2-digit', year: 'numeric' })}
           </DialogTitle>
           {showMoreDay && (

@@ -16,7 +16,7 @@ function ProductThumbnail({ product }: { product: Product }) {
   const firstPhoto = product.photos?.[0]
   if (!firstPhoto) {
     return (
-      <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md bg-brand-50 text-brand-300">
+      <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md bg-secondary text-muted-foreground">
         <Shirt size={18} />
       </span>
     )
@@ -86,13 +86,13 @@ export function ProductsPage() {
         />
       )}
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {products && products.length === 0 && <p className="text-muted-text">{t('empty')}</p>}
+        {products && products.length === 0 && <p className="text-muted-foreground">{t('empty')}</p>}
         {products && products.length > 0 && filteredProducts?.length === 0 && (
-          <p className="text-muted-text">{t('noResults')}</p>
+          <p className="text-muted-foreground">{t('noResults')}</p>
         )}
         {filteredProducts && filteredProducts.length > 0 && (
-          <div className="rounded-md border border-border-soft">
-            <div className="sticky top-0 z-10 flex justify-between bg-gray-50 px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-text">
+          <div className="rounded-md border border-border">
+            <div className="sticky top-0 z-10 flex justify-between bg-muted px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               <span>{t('fields.name')}</span>
               <span className="flex gap-4">
                 <span>{t('fields.size')}</span>
@@ -105,15 +105,15 @@ export function ProductsPage() {
                   key={product.id}
                   onClick={() => setEditing(product)}
                   className={cn(
-                    'flex items-center justify-between p-2 text-left text-sm hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-cream',
-                    index % 2 === 1 && 'bg-gray-50/50',
+                    'flex items-center justify-between p-2 text-left text-sm hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                    index % 2 === 1 && 'bg-muted/50',
                   )}
                 >
                   <span className="flex min-w-0 items-center gap-3">
                     <ProductThumbnail product={product} />
                     <span className="truncate">{product.name}</span>
                   </span>
-                  <span className="flex items-center gap-4 text-muted-text">
+                  <span className="flex items-center gap-4 text-muted-foreground">
                     <span>{product.size}</span>
                     {product.status === 'active' ? (
                       <Badge tone={AVAILABILITY_TONE[product.availability]}>
