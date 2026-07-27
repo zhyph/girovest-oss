@@ -44,6 +44,174 @@ describe('ProductDrawer', () => {
     expect(onClose).toHaveBeenCalledOnce()
   })
 
+  it('closes immediately when Cancelar is clicked on a pristine drawer', async () => {
+    const onClose = vi.fn()
+    mockProductHooks()
+    renderWithToast(<ProductDrawer product={product} onClose={onClose} />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+    expect(screen.queryByText('Descartar alterações?')).not.toBeInTheDocument()
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('asks to confirm before discarding typed input when Cancelar is clicked', async () => {
+    const onClose = vi.fn()
+    mockProductHooks()
+    renderWithToast(<ProductDrawer product={null} onClose={onClose} />)
+
+    await userEvent.type(screen.getByLabelText('Nome'), 'Vestido Verde')
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+    expect(screen.getByText('Descartar alterações?')).toBeInTheDocument()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('discards and closes once Descartar is confirmed', async () => {
+    const onClose = vi.fn()
+    mockProductHooks()
+    renderWithToast(<ProductDrawer product={null} onClose={onClose} />)
+
+    await userEvent.type(screen.getByLabelText('Nome'), 'Vestido Verde')
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Descartar' }))
+
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('keeps the drawer and the typed value when Continuar editando is chosen', async () => {
+    const onClose = vi.fn()
+    mockProductHooks()
+    renderWithToast(<ProductDrawer product={null} onClose={onClose} />)
+
+    await userEvent.type(screen.getByLabelText('Nome'), 'Vestido Verde')
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Continuar editando' }))
+
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByLabelText('Nome')).toHaveValue('Vestido Verde')
+  })
+
+  it('prompts instead of closing when the backdrop is clicked with unsaved input', async () => {
+    const onClose = vi.fn()
+    mockProductHooks()
+    renderWithToast(<ProductDrawer product={null} onClose={onClose} />)
+
+    await userEvent.type(screen.getByLabelText('Nome'), 'Vestido Verde')
+    await userEvent.click(document.querySelector('[data-slot="sheet-overlay"]')!)
+
+    expect(screen.getByText('Descartar alterações?')).toBeInTheDocument()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('prompts instead of closing when Escape is pressed with unsaved input', async () => {
+    const onClose = vi.fn()
+    mockProductHooks()
+    renderWithToast(<ProductDrawer product={null} onClose={onClose} />)
+
+    await userEvent.type(screen.getByLabelText('Nome'), 'Vestido Verde')
+    await userEvent.keyboard('{Escape}')
+
+    expect(screen.getByText('Descartar alterações?')).toBeInTheDocument()
+    expect(onClose).not.toHaveBeenCalled()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Continuar editando' }))
+    expect(screen.getByRole('dialog', { name: 'Novo produto' })).toBeInTheDocument()
+  })
+
+  it('prompts instead of closing when the header X is clicked with unsaved input', async () => {
+    const onClose = vi.fn()
+    mockProductHooks()
+    renderWithToast(<ProductDrawer product={null} onClose={onClose} />)
+
+    await userEvent.type(screen.getByLabelText('Nome'), 'Vestido Verde')
+    await userEvent.click(screen.getByRole('button', { name: 'Fechar' }))
+
+    expect(screen.getByText('Descartar alterações?')).toBeInTheDocument()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('prompts when only a photo was added, which the form state cannot see', async () => {
+    const onClose = vi.fn()
+    mockProductHooks()
+    renderWithToast(<ProductDrawer product={product} onClose={onClose} />)
+
+    await userEvent.type(screen.getByPlaceholderText('URL da foto'), 'https://example.com/a.jpg')
+    await userEvent.click(screen.getByRole('button', { name: 'Adicionar' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+    expect(screen.getByText('Descartar alterações?')).toBeInTheDocument()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('prompts when a photo was removed', async () => {
+    const onClose = vi.fn()
+    mockProductHooks()
+    renderWithToast(
+      <ProductDrawer product={{ ...product, photos: ['https://example.com/a.jpg'] }} onClose={onClose} />,
+    )
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remover' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+    expect(screen.getByText('Descartar alterações?')).toBeInTheDocument()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('prompts when a photo URL was typed but not added yet', async () => {
+    const onClose = vi.fn()
+    mockProductHooks()
+    renderWithToast(<ProductDrawer product={product} onClose={onClose} />)
+
+    await userEvent.type(screen.getByPlaceholderText('URL da foto'), 'https://example.com/a.jpg')
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+    expect(screen.getByText('Descartar alterações?')).toBeInTheDocument()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('prompts when only the status was changed', async () => {
+    const onClose = vi.fn()
+    mockProductHooks()
+    renderWithToast(<ProductDrawer product={product} onClose={onClose} />)
+
+    await userEvent.selectOptions(screen.getByLabelText('Status'), 'maintenance')
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+    expect(screen.getByText('Descartar alterações?')).toBeInTheDocument()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('does not prompt when only "Salvar e adicionar outro" was toggled', async () => {
+    const onClose = vi.fn()
+    mockProductHooks()
+    renderWithToast(<ProductDrawer product={null} onClose={onClose} />)
+
+    await userEvent.click(screen.getByLabelText('Salvar e adicionar outro'))
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+    expect(screen.queryByText('Descartar alterações?')).not.toBeInTheDocument()
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('does not prompt after a save-and-add-another reset', async () => {
+    const onClose = vi.fn()
+    const createImpl = vi.fn().mockResolvedValue(undefined)
+    mockProductHooks(vi.fn(), createImpl)
+    renderWithToast(<ProductDrawer product={null} onClose={onClose} />)
+
+    await userEvent.type(screen.getByLabelText('Nome'), 'Vestido Verde')
+    await userEvent.type(screen.getByLabelText('Categoria'), 'festa')
+    await userEvent.type(screen.getByLabelText('Tamanho'), 'M')
+    await userEvent.type(screen.getByLabelText('Cor'), 'verde')
+    await userEvent.click(screen.getByLabelText('Salvar e adicionar outro'))
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+    expect(screen.queryByText('Descartar alterações?')).not.toBeInTheDocument()
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
   it('does not show a delete button in create mode', () => {
     mockProductHooks(vi.fn())
     renderWithToast(<ProductDrawer product={null} onClose={vi.fn()} />)
