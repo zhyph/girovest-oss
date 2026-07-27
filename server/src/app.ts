@@ -1,6 +1,7 @@
 import express from 'express'
 import cors from 'cors'
 import { errorMiddleware } from './errors/errorMiddleware.js'
+import { RENEWED_TOKEN_HEADER } from './auth/authMiddleware.js'
 import { authRouter } from './auth/authRoutes.js'
 import { setupRouter } from './routes/setup.js'
 import { clientsRouter } from './routes/clients.js'
@@ -13,7 +14,12 @@ import { locationSettingsRouter } from './routes/locationSettings.js'
 
 export const app = express()
 app.disable('x-powered-by')
-app.use(cors())
+// exposedHeaders is load-bearing, not cosmetic: the packaged Electron renderer
+// loads over file:// and calls http://localhost:3000, so every API request is
+// cross-origin. A response header that is not CORS-safelisted stays invisible
+// to JS unless it is named here, and X-Renewed-Token is how sliding session
+// renewal reaches the client (see auth/authMiddleware.ts).
+app.use(cors({ exposedHeaders: [RENEWED_TOKEN_HEADER] }))
 app.use(express.json())
 
 app.get('/health', (_req, res) => {

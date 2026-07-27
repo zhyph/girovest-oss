@@ -118,4 +118,14 @@ describe('CORS', () => {
     const response = await request(app).get('/health')
     expect(response.headers['access-control-allow-origin']).toBe('*')
   })
+
+  // The packaged Electron renderer runs on a file:// origin and talks to
+  // http://localhost:3000, so every API call is cross-origin. Without an
+  // explicit Access-Control-Expose-Headers the browser hides X-Renewed-Token
+  // from JS and sliding renewal silently dies in production only — no other
+  // test would notice, because none of them go through a real CORS layer.
+  it('exposes the session renewal header to cross-origin callers', async () => {
+    const response = await request(app).get('/health')
+    expect(response.headers['access-control-expose-headers']).toContain('X-Renewed-Token')
+  })
 })
