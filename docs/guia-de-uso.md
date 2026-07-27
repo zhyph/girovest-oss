@@ -44,7 +44,7 @@ Se errar, aparece "Usuário ou senha inválidos." Confira e tente de novo.
 
 ### Dicas
 
-- Enquanto você está trabalhando, a sessão se renova sozinha: pode passar o dia inteiro no Girovest que ele não pede a senha no meio do serviço. Só quando o aplicativo fica muito tempo sem ninguém mexer (cerca de 12 horas) é que ele pede a senha de novo e volta para a tela de entrada. É normal: nada se perde, basta entrar de novo.
+- Enquanto você está trabalhando, a sessão se renova sozinha: pode passar o dia inteiro no Girovest que ele não pede a senha no meio do serviço. Já uma sessão deixada parada vence sozinha depois de algumas horas: às vezes leva 12 horas, às vezes bem menos, porque a renovação não acontece a cada clique. Na prática, conte que umas 6 horas sem ninguém mexer já bastam para o aplicativo voltar para a tela de entrada. É normal: nada se perde, basta entrar de novo.
 - Para sair da conta a qualquer momento, clique em **"Sair"**, no rodapé do menu lateral.
 
 ---
@@ -360,10 +360,10 @@ Se aparecer "Este produto está reservado para outro cliente antes da data de sa
 Na lista só entram peças com status Disponível; peças em Manutenção ou Aposentadas ficam de fora. Se a peça existe mas as datas conflitam com outro contrato, escolha outras datas ou outra peça.
 
 **O aplicativo voltou sozinho para a tela de entrada.**
-Enquanto você usa o Girovest, a sessão se renova sozinha, então trabalhar sem parar não desconecta ninguém. Mas uma sessão deixada de lado por muito tempo (cerca de 12 horas sem ninguém mexer) expira por segurança. Nada se perde: entre de novo com usuário e senha.
+Enquanto você usa o Girovest, a sessão se renova sozinha, então trabalhar sem parar não desconecta ninguém. Mas uma sessão deixada de lado expira por segurança: depois de umas 6 horas paradas ela já pode ter vencido, e com 12 horas vence sempre. Nada se perde: entre de novo com usuário e senha.
 
 **Cliquei em "Cancelar" no formulário. Perco o que digitei?**
-Só se você confirmar. Se houver algo preenchido e ainda não salvo, o aplicativo pergunta antes: aparece **"Descartar alterações?"** com o aviso "As alterações que você fez não foram salvas e serão perdidas." Clique em **"Continuar editando"** para voltar ao formulário do jeito que estava, ou em **"Descartar"** para jogar fora mesmo. Isso vale para os formulários de cliente, de produto, de contrato novo e para as janelas de **"Check-out"** e **"Devolução"** (e também quando você fecha pelo **X** ou clicando fora). A tela de **Configurações** não tem essa pergunta: lá, clique em **"Salvar"** antes de sair. A **"Aparência"** é o caso à parte de sempre, porque vale na hora e não precisa salvar.
+Só se você confirmar. Se houver algo preenchido e ainda não salvo, o aplicativo pergunta antes: aparece **"Descartar alterações?"** com o aviso "As alterações que você fez não foram salvas e serão perdidas." Clique em **"Continuar editando"** para voltar ao formulário do jeito que estava, ou em **"Descartar"** para jogar fora mesmo. Isso vale para os formulários de cliente, de produto, de contrato novo e para as janelas de **"Check-out"** e **"Devolução"** (e também quando você fecha clicando fora ou apertando Esc; nos três formulários, o **X** do canto também passa pela mesma pergunta). A tela de **Configurações** não tem essa pergunta: lá, clique em **"Salvar"** antes de sair. A **"Aparência"** é o caso à parte de sempre, porque vale na hora e não precisa salvar.
 
 **A impressão está saindo estranha / quero conferir antes de imprimir.**
 A página de impressão mostra exatamente o que sai no papel, em folha A4, sempre com fundo claro (mesmo no modo escuro do aplicativo). Use **"Voltar"** para retornar sem imprimir. Se faltarem os "Termos e Condições", confira as **"Cláusulas do Contrato"** em Configurações.
