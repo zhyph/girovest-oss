@@ -265,7 +265,12 @@ async function resolveActivation(installId: string, userDataPath: string): Promi
         ? { url: GIROVEST_UPDATE_URL, productKey: GIROVEST_UPDATE_KEY }
         : null,
   })
-  console.log(`[activation] ${state.state}`)
+  // electron-log, not console.log: `console` in the main process is not routed
+  // to the log file, so a console.log here would go to stdout and vanish for a
+  // packaged app. This line is the only way support can tell an `activated`
+  // install from an `unverifiable` one, since both simply open the app.
+  const log = (await import('electron-log')).default
+  log.info(`[activation] ${state.state}`)
   return state
 }
 
