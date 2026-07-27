@@ -133,17 +133,39 @@ function runMigrations(serverCwd: string, env: NodeJS.ProcessEnv): Promise<void>
     const migrate = spawn(process.execPath, [prismaCli, 'migrate', 'deploy'], {
       cwd: serverCwd,
       env: { ...env, ELECTRON_RUN_AS_NODE: '1' },
-      stdio: 'inherit',
+      stdio: 'pipe',
     })
+    // stdio: 'pipe', not 'inherit': a packaged Windows build runs under the
+    // GUI subsystem with no parent console for 'inherit' to attach to, so
+    // Prisma's actual error text was being silently discarded and only the
+    // bare exit code survived. Capture the tail so the real reason reaches
+    // both the log file and the failure dialog.
+    let output = ''
+    const capture = (chunk: Buffer) => {
+      output = (output + chunk.toString()).slice(-4000)
+    }
+    migrate.stdout?.on('data', capture)
+    migrate.stderr?.on('data', capture)
     migrate.on('exit', (code) => {
       if (code === 0) resolve()
-      else reject(new Error(`prisma migrate deploy exited with code ${code}`))
+      else reject(new Error(`prisma migrate deploy exited with code ${code}\n${output.trim()}`))
     })
     migrate.on('error', reject)
   })
 }
 
-async function startServer(): Promise<boolean> {
+// electron-log's transports (file + console) are configured as a side effect
+// of importing it, and that import touches Electron internals `app` doesn't
+// expose under Vitest (see the dynamic-import comment on resolveActivation
+// below) -- so every call site imports it lazily like this rather than once
+// at module scope.
+async function logError(message: string, error: unknown): Promise<void> {
+  const log = (await import('electron-log')).default
+  log.error(message, error)
+}
+
+// Returns null on success, or the failure detail to show/log otherwise.
+async function startServer(): Promise<string | null> {
   const userDataPath = app.getPath('userData')
   // Packaged: copy the whole resources directory (not just resources/server)
   // into the writable runtime location, preserving the server/node_modules
@@ -184,8 +206,9 @@ async function startServer(): Promise<boolean> {
     // launch attempt, so the marker can't move until migrations land.
     writeBackupMarker(userDataPath, app.getVersion())
   } catch (error) {
-    console.error('Database preparation failed:', error)
-    return false
+    const detail = error instanceof Error ? error.message : String(error)
+    await logError('Database preparation failed:', error)
+    return detail
   }
 
   // During an update restart the previous instance's server may not have
@@ -211,12 +234,12 @@ async function startServer(): Promise<boolean> {
   serverProcess.stderr?.on('data', captureOutput)
 
   serverProcess.on('error', (error) => {
-    console.error('Backend process failed to start:', error)
+    void logError('Backend process failed to start:', error)
   })
   serverProcess.on('exit', (code) => {
     if (isShuttingDown) return
     isShuttingDown = true
-    console.error(`Backend process exited unexpectedly with code ${code}\n${recentOutput}`)
+    void logError(`Backend process exited unexpectedly with code ${code}`, recentOutput.trim())
     dialog.showErrorBox(
       'Server Stopped Unexpectedly',
       `The application server stopped unexpectedly (exit code ${code}). The app will now close.\n\n${recentOutput.trim()}`,
@@ -224,7 +247,7 @@ async function startServer(): Promise<boolean> {
     app.quit()
   })
 
-  return true
+  return null
 }
 
 // Injected at build time by electron.vite.config.ts, alongside the updater's
@@ -314,6 +337,23 @@ function loadAppOrActivation(win: BrowserWindow, state: ActivationState): void {
 // try to call methods on that string. Under a real Electron process `app`
 // is always a populated object, so production behavior is unaffected.
 if (app) {
+  // Without these, an error thrown outside the explicit try/catches above
+  // (e.g. inside an IPC handler, or a rejected promise nobody awaited) would
+  // crash the main process with nothing recorded anywhere in a packaged
+  // build — the same silent-failure gap `logError` closes for startup.
+  process.on('uncaughtException', (error) => {
+    void logError('Uncaught exception in main process:', error).then(() => {
+      dialog.showErrorBox(
+        'Unexpected Error',
+        `Girovest hit an unexpected error and will close.\n\n${error.message}`,
+      )
+      app.quit()
+    })
+  })
+  process.on('unhandledRejection', (reason) => {
+    void logError('Unhandled promise rejection in main process:', reason)
+  })
+
   // Must run before app.whenReady() resolves: Electron resolves the default
   // userData path from package.json's name as soon as it's ready, so setting
   // the name any later (e.g. inside startServer(), which used to run this
@@ -348,11 +388,11 @@ if (app) {
   })
 
   app.whenReady().then(async () => {
-    const started = await startServer()
-    if (!started) {
+    const startupError = await startServer()
+    if (startupError !== null) {
       dialog.showErrorBox(
         'Startup Failed',
-        'The application database could not be prepared (migration failed). The app will now close. Check the logs for details.',
+        `The application database could not be prepared (migration failed). The app will now close.\n\n${startupError}`,
       )
       app.quit()
       return

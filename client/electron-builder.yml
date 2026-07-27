@@ -21,12 +21,42 @@ extraResources:
     # needed at runtime (server/node_modules already ships separately;
     # client's own source has no business inside the packaged server's
     # node_modules), so both are excluded outright.
+    #
+    # The packages below are excluded because this whole entry only exists so
+    # the packaged server-bundle.mjs can resolve its externals (bcrypt,
+    # better-sqlite3, pg-native) and the handful of hoisted workspace deps it
+    # doesn't inline (effect, dotenv, zod, cors, ...) -- see the comment on
+    # ensureWritableServerRuntime in main.ts. None of these are that: they're
+    # build/dev/test-only tooling (confirmed via grep: nothing under
+    # server/src or client/src imports them), and together they're ~376MB of
+    # the ~826MB this entry used to copy -- the largest single contributor to
+    # a slow Windows install, since NSIS extracts and Defender scans every
+    # file individually.
+    #   - electron: the dev-time Electron binary itself. The packaged app
+    #     already *is* Electron; it never loads a second copy from resources.
+    #   - electron-winstaller: builds Squirrel (.exe) installers. This project
+    #     only ever uses the nsis Windows target (see win.target below).
+    #   - playwright / playwright-core: e2e test runner, dev-only.
+    #   - lightningcss-linux-x64-gnu: a Linux-only native binary pulled in by
+    #     Tailwind's build step -- irrelevant after the CSS is already
+    #     compiled into client/out, and wrong-platform on a Windows/macOS
+    #     build regardless.
     filter:
       - '**/*'
       - '!girovest-client'
       - '!girovest-client/**'
       - '!girovest-server'
       - '!girovest-server/**'
+      - '!electron'
+      - '!electron/**'
+      - '!electron-winstaller'
+      - '!electron-winstaller/**'
+      - '!playwright'
+      - '!playwright/**'
+      - '!playwright-core'
+      - '!playwright-core/**'
+      - '!lightningcss-linux-x64-gnu'
+      - '!lightningcss-linux-x64-gnu/**'
   - from: ../server/prisma
     to: server/prisma
     filter:
@@ -39,6 +69,13 @@ win:
   target: nsis
 linux:
   target: AppImage
+# The app is Portuguese-only (client/src/i18n.ts hardcodes lng/fallbackLng to
+# pt-BR, no language switcher), so Chromium's own locale strings (spellcheck,
+# native context menus, etc.) never need the other ~54 languages electron
+# ships by default -- electron-builder deletes their .pak files from the
+# packaged app, trimming another ~40MB/~50 files regardless of platform.
+electronLanguages:
+  - pt-BR
 publish:
   provider: github
   # Upload target for CI only. Both this repo and the source repo are private:
