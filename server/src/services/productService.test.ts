@@ -145,6 +145,36 @@ describe.sequential('productService', () => {
     expect(listed.availability).toBe('rented')
   })
 
+  it('CRITICAL: badges a dress taken out early as rented today, not available until its planned checkout date', async () => {
+    const staff = await prisma.staff.create({
+      data: { name: 'S', login: 'staff-early', passwordHash: 'x', role: 'staff', locationId },
+    })
+    const client = await prisma.client.create({ data: { name: 'C', phone: '1', email: 'c3@example.com' } })
+    const product = await createProduct({
+      locationId, name: 'A', category: 'festa', size: 'M', color: 'azul', rentalPrice: 1, depositAmount: 1,
+    })
+
+    // Planned pickup is far in the future, but the dress physically left the
+    // store yesterday after a confirmed early check-out.
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000)
+    await prisma.allocation.create({
+      data: {
+        productId: product.id,
+        clientId: client.id,
+        staffId: staff.id,
+        checkoutDate: new Date('2099-01-10'),
+        actualCheckoutDate: yesterday,
+        dueDate: new Date('2099-01-15'),
+        status: 'checked_out',
+        priceCharged: 1,
+      },
+    })
+
+    expect((await getProduct(product.id)).availability).toBe('rented')
+    const [listed] = await listProducts()
+    expect(listed.availability).toBe('rented')
+  })
+
   it('reports hasAllocationHistory, independent of availability', async () => {
     const staff = await prisma.staff.create({
       data: { name: 'S', login: 'staff-dhist', passwordHash: 'x', role: 'staff', locationId },

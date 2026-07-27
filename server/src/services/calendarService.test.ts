@@ -70,6 +70,27 @@ describe('calendarService', () => {
     expect(results).toHaveLength(1)
   })
 
+  it('keeps overdue and due-back keyed on the due date after an early check-out', async () => {
+    await prisma.allocation.create({
+      data: {
+        productId, clientId, staffId,
+        checkoutDate: new Date('2026-01-10'),
+        // Picked up a week before the contracted date.
+        actualCheckoutDate: new Date('2026-01-03'),
+        dueDate: new Date('2026-01-15'),
+        status: 'checked_out', priceCharged: 100,
+      },
+    })
+
+    // Lateness is measured against the promised return date only — an early
+    // pickup neither creates nor clears an overdue.
+    expect(await listOverdue(new Date('2026-01-12'))).toHaveLength(0)
+    expect(await listOverdue(new Date('2026-01-20'))).toHaveLength(1)
+    expect(await listDueBack(new Date('2026-01-14'), new Date('2026-01-16'))).toHaveLength(1)
+    // Once checked out it is no longer "saindo" on its planned checkout day.
+    expect(await listGoingOut(new Date('2026-01-01'), new Date('2026-01-31'))).toHaveLength(0)
+  })
+
   it('does not count a returned allocation as overdue', async () => {
     await prisma.allocation.create({
       data: {

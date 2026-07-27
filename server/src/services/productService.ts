@@ -81,6 +81,7 @@ async function availabilityFor(productId: string, asOf = new Date()): Promise<De
     allocations.map((allocation) => ({
       status: allocation.status as AllocationStatus,
       checkoutDate: allocation.checkoutDate,
+      actualCheckoutDate: allocation.actualCheckoutDate,
       dueDate: allocation.dueDate,
       actualReturnDate: allocation.actualReturnDate,
     })),
@@ -107,6 +108,7 @@ async function availabilityByProductId(productIds: string[]): Promise<Map<string
     const windows = (byProduct.get(productId) ?? []).map((allocation) => ({
       status: allocation.status as AllocationStatus,
       checkoutDate: allocation.checkoutDate,
+      actualCheckoutDate: allocation.actualCheckoutDate,
       dueDate: allocation.dueDate,
       actualReturnDate: allocation.actualReturnDate,
     }))

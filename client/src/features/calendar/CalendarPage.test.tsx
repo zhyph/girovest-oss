@@ -22,6 +22,7 @@ function makeAllocation(overrides: Partial<Allocation> = {}): Allocation {
     clientId: 'client-1',
     staffId: 'staff-1',
     checkoutDate: '2026-07-01T00:00:00.000Z',
+    actualCheckoutDate: null,
     dueDate: '2026-07-10T00:00:00.000Z',
     actualReturnDate: null,
     status: 'checked_out',

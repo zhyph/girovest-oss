@@ -2,7 +2,10 @@ export type AllocationStatus = 'reserved' | 'checked_out' | 'returned' | 'cancel
 
 export interface AllocationWindow {
   status: AllocationStatus
+  /** The planned, contracted pickup date — never overwritten by what actually happened. */
   checkoutDate: Date
+  /** When the dress physically left the store; null when it was never recorded. */
+  actualCheckoutDate: Date | null
   dueDate: Date
   actualReturnDate: Date | null
 }
@@ -17,10 +20,20 @@ function occupiedRange(allocation: AllocationWindow): OccupiedRange | null {
   switch (allocation.status) {
     case 'reserved':
       return { start: allocation.checkoutDate, end: allocation.dueDate }
-    case 'checked_out':
+    case 'checked_out': {
       // Occupied until a return is actually recorded, not until due_date —
       // a late return is a real physical conflict, not a plan.
-      return { start: allocation.checkoutDate, end: null }
+      // Occupancy starts the moment the dress actually left the store, so an
+      // early check-out does not leave [actual pickup, planned checkout) free
+      // for someone else to book. A LATE pickup must not shrink occupancy
+      // either — the reserved days were still blocked — hence the earlier of
+      // the two.
+      const start =
+        allocation.actualCheckoutDate && allocation.actualCheckoutDate.getTime() < allocation.checkoutDate.getTime()
+          ? allocation.actualCheckoutDate
+          : allocation.checkoutDate
+      return { start, end: null }
+    }
     case 'returned':
     case 'cancelled':
       return null

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, type Mock } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -8,6 +8,8 @@ import { ContractsPage } from './ContractsPage.tsx'
 import * as useContractsModule from './useContracts.ts'
 import * as useProductsModule from '../products/useProducts.ts'
 import * as useClientsModule from '../clients/useClients.ts'
+import * as useAllocationsModule from '../allocations/useAllocations.ts'
+import * as toastModule from '../../lib/toast.ts'
 import type { Contract } from './contractSchemas.ts'
 
 function renderWithProviders(ui: React.ReactElement) {
@@ -26,7 +28,7 @@ const contract: Contract = {
   allocations: [
     {
       id: 'a1', productId: 'p1', clientId: 'c1', staffId: 's1', contractId: 'ct1',
-      checkoutDate: '2026-10-02', dueDate: '2026-10-06', actualReturnDate: null,
+      checkoutDate: '2026-10-02', actualCheckoutDate: null, dueDate: '2026-10-06', actualReturnDate: null,
       status: 'reserved', priceCharged: 380, depositCollected: null, depositReturned: null,
       conditionNotesOut: null, conditionNotesIn: null, createdAt: '2026-09-01',
     },
@@ -34,7 +36,13 @@ const contract: Contract = {
   installments: [{ id: 'i1', contractId: 'ct1', dueDate: '2026-09-20', amount: 380, paid: false, paidAt: null }],
 }
 
-function mockHooks(overrides: { contracts?: Contract[]; cancelImpl?: (...args: never[]) => Promise<unknown> } = {}) {
+function mockHooks(
+  overrides: {
+    contracts?: Contract[]
+    cancelImpl?: (...args: never[]) => Promise<unknown>
+    checkOutImpl?: Mock
+  } = {},
+) {
   const contracts = overrides.contracts ?? [contract]
   vi.spyOn(useContractsModule, 'useContractsList').mockReturnValue({
     data: { contracts, total: contracts.length, page: 1, pageSize: 20 },
@@ -51,6 +59,19 @@ function mockHooks(overrides: { contracts?: Contract[]; cancelImpl?: (...args: n
     mutateAsync: vi.fn().mockResolvedValue({ token: 't', expiresAt: new Date().toISOString(), port: 3000, candidates: [] }),
     isPending: false,
   } as never)
+  const checkOutImpl = overrides.checkOutImpl ?? vi.fn().mockResolvedValue(undefined)
+  vi.spyOn(useAllocationsModule, 'useCheckOutAllocation').mockReturnValue({
+    mutateAsync: checkOutImpl,
+    isPending: false,
+  } as never)
+  vi.spyOn(useAllocationsModule, 'useReturnAllocation').mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
+  vi.spyOn(useAllocationsModule, 'useCancelAllocation').mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
+  return { checkOutImpl }
+}
+
+async function openCheckOutAndConfirm() {
+  await userEvent.click(screen.getByRole('button', { name: 'Check-out' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Confirmar check-out' }))
 }
 
 describe('ContractsPage', () => {
@@ -74,6 +95,90 @@ describe('ContractsPage', () => {
     mockHooks()
     renderWithProviders(<ContractsPage />)
     expect(screen.getByRole('button', { name: 'Check-out' })).toBeInTheDocument()
+  })
+
+  it('checks out on the first confirmation when the date is not early', async () => {
+    const { checkOutImpl } = mockHooks()
+    renderWithProviders(<ContractsPage />)
+
+    await openCheckOutAndConfirm()
+
+    expect(checkOutImpl).toHaveBeenCalledTimes(1)
+    expect(checkOutImpl).toHaveBeenCalledWith(expect.objectContaining({ id: 'a1' }))
+    expect(checkOutImpl.mock.calls[0][0]).not.toHaveProperty('allowEarly', true)
+    expect(screen.queryByRole('button', { name: 'Retirar mesmo assim' })).not.toBeInTheDocument()
+  })
+
+  it('offers a confirmation showing the marked date instead of dead-ending on an early check-out', async () => {
+    const checkOutImpl = vi.fn().mockRejectedValue({ code: 'CHECKOUT_TOO_EARLY' })
+    mockHooks({ checkOutImpl })
+    renderWithProviders(<ContractsPage />)
+
+    await openCheckOutAndConfirm()
+
+    const confirmButton = screen.getByRole('button', { name: 'Retirar mesmo assim' })
+    const dialog = confirmButton.closest('[role="dialog"]') as HTMLElement
+    expect(within(dialog).getByText(/02\/10\/2026/)).toBeInTheDocument()
+  })
+
+  it('repeats the check-out with the override once the early pickup is confirmed', async () => {
+    const checkOutImpl = vi
+      .fn()
+      .mockRejectedValueOnce({ code: 'CHECKOUT_TOO_EARLY' })
+      .mockResolvedValueOnce(undefined)
+    mockHooks({ checkOutImpl })
+    renderWithProviders(<ContractsPage />)
+
+    await openCheckOutAndConfirm()
+    await userEvent.click(screen.getByRole('button', { name: 'Retirar mesmo assim' }))
+
+    expect(checkOutImpl).toHaveBeenCalledTimes(2)
+    expect(checkOutImpl).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'a1', allowEarly: true }))
+    expect(screen.queryByRole('button', { name: 'Retirar mesmo assim' })).not.toBeInTheDocument()
+  })
+
+  it('leaves the allocation untouched when the early pickup is dismissed', async () => {
+    const checkOutImpl = vi.fn().mockRejectedValue({ code: 'CHECKOUT_TOO_EARLY' })
+    mockHooks({ checkOutImpl })
+    renderWithProviders(<ContractsPage />)
+
+    await openCheckOutAndConfirm()
+    const dialog = screen.getByRole('button', { name: 'Retirar mesmo assim' }).closest('[role="dialog"]') as HTMLElement
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }))
+
+    expect(checkOutImpl).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('button', { name: 'Retirar mesmo assim' })).not.toBeInTheDocument()
+  })
+
+  it('still toasts other check-out failures instead of offering the early override', async () => {
+    const toastSpy = vi.spyOn(toastModule, 'showErrorToast').mockImplementation(() => {})
+    const checkOutImpl = vi.fn().mockRejectedValue({ code: 'INVALID_ALLOCATION_TRANSITION' })
+    mockHooks({ checkOutImpl })
+    renderWithProviders(<ContractsPage />)
+
+    await openCheckOutAndConfirm()
+
+    expect(screen.queryByRole('button', { name: 'Retirar mesmo assim' })).not.toBeInTheDocument()
+    expect(toastSpy).toHaveBeenCalledWith('Esta ação não é permitida no status atual.')
+  })
+
+  it('names the real reason when the confirmed early pickup collides with another booking', async () => {
+    const toastSpy = vi.spyOn(toastModule, 'showErrorToast').mockImplementation(() => {})
+    const checkOutImpl = vi
+      .fn()
+      .mockRejectedValueOnce({ code: 'CHECKOUT_TOO_EARLY' })
+      .mockRejectedValueOnce({ code: 'EARLY_CHECKOUT_CONFLICT' })
+    mockHooks({ checkOutImpl })
+    renderWithProviders(<ContractsPage />)
+
+    await openCheckOutAndConfirm()
+    await userEvent.click(screen.getByRole('button', { name: 'Retirar mesmo assim' }))
+
+    // Not the generic "erro inesperado" — the operator has to know the dress is
+    // promised to someone else, otherwise they just try again.
+    expect(toastSpy).toHaveBeenCalledWith(
+      'Este produto está reservado para outro cliente antes da data de saída marcada. Só é possível retirar agora se essa outra reserva for alterada.',
+    )
   })
 
   it('shows a cancel-contract action when the contract has a reserved item, and cancels on confirm', async () => {

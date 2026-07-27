@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { prisma } from '../db/client.js'
 import { AppError } from '../errors/AppError.js'
 import { createContract, cancelContract, listContracts, getContract } from './contractService.js'
+import { checkOutAllocation } from './allocationService.js'
 
 let locationId: string
 let staffId: string
@@ -185,6 +186,23 @@ describe('createContract', () => {
     expect(fulfilled).toHaveLength(2)
     const numbers = fulfilled.map((r) => r.value.number).sort((a, b) => a - b)
     expect(numbers).toEqual([1, 2])
+  })
+
+  it('CRITICAL: a product taken out early cannot be booked for the days between the real pickup and its planned checkout date', async () => {
+    const contract = await createContract(baseInput())
+    await checkOutAllocation(contract.allocations[0].id, { allowEarly: true }, new Date('2026-09-25T09:00:00.000Z'))
+
+    // The dress left the store on Sep 25 even though the contract said Oct 2 —
+    // those days are physically taken and must not be bookable.
+    await expect(
+      createContract(
+        baseInput({
+          items: [
+            { productId, checkoutDate: new Date('2026-09-26'), dueDate: new Date('2026-09-28'), priceCharged: 100 },
+          ],
+        }),
+      ),
+    ).rejects.toMatchObject({ code: 'PRODUCT_UNAVAILABLE' })
   })
 })
 

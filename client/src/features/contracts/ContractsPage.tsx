@@ -31,7 +31,9 @@ export function RowActions({ allocation }: { allocation: Allocation }) {
   const checkOut = useCheckOutAllocation()
   const returnAllocation = useReturnAllocation()
   const cancel = useCancelAllocation()
+  const { locale } = useLocale()
   const [showCheckOutDialog, setShowCheckOutDialog] = useState(false)
+  const [showEarlyConfirm, setShowEarlyConfirm] = useState(false)
   const [showReturnDialog, setShowReturnDialog] = useState(false)
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
   const [conditionNotesOut, setConditionNotesOut] = useState('')
@@ -49,6 +51,24 @@ export function RowActions({ allocation }: { allocation: Allocation }) {
       await checkOut.mutateAsync({ id: allocation.id, conditionNotesOut, depositCollected })
       setShowCheckOutDialog(false)
     } catch (error) {
+      // Being early is a decision for the shop to make, not a dead end — ask
+      // instead of toasting. The server clock stays the only authority on
+      // what counts as early, so this is driven by its answer.
+      if (resolveErrorCode(error) === 'CHECKOUT_TOO_EARLY') {
+        setShowEarlyConfirm(true)
+        return
+      }
+      showActionError(error)
+    }
+  }
+
+  async function handleConfirmEarlyCheckOut() {
+    try {
+      await checkOut.mutateAsync({ id: allocation.id, conditionNotesOut, depositCollected, allowEarly: true })
+      setShowEarlyConfirm(false)
+      setShowCheckOutDialog(false)
+    } catch (error) {
+      setShowEarlyConfirm(false)
       showActionError(error)
     }
   }
@@ -100,6 +120,25 @@ export function RowActions({ allocation }: { allocation: Allocation }) {
                 {t('checkOutDialog.confirm')}
               </Button>
             </div>
+          </div>
+        </Modal>
+        <Modal open={showEarlyConfirm} onClose={() => setShowEarlyConfirm(false)} title={t('checkOutDialog.earlyTitle')}>
+          <p className="mb-4 text-sm text-foreground">
+            {t('checkOutDialog.earlyMessage', {
+              date: formatDate(parseDateOnly(allocation.checkoutDate), locale, {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+              }),
+            })}
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setShowEarlyConfirm(false)}>
+              {t('common:actions.cancel', { ns: 'common' })}
+            </Button>
+            <Button type="button" onClick={handleConfirmEarlyCheckOut} disabled={checkOut.isPending}>
+              {t('checkOutDialog.earlyConfirm')}
+            </Button>
           </div>
         </Modal>
         <Modal
