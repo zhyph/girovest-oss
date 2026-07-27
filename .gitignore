@@ -8,3 +8,15 @@ node_modules
 # but allow shared project config (.claude/settings.json) to be committed.
 .claude/*
 !.claude/settings.json
+
+# Material comercial: contém CPF, endereço e chave PIX, além do contrato
+# preenchido com dados da contratante. Fica fora do versionamento — este
+# repositório alimenta releases públicas e um dia pode virar público.
+docs/comercial/
+
+# Cache do ruff (gerado ao rodar lint nos scripts Python de docs/)
+.ruff_cache/
+
+# Estado local do wrangler (cache de build e sessao), gerado ao rodar
+# `wrangler deploy`/`dev` em infra/update-proxy.
+.wrangler/
