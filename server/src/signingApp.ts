@@ -6,9 +6,11 @@ import { errorMiddleware } from './errors/errorMiddleware.js'
 import { checkTokenValidity as checkSigningTokenValidity, submitSignature } from './services/signingService.js'
 import {
   checkTokenValidity as checkPhotoTokenValidity,
+  createProductFromPhotoToken,
   submitPhotos,
 } from './services/productPhotoTokenService.js'
 import { listProductsForLocation } from './services/productService.js'
+import { productCreateSchema } from './lib/productValidation.js'
 import { getSigningPageHtml } from './signingPage.js'
 import { getProductPhotoPageHtml } from './productPhotoPage.js'
 import { prisma } from './db/client.js'
@@ -58,6 +60,17 @@ signingApp.get('/product-photos/:token/products', async (req, res) => {
   }
   const search = typeof req.query.search === 'string' ? req.query.search : undefined
   res.json(await listProductsForLocation(photoToken.locationId, { search }))
+})
+
+// The schema has no `locationId` at all, and the service reads the location
+// from the token row — a body that carries one is silently dropped by zod
+// rather than trusted.
+signingApp.post('/product-photos/:token/products', async (req, res) => {
+  const parsed = productCreateSchema.safeParse(req.body)
+  if (!parsed.success) {
+    throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'Invalid product payload')
+  }
+  res.status(201).json(await createProductFromPhotoToken(req.params.token, parsed.data))
 })
 
 const submitPhotosSchema = z.object({

@@ -17,7 +17,11 @@ const STYLES = `
   button.primary { background: #b85c6e; color: white; border-color: #b85c6e; }
   button:disabled { opacity: 0.5; }
   .message { padding: 16px; border-radius: 8px; background: white; border: 1px solid #e9dcd3; max-width: 500px; }
-  #status { margin-top: 8px; font-size: 0.9rem; color: #8c7a72; }
+  #status, #create-status { margin-top: 8px; font-size: 0.9rem; color: #8c7a72; }
+  .field-label { display: block; max-width: 500px; font-size: 0.85rem; color: #8c7a72; margin-bottom: 4px; }
+  .full-button { display: block; width: 100%; max-width: 500px; padding: 14px; }
+  #create-entry { margin-bottom: 16px; }
+  #create-back-link { display: inline-block; margin-bottom: 12px; color: #b85c6e; text-decoration: none; }
   .search-input { display: block; width: 100%; max-width: 500px; padding: 12px; border: 1px solid #e9dcd3; border-radius: 8px; background: white; margin-bottom: 12px; font-size: 1rem; }
   .product-list { display: flex; flex-direction: column; gap: 8px; max-width: 500px; }
   .product-row { text-align: left; padding: 12px; border-radius: 8px; border: 1px solid #e9dcd3; background: white; cursor: pointer; }
@@ -37,7 +41,26 @@ function photoIntakeBody(token: string): string {
     <div id="picker-screen">
       <h1>Selecione um produto</h1>
       <input id="search-input" class="search-input" type="text" placeholder="Buscar por nome, categoria ou cor..." />
+      <button id="create-entry" class="full-button" type="button">+ Cadastrar nova peça</button>
       <div class="product-list" id="product-list"></div>
+    </div>
+    <div id="create-screen" style="display:none">
+      <a href="#" id="create-back-link">← Voltar</a>
+      <h1>Cadastrar nova peça</h1>
+      <label class="field-label" for="create-name">Nome</label>
+      <input id="create-name" class="search-input" type="text" />
+      <label class="field-label" for="create-category">Categoria</label>
+      <input id="create-category" class="search-input" type="text" />
+      <label class="field-label" for="create-size">Tamanho</label>
+      <input id="create-size" class="search-input" type="text" />
+      <label class="field-label" for="create-color">Cor</label>
+      <input id="create-color" class="search-input" type="text" />
+      <label class="field-label" for="create-rental-price">Preço do aluguel</label>
+      <input id="create-rental-price" class="search-input" type="text" inputmode="numeric" />
+      <label class="field-label" for="create-deposit">Caução</label>
+      <input id="create-deposit" class="search-input" type="text" inputmode="numeric" />
+      <button id="create-submit" class="primary full-button" type="button">Cadastrar e tirar fotos</button>
+      <p id="create-status"></p>
     </div>
     <div id="capture-screen" style="display:none">
       <a href="#" id="back-link">← Voltar</a>
@@ -59,6 +82,20 @@ function photoIntakeBody(token: string): string {
 
       var pickerScreen = document.getElementById('picker-screen');
       var captureScreen = document.getElementById('capture-screen');
+      var createScreen = document.getElementById('create-screen');
+      var createEntryBtn = document.getElementById('create-entry');
+      var createBackLink = document.getElementById('create-back-link');
+      var createSubmitBtn = document.getElementById('create-submit');
+      var createStatus = document.getElementById('create-status');
+      var createFields = {
+        name: document.getElementById('create-name'),
+        category: document.getElementById('create-category'),
+        size: document.getElementById('create-size'),
+        color: document.getElementById('create-color'),
+      };
+      var createRentalPrice = document.getElementById('create-rental-price');
+      var createDeposit = document.getElementById('create-deposit');
+      var CREATE_LABEL = 'Cadastrar e tirar fotos';
       var searchInput = document.getElementById('search-input');
       var productList = document.getElementById('product-list');
       var backLink = document.getElementById('back-link');
@@ -183,6 +220,7 @@ function photoIntakeBody(token: string): string {
         renderPreviews();
         statusEl.textContent = '';
         pickerScreen.style.display = 'none';
+        createScreen.style.display = 'none';
         captureScreen.style.display = 'block';
         stopPolling();
       }
@@ -192,14 +230,98 @@ function photoIntakeBody(token: string): string {
         capturedPhotos = [];
         renderPreviews();
         captureScreen.style.display = 'none';
+        createScreen.style.display = 'none';
         pickerScreen.style.display = 'block';
         fetchProducts(searchInput.value);
         startPolling();
       }
 
+      // Money is typed the same way as on the desktop: the keypad only ever
+      // produces digits, which are read as centavos and divided by 100. The
+      // API takes reais, so skipping this division would send every price in
+      // at 100x.
+      var moneyFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+
+      function moneyValue(input) {
+        var digits = input.value.replace(/[^0-9]/g, '');
+        if (digits === '') return 0;
+        return parseInt(digits, 10) / 100;
+      }
+
+      function bindMoneyInput(input) {
+        input.value = moneyFormatter.format(0);
+        input.addEventListener('input', function () {
+          input.value = moneyFormatter.format(moneyValue(input));
+        });
+      }
+
+      function openCreateScreen() {
+        createStatus.textContent = '';
+        createSubmitBtn.disabled = false;
+        createSubmitBtn.textContent = CREATE_LABEL;
+        Object.keys(createFields).forEach(function (key) {
+          createFields[key].value = '';
+        });
+        createRentalPrice.value = moneyFormatter.format(0);
+        createDeposit.value = moneyFormatter.format(0);
+        pickerScreen.style.display = 'none';
+        captureScreen.style.display = 'none';
+        createScreen.style.display = 'block';
+        stopPolling();
+      }
+
+      function submitCreate() {
+        var payload = {
+          name: createFields.name.value.trim(),
+          category: createFields.category.value.trim(),
+          size: createFields.size.value.trim(),
+          color: createFields.color.value.trim(),
+          rentalPrice: moneyValue(createRentalPrice),
+          depositAmount: moneyValue(createDeposit),
+        };
+        if (!payload.name || !payload.category || !payload.size || !payload.color) {
+          createStatus.textContent = 'Preencha nome, categoria, tamanho e cor.';
+          return;
+        }
+        createSubmitBtn.disabled = true;
+        createSubmitBtn.textContent = 'Cadastrando...';
+        createStatus.textContent = '';
+        fetch(basePath + '/products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+          .then(function (response) {
+            if (!response.ok) throw new Error('failed');
+            return response.json();
+          })
+          .then(function (product) {
+            createSubmitBtn.disabled = false;
+            createSubmitBtn.textContent = CREATE_LABEL;
+            // Straight into the capture screen for the piece just created —
+            // the whole point of creating from the phone is to photograph it
+            // right away, and the picker's 5s poll is too slow to rely on.
+            openCaptureScreen(product);
+          })
+          .catch(function () {
+            createStatus.textContent = 'Erro ao cadastrar. Tente novamente.';
+            createSubmitBtn.disabled = false;
+            createSubmitBtn.textContent = CREATE_LABEL;
+          });
+      }
+
       searchInput.addEventListener('input', function () {
         fetchProducts(searchInput.value);
       });
+
+      createEntryBtn.addEventListener('click', openCreateScreen);
+
+      createBackLink.addEventListener('click', function (event) {
+        event.preventDefault();
+        openPickerScreen();
+      });
+
+      createSubmitBtn.addEventListener('click', submitCreate);
 
       takePhotoBtn.addEventListener('click', function () {
         cameraInput.click();
@@ -251,6 +373,8 @@ function photoIntakeBody(token: string): string {
           });
       });
 
+      bindMoneyInput(createRentalPrice);
+      bindMoneyInput(createDeposit);
       fetchProducts('');
       startPolling();
     </script>

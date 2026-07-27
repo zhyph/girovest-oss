@@ -14,14 +14,25 @@ class FakeEventSource {
   onmessage: ((event: { data: string }) => void) | null = null
   onerror: (() => void) | null = null
   closed = false
+  // Named SSE frames never reach onmessage, so the fake has to model
+  // addEventListener for the product-created path to be testable at all.
+  listeners: Record<string, ((event: { data: string }) => void)[]> = {}
   constructor(public url: string) {
     FakeEventSource.instances.push(this)
   }
   close() {
     this.closed = true
   }
+  addEventListener(type: string, listener: (event: { data: string }) => void) {
+    ;(this.listeners[type] ??= []).push(listener)
+  }
   emit(data: unknown) {
     this.onmessage?.({ data: JSON.stringify(data) })
+  }
+  emitNamed(type: string, data: unknown) {
+    for (const listener of this.listeners[type] ?? []) {
+      listener({ data: JSON.stringify(data) })
+    }
   }
 }
 
@@ -74,6 +85,48 @@ describe('useProductPhotoEvents', () => {
       const cached = queryClient.getQueryData(PRODUCTS_KEY) as { id: string; photos: string[] }[]
       expect(cached.find((p) => p.id === 'p2')?.photos).toEqual(['/api/products/p2/photos/x.jpg'])
       expect(cached.find((p) => p.id === 'p1')?.photos).toEqual([])
+    })
+  })
+
+  describe('product-created', () => {
+    it('prepends a product created from the phone to the cached list', async () => {
+      const queryClient = new QueryClient()
+      queryClient.setQueryData(PRODUCTS_KEY, [{ id: 'p1', photos: [], name: 'A' }])
+      renderWithClient(queryClient)
+      await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1))
+
+      FakeEventSource.instances[0].emitNamed('product-created', { id: 'p2', photos: [], name: 'Novo' })
+
+      await waitFor(() => {
+        const cached = queryClient.getQueryData(PRODUCTS_KEY) as { id: string }[]
+        // The list is ordered createdAt desc, so the newest row goes first.
+        expect(cached.map((p) => p.id)).toEqual(['p2', 'p1'])
+      })
+    })
+
+    it('does not duplicate a product that is already cached', async () => {
+      const queryClient = new QueryClient()
+      queryClient.setQueryData(PRODUCTS_KEY, [{ id: 'p1', photos: [], name: 'A' }])
+      renderWithClient(queryClient)
+      await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1))
+
+      FakeEventSource.instances[0].emitNamed('product-created', { id: 'p2', photos: [], name: 'Novo' })
+      FakeEventSource.instances[0].emitNamed('product-created', { id: 'p2', photos: [], name: 'Novo' })
+
+      await waitFor(() => {
+        const cached = queryClient.getQueryData(PRODUCTS_KEY) as { id: string }[]
+        expect(cached.map((p) => p.id)).toEqual(['p2', 'p1'])
+      })
+    })
+
+    it('does not crash or seed the cache when the list was never fetched', async () => {
+      const queryClient = new QueryClient()
+      renderWithClient(queryClient)
+      await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1))
+
+      FakeEventSource.instances[0].emitNamed('product-created', { id: 'p2', photos: [], name: 'Novo' })
+
+      expect(queryClient.getQueryData(PRODUCTS_KEY)).toBeUndefined()
     })
   })
 

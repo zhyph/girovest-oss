@@ -57,6 +57,31 @@ describe('GET /api/products/events', () => {
     req.abort()
   })
 
+  // Named frame, unlike the photo frame above: EventSource.onmessage only
+  // sees unnamed frames, so tagging this one keeps the photo wire format
+  // byte-identical for clients that predate product creation from the phone.
+  it('streams a named product-created frame for a matching location and not for a different one', async () => {
+    const { ticket } = mintSseTicket('staff-1', locationId)
+    const req = request(app).get('/api/products/events').query({ ticket }).buffer(false)
+    const dataPromise = waitForData(req)
+
+    await new Promise((r) => setTimeout(r, 50))
+    productPhotoEvents.emit('product-created', {
+      locationId: otherLocationId,
+      product: { id: 'other-location-product', name: 'Elsewhere' },
+    })
+    productPhotoEvents.emit('product-created', {
+      locationId,
+      product: { id: 'p-new', name: 'Vestido Novo' },
+    })
+
+    const chunk = await dataPromise
+    expect(chunk).toContain('event: product-created')
+    expect(chunk).toContain('"id":"p-new"')
+    expect(chunk).not.toContain('other-location-product')
+    req.abort()
+  })
+
   it('rejects a missing or invalid ticket with 401 and does not hang the connection open', async () => {
     const res = await request(app).get('/api/products/events').query({ ticket: 'not-a-real-ticket' })
     expect(res.status).toBe(401)
