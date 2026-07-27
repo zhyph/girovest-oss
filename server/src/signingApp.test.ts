@@ -213,6 +213,105 @@ describe('POST /product-photos/:token/submit', () => {
   })
 })
 
+describe('POST /product-photos/:token/products', () => {
+  const NEW_PRODUCT = {
+    name: 'Vestido Novo',
+    category: 'festa',
+    size: 'G',
+    color: 'vermelho',
+    rentalPrice: 250,
+    depositAmount: 125,
+  }
+
+  it('creates a product and returns it with 201', async () => {
+    const { token } = await issueProductPhotoSession(staffId, locationId)
+
+    const response = await request(signingApp).post(`/product-photos/${token}/products`).send(NEW_PRODUCT)
+
+    expect(response.status).toBe(201)
+    expect(response.body.id).toEqual(expect.any(String))
+    expect(response.body.name).toBe('Vestido Novo')
+    expect(response.body.photos).toEqual([])
+    expect(response.body.availability).toBe('available')
+  })
+
+  it('ignores a locationId in the body and uses the token\'s location', async () => {
+    const { token } = await issueProductPhotoSession(staffId, locationId)
+    const otherLocation = await prisma.location.create({ data: { name: 'Other', address: 'X' } })
+
+    const response = await request(signingApp)
+      .post(`/product-photos/${token}/products`)
+      .send({ ...NEW_PRODUCT, locationId: otherLocation.id })
+
+    expect(response.status).toBe(201)
+    expect(response.body.locationId).toBe(locationId)
+    const row = await prisma.product.findUniqueOrThrow({ where: { id: response.body.id } })
+    expect(row.locationId).toBe(locationId)
+  })
+
+  it.each(['name', 'category', 'size', 'color', 'rentalPrice', 'depositAmount'])(
+    'rejects a payload missing %s with 400',
+    async (field) => {
+      const { token } = await issueProductPhotoSession(staffId, locationId)
+      const payload: Record<string, unknown> = { ...NEW_PRODUCT }
+      delete payload[field]
+
+      const response = await request(signingApp).post(`/product-photos/${token}/products`).send(payload)
+
+      expect(response.status).toBe(400)
+    },
+  )
+
+  it('rejects a negative rentalPrice with 400', async () => {
+    const { token } = await issueProductPhotoSession(staffId, locationId)
+
+    const response = await request(signingApp)
+      .post(`/product-photos/${token}/products`)
+      .send({ ...NEW_PRODUCT, rentalPrice: -1 })
+
+    expect(response.status).toBe(400)
+  })
+
+  it('rejects an over-long name with 400', async () => {
+    const { token } = await issueProductPhotoSession(staffId, locationId)
+
+    const response = await request(signingApp)
+      .post(`/product-photos/${token}/products`)
+      .send({ ...NEW_PRODUCT, name: 'a'.repeat(201) })
+
+    expect(response.status).toBe(400)
+  })
+
+  it('rejects an unknown token with 404', async () => {
+    const response = await request(signingApp).post('/product-photos/unknown-token/products').send(NEW_PRODUCT)
+
+    expect(response.status).toBe(404)
+    expect(await prisma.product.count({ where: { name: NEW_PRODUCT.name } })).toBe(0)
+  })
+
+  // 410 rather than the sibling GET's 404: this matches POST .../submit, the
+  // other write path, so the phone can tell "your code expired, ask for a new
+  // one" apart from "that never existed".
+  it('rejects an expired token with 410', async () => {
+    const { token } = await issueProductPhotoSession(staffId, locationId)
+    await prisma.productPhotoToken.update({ where: { token }, data: { expiresAt: new Date(Date.now() - 1000) } })
+
+    const response = await request(signingApp).post(`/product-photos/${token}/products`).send(NEW_PRODUCT)
+
+    expect(response.status).toBe(410)
+    expect(await prisma.product.count({ where: { name: NEW_PRODUCT.name } })).toBe(0)
+  })
+
+  it('makes the created product immediately visible to the picker listing', async () => {
+    const { token } = await issueProductPhotoSession(staffId, locationId)
+
+    const created = await request(signingApp).post(`/product-photos/${token}/products`).send(NEW_PRODUCT)
+    const listed = await request(signingApp).get(`/product-photos/${token}/products`)
+
+    expect(listed.body.map((p: { id: string }) => p.id)).toContain(created.body.id)
+  })
+})
+
 describe('GET /product-photos/:token/products', () => {
   it('returns the token\'s location\'s products, most recent first', async () => {
     const secondProduct = await prisma.product.create({
