@@ -19,5 +19,12 @@
     "tomorrow": "Amanhã",
     "thisWeek": "Esta semana",
     "later": "Mais tarde"
+  },
+  "rbc": {
+    "today": "Hoje",
+    "previous": "Anterior",
+    "next": "Próximo",
+    "month": "Mês",
+    "showMore": "+{{count}} mais"
   }
 }

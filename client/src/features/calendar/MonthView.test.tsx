@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '../../i18n.ts'
@@ -31,7 +31,35 @@ const products = new Map([['p1', makeProduct()]])
 const clientNames = new Map([['c1', 'Maria Silva']])
 const productNames = new Map([['p1', 'Vestido Azul']])
 
+// jsdom has no layout engine, so every getBoundingClientRect() reports zeroes.
+// react-big-calendar sizes a month cell by dividing the row height by the event
+// height (DateContentRow.getRowLimit), which with zeroes yields NaN — so it
+// renders every event and the "+N more" overflow button is never created at
+// all. Reporting one uniform non-zero height collapses the row limit to 1,
+// which is what makes the overflow button exist here. Deliberately scoped to
+// this file rather than setupTests.ts: a global layout stub would change Radix
+// popover/dialog positioning in every other test file.
+function mockLayoutHeights() {
+  vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(
+    () =>
+      ({
+        width: 100, height: 20, top: 0, left: 0, right: 100, bottom: 20, x: 0, y: 0,
+        toJSON: () => ({}),
+      }) as DOMRect,
+  )
+}
+
+// Five allocations on the same day: with a row limit of 1, one renders and the
+// other four collapse into the overflow button.
+function sameDayAllocations() {
+  return Array.from({ length: 5 }, (_, i) => makeAllocation({ id: `a${i}`, checkoutDate: '2026-07-22' }))
+}
+
 describe('MonthView', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('renders the toolbar in pt-BR instead of the react-big-calendar English default', () => {
     render(
       <MonthView
@@ -76,29 +104,46 @@ describe('MonthView', () => {
   })
 
   it('opens the day-items panel (not Agenda) when "+N more" is clicked', async () => {
+    mockLayoutHeights()
     const onSelectDay = vi.fn()
-    const day = new Date(2026, 6, 22)
-    const allocations = Array.from({ length: 5 }, (_, i) =>
-      makeAllocation({ id: `a${i}`, checkoutDate: '2026-07-22' }),
-    )
     render(
       <MonthView
-        allocations={allocations}
+        allocations={sameDayAllocations()}
         dateField="checkoutDate"
         onSelectDay={onSelectDay}
         productNames={productNames}
         products={products}
         clientNames={clientNames}
-        date={day}
+        date={new Date(2026, 6, 22)}
         onNavigate={vi.fn()}
       />,
     )
 
-    const showMoreLink = document.querySelector('.rbc-show-more') as HTMLElement | null
-    if (showMoreLink) {
-      await userEvent.click(showMoreLink)
-      expect(onSelectDay).not.toHaveBeenCalled()
-      expect(screen.getAllByText('Vestido Azul').length).toBeGreaterThan(0)
-    }
+    const showMoreLink = screen.getByRole('button', { name: '+4 mais' })
+    await userEvent.click(showMoreLink)
+
+    expect(onSelectDay).not.toHaveBeenCalled()
+    expect(screen.getAllByText('Vestido Azul').length).toBeGreaterThan(0)
+  })
+
+  it('renders the overflow link as "+N mais" instead of the react-big-calendar English default', () => {
+    mockLayoutHeights()
+    render(
+      <MonthView
+        allocations={sameDayAllocations()}
+        dateField="checkoutDate"
+        onSelectDay={vi.fn()}
+        productNames={productNames}
+        products={products}
+        clientNames={clientNames}
+        date={new Date(2026, 6, 22)}
+        onNavigate={vi.fn()}
+      />,
+    )
+
+    // 5 allocations, 4 hidden: the count is the number of events the cell could
+    // not fit, not the day total.
+    expect(screen.getByRole('button', { name: '+4 mais' })).toBeInTheDocument()
+    expect(screen.queryByText(/\+\d+ more$/)).not.toBeInTheDocument()
   })
 })
