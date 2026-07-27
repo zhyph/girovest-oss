@@ -44,6 +44,7 @@ test('Month view "+N more" opens the populated day-items panel, not Agenda', asy
 
   const showMoreLink = page.locator('.rbc-show-more').first()
   await expect(showMoreLink).toBeVisible()
+  await expect(showMoreLink).toHaveText(/^\+\d+ mais$/) // localized, not rbc's "+N more"
   await showMoreLink.click()
 
   // Must NOT have bounced to Agenda: the month grid must still be mounted underneath the dialog.
