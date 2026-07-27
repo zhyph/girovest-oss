@@ -6,10 +6,13 @@ on:
     tags:
       - 'v*'
 
-# Publishing goes to the separate public releases repo (see the publish block
-# in client/electron-builder.yml) via the RELEASES_TOKEN PAT — the built-in
+# Publishing goes to the separate releases repo (see the publish block in
+# client/electron-builder.yml) via the RELEASES_TOKEN PAT — the built-in
 # GITHUB_TOKEN can't write to a different repo, so this workflow needs no
-# write access to this one.
+# write access to this one. That repo is private: installed apps never read it
+# directly, they go through the update proxy in infra/update-proxy, which holds
+# a read-only PAT server-side. RELEASES_TOKEN therefore needs write access to a
+# private repo (fine-grained: Contents read+write scoped to girovest-releases).
 permissions:
   contents: read
 
@@ -112,9 +115,9 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         # Tag builds already ship these installers as release assets on the
-        # public releases repo (free); duplicating them as run artifacts at
-        # the default 90-day retention is what exhausted the account's 0.5 GB
-        # Actions storage quota. Keep artifacts only for manual dispatch runs,
+        # releases repo, and release assets don't count against the Actions
+        # storage quota; duplicating them as run artifacts at the default
+        # 90-day retention is what exhausted the account's 0.5 GB of it. Keep artifacts only for manual dispatch runs,
         # which don't publish anywhere else, and expire them fast.
         if: github.event_name == 'workflow_dispatch'
         with:
