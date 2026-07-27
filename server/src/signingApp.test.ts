@@ -162,6 +162,43 @@ describe('GET /product-photos/:token', () => {
     expect(response.text).toContain('id="back-link"')
   })
 
+  it('renders a create screen reachable from the picker, with every field the create API requires', async () => {
+    const { token } = await issueProductPhotoSession(staffId, locationId)
+
+    const response = await request(signingApp).get(`/product-photos/${token}`)
+
+    // The QR instructions promise the phone can "escolher ou cadastrar" a
+    // product, so the picker needs an entry point into a full create form.
+    expect(response.text).toContain('id="create-entry"')
+    expect(response.text).toContain('id="create-screen"')
+    expect(response.text).toContain('id="create-name"')
+    expect(response.text).toContain('id="create-category"')
+    expect(response.text).toContain('id="create-size"')
+    expect(response.text).toContain('id="create-color"')
+    expect(response.text).toContain('id="create-rental-price"')
+    expect(response.text).toContain('id="create-deposit"')
+    expect(response.text).toContain('id="create-submit"')
+    expect(response.text).toContain('id="create-back-link"')
+  })
+
+  it('gives the money fields a numeric keypad, since they are typed in centavos', async () => {
+    const { token } = await issueProductPhotoSession(staffId, locationId)
+
+    const response = await request(signingApp).get(`/product-photos/${token}`)
+
+    for (const id of ['create-rental-price', 'create-deposit']) {
+      const match = response.text.match(new RegExp(`<input[^>]*id="${id}"[^>]*>`))
+      expect(match).not.toBeNull()
+      expect(match![0]).toContain('inputmode="numeric"')
+    }
+  })
+
+  it('does not render the create screen on an invalid-code page', async () => {
+    const response = await request(signingApp).get('/product-photos/unknown-token')
+
+    expect(response.text).not.toContain('id="create-screen"')
+  })
+
   it('embeds the token in the inline script so the picker/capture screens can call the token-scoped API', async () => {
     const { token } = await issueProductPhotoSession(staffId, locationId)
 
