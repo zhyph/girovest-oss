@@ -10,4 +10,9 @@ contextBridge.exposeInMainWorld('girovest', {
   setTheme: (preference: 'light' | 'dark' | 'system') => {
     ipcRenderer.send('theme:set', preference)
   },
+  // invoke (not send) because this one has a return value. The hosted web build
+  // has no bridge at all, so the renderer treats absence as "no install id",
+  // which is the correct answer there: the identifier only exists for a desktop
+  // installation.
+  getInstallId: (): Promise<string | null> => ipcRenderer.invoke('install:id'),
 })

@@ -41,11 +41,21 @@ linux:
   target: AppImage
 publish:
   provider: github
-  # Source repo is private; electron-updater can't read private release assets
-  # without shipping a token inside the app. Binaries + update feed
-  # (latest*.yml) go to this public, releases-only repo instead. This block is
-  # also baked into the package as app-update.yml — it's what installed
-  # clients poll.
+  # Upload target for CI only. Both this repo and the source repo are private:
+  # electron-updater can't read private release assets without shipping a
+  # GitHub token inside the app, so installed clients never talk to GitHub
+  # directly. They go through a Cloudflare Worker that holds the PAT
+  # server-side and authenticates the app by product key.
+  #
+  # electron-builder still bakes this block into the package as
+  # app-update.yml, and that file is deliberately dead weight at runtime:
+  # electron/updater.ts calls setFeedURL() with the proxy URL before the first
+  # check, which replaces the provider this file would have configured. It is
+  # kept as github/... anyway because electron-builder reads the same block to
+  # know where to upload, and pointing it at the proxy would break publishing.
+  # If updater.ts ever stops calling setFeedURL, updates go silently dead
+  # (404s against a private repo) rather than leaking — see the warn-and-bail
+  # branch there.
   owner: zhyph
   repo: girovest-releases
   # Draft, not published: artifacts land attached to a draft release for a

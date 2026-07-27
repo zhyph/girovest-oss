@@ -5,6 +5,7 @@ import fs from 'fs'
 import net from 'net'
 import path from 'path'
 import { backupDatabaseIfNeeded, writeBackupMarker } from './backup.ts'
+import { resolveInstallId } from './installId.ts'
 import { setupAutoUpdater } from './updater.ts'
 
 export function resolveServerCwd(appRoot: string): string {
@@ -267,6 +268,22 @@ if (app) {
     }
   })
 
+  // Exposed so the shop can read its own install id off the Settings screen and
+  // relay it over the phone: it is the handle used to revoke that one
+  // installation's updates (see docs/update-proxy-runbook.md), and without a
+  // screen the only ways to obtain it are walking to the machine or grepping
+  // the proxy logs.
+  //
+  // Resolved lazily and memoized rather than at module load: app.getPath
+  // ('userData') is only correct after app.setName above, and this handler is
+  // registered next to the other one for symmetry, before whenReady resolves.
+  // First invocation always arrives long after the window exists.
+  let cachedInstallId: string | null = null
+  ipcMain.handle('install:id', () => {
+    cachedInstallId ??= resolveInstallId(app.getPath('userData'))
+    return cachedInstallId
+  })
+
   app.whenReady().then(async () => {
     const started = await startServer()
     if (!started) {
@@ -291,7 +308,10 @@ if (app) {
     }
 
     createWindow()
-    void setupAutoUpdater()
+    // Resolved here rather than inside setupAutoUpdater so the file lives
+    // next to the other userData-backed values and stays independent of
+    // whether the updater is enabled in this build.
+    void setupAutoUpdater(resolveInstallId(app.getPath('userData')))
   })
 
   app.on('window-all-closed', () => {

@@ -1,5 +1,15 @@
 import { app, dialog } from 'electron'
 
+// Injected at build time by electron.vite.config.ts's `define` for the `main`
+// target, from the GIROVEST_UPDATE_URL / GIROVEST_UPDATE_KEY environment
+// variables (empty string when the build didn't set them). They are literal
+// text substitutions, so they only exist in the packaged bundle: under Vitest
+// these identifiers are undeclared and a bare reference would throw a
+// ReferenceError. Every read below therefore sits after the `isPackaged`
+// guard, which returns long before any test reaches it.
+declare const GIROVEST_UPDATE_URL: string
+declare const GIROVEST_UPDATE_KEY: string
+
 // Shop machines stay open all day; launch-only checks would miss updates.
 const CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000
 
@@ -11,7 +21,7 @@ const CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000
 // prompts — which is also why the interval keeps running after a download.
 let promptedVersion: string | null = null
 
-export async function setupAutoUpdater(): Promise<void> {
+export async function setupAutoUpdater(installId: string): Promise<void> {
   // Optional chaining matters: under Vitest `app` is undefined (see the
   // `if (app)` guard comment in main.ts), and a bare `app.isPackaged` here
   // would TypeError if a future test ever calls this. In dev (real Electron,
@@ -30,6 +40,69 @@ export async function setupAutoUpdater(): Promise<void> {
 
   log.transports.file.level = 'info'
   autoUpdater.logger = log
+
+  // Fail loudly and do nothing. Without this, a build that forgot the two
+  // environment variables would silently fall back to the app-update.yml
+  // baked into the package (GitHub provider, girovest-releases) — a repo that
+  // is now private, so every check would 404 and look like "no updates
+  // available" forever. Warning-and-returning makes a misconfigured build
+  // visible in the log instead of turning into a silently dead update path.
+  if (!GIROVEST_UPDATE_URL || !GIROVEST_UPDATE_KEY) {
+    log.warn(
+      'Auto-update desativado: build sem GIROVEST_UPDATE_URL/GIROVEST_UPDATE_KEY. ' +
+        'Nenhum feed configurado (o app-update.yml do pacote foi ignorado de proposito).',
+    )
+    return
+  }
+
+  // The releases repo is private now, so the app never talks to GitHub
+  // directly: it points at a Cloudflare Worker that holds the GitHub PAT
+  // server-side and proxies latest*.yml plus the installer assets. 'generic'
+  // is the provider for "a plain HTTP directory of update files", which is
+  // exactly the shape the Worker exposes.
+  //
+  // useMultipleRangeRequest: false is not optional here, and its absence would
+  // fail silently. providerFactory.js:53 defaults it to true for any URL that
+  // isn't S3-shaped, which turns on the multi-range differential downloader:
+  // it sends one `Range: bytes=0-99, 500-999, ...` with many ranges and then
+  // requires the response to be `multipart/byteranges`
+  // (multipleRangeDownloader.js:81). The Worker forwards Range verbatim to
+  // GitHub's release-asset storage, and that storage does not implement
+  // multipart ranges — it answers with a plain 200. NsisUpdater swallows the
+  // resulting error, logs "Cannot download differentially, fallback to full
+  // download" and re-downloads the whole installer, so the only symptom is
+  // every shop pulling ~100 MB on every update forever. With the flag off the
+  // updater falls back to one range per request (DifferentialDownloader.js),
+  // which is exactly what the storage and the Worker do support. This is the
+  // same thing electron-updater itself does for S3/Spaces.
+  autoUpdater.setFeedURL({
+    provider: 'generic',
+    url: GIROVEST_UPDATE_URL,
+    useMultipleRangeRequest: false,
+  })
+
+  // Order is load-bearing, and it is the opposite of what the names suggest.
+  // Read from electron-updater 6.8.9's AppUpdater source:
+  //   - setFeedURL() never touches requestHeaders (only the constructor does,
+  //     and only from its own options object), so it is safe on either side.
+  //   - addAuthHeader(token) is not an "add": it does
+  //     `this.requestHeaders = Object.assign({}, this.requestHeaders, {...})`,
+  //     i.e. it REPLACES the object with a merged copy.
+  // So addAuthHeader must come first and the install header must be applied
+  // as a spread of the current value. Assigning requestHeaders wholesale
+  // afterwards (or calling addAuthHeader last with a plain assignment before
+  // it) would drop one of the two headers. Both are read lazily, at check and
+  // download time (computeFinalHeaders / computeRequestHeaders), so mutating
+  // them after setFeedURL still applies to the very first check.
+  //
+  // Accepted and deliberate: the key ships inside the asar and can be
+  // extracted. This is identification with server-side revocation, not
+  // secrecy.
+  autoUpdater.addAuthHeader(`Bearer ${GIROVEST_UPDATE_KEY}`)
+  autoUpdater.requestHeaders = {
+    ...autoUpdater.requestHeaders,
+    'X-Girovest-Install': installId,
+  }
 
   // Mandatory: autoUpdater is an EventEmitter, and an 'error' emission with
   // no listener is an uncaught exception — a crash dialog for an offline

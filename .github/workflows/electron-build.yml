@@ -55,7 +55,38 @@ jobs:
         # already-pruned server/node_modules production-only tree untouched.
         run: npm install --workspace=client
 
+      - name: Fail early if a tag build has no update-proxy coordinates
+        # A tag build is a build that gets published and installed. Without
+        # these two values electron.vite.config.ts bakes empty strings into the
+        # main bundle, updater.ts takes its warn-and-return branch, and the
+        # installer that reaches the shops is valid, installable, and can never
+        # update itself again. Nothing downstream catches that: the CI stays
+        # green, the draft release is complete, and even the post-release curl
+        # from docs/release-checklist.md passes, because it exercises the
+        # Worker and not the app. Manual workflow_dispatch runs are exempt on
+        # purpose — they exist to check that the build itself still works and
+        # they never publish (--publish onTag).
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          missing=""
+          [ -n "${{ secrets.GIROVEST_UPDATE_URL }}" ] || missing="$missing GIROVEST_UPDATE_URL"
+          [ -n "${{ secrets.GIROVEST_UPDATE_KEY }}" ] || missing="$missing GIROVEST_UPDATE_KEY"
+          if [ -n "$missing" ]; then
+            echo "::error::Secrets ausentes:$missing. Cadastre em Settings > Secrets and variables > Actions e refaca a tag. Sem eles o instalador publicado nunca se atualiza." >&2
+            exit 1
+          fi
+
       - name: Build client renderer/main/preload
+        # electron-vite's `define` for the main target reads these two from the
+        # environment (client/electron.vite.config.ts) and substitutes them as
+        # literals into out/main. This is the only step where they matter:
+        # electron-builder just packages what this step produced. Both are
+        # secrets rather than variables even though the URL is not sensitive,
+        # so the pair stays in one place and neither leaks into the run log.
+        env:
+          GIROVEST_UPDATE_URL: ${{ secrets.GIROVEST_UPDATE_URL }}
+          GIROVEST_UPDATE_KEY: ${{ secrets.GIROVEST_UPDATE_KEY }}
         run: npm run electron:build --workspace=client
 
       - name: Package with electron-builder
