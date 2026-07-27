@@ -6,7 +6,7 @@ import { X } from 'lucide-react'
 import { Button } from '../../components/ui/button.tsx'
 import { Input } from '../../components/ui/input.tsx'
 import { CurrencyInput } from '../../components/ui/currency-input.tsx'
-import { Modal } from '../../components/ui/modal.tsx'
+import { ConfirmDialog } from '../../components/ui/confirm-dialog.tsx'
 import { Select } from '../../components/ui/select.tsx'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from '../../components/ui/sheet.tsx'
 import { showErrorToast } from '../../lib/toast.ts'
@@ -250,21 +250,17 @@ export function ProductDrawer({
         </div>
       </form>
       {product && (
-        <Modal
+        <ConfirmDialog
           open={confirmingDelete}
-          onClose={() => setConfirmingDelete(false)}
           title={t('common:confirmDelete.title', { ns: 'common', name: product.name })}
-        >
-          <p className="mb-4 text-sm text-foreground">{t('common:confirmDelete.message', { ns: 'common' })}</p>
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={() => setConfirmingDelete(false)}>
-              {t('common:actions.cancel', { ns: 'common' })}
-            </Button>
-            <Button type="button" variant="danger" onClick={handleDelete} disabled={deleteProduct.isPending}>
-              {t('common:actions.delete', { ns: 'common' })}
-            </Button>
-          </div>
-        </Modal>
+          message={t('common:confirmDelete.message', { ns: 'common' })}
+          confirmLabel={t('common:actions.delete', { ns: 'common' })}
+          cancelLabel={t('common:actions.cancel', { ns: 'common' })}
+          confirmVariant="danger"
+          confirmDisabled={deleteProduct.isPending}
+          onConfirm={handleDelete}
+          onCancel={() => setConfirmingDelete(false)}
+        />
       )}
       </SheetContent>
     </Sheet>

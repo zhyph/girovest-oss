@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/button.tsx'
 import { Input } from '../../components/ui/input.tsx'
 import { CurrencyInput } from '../../components/ui/currency-input.tsx'
 import { Modal } from '../../components/ui/modal.tsx'
+import { ConfirmDialog } from '../../components/ui/confirm-dialog.tsx'
 import { parseDateOnly, formatDate } from '../../lib/date.ts'
 import { useLocale } from '../../lib/LocaleContext.tsx'
 import { showErrorToast } from '../../lib/toast.ts'
@@ -102,21 +103,16 @@ export function RowActions({ allocation }: { allocation: Allocation }) {
             </div>
           </div>
         </Modal>
-        <Modal
+        <ConfirmDialog
           open={showCancelConfirm}
-          onClose={() => setShowCancelConfirm(false)}
           title={t('common:confirmCancelAllocation.title', { ns: 'common' })}
-        >
-          <p className="mb-4 text-sm text-foreground">{t('common:confirmCancelAllocation.message', { ns: 'common' })}</p>
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={() => setShowCancelConfirm(false)}>
-              {t('common:actions.cancel', { ns: 'common' })}
-            </Button>
-            <Button type="button" onClick={handleCancel} disabled={cancel.isPending}>
-              {t('common:confirmCancelAllocation.confirm', { ns: 'common' })}
-            </Button>
-          </div>
-        </Modal>
+          message={t('common:confirmCancelAllocation.message', { ns: 'common' })}
+          confirmLabel={t('common:confirmCancelAllocation.confirm', { ns: 'common' })}
+          cancelLabel={t('common:actions.cancel', { ns: 'common' })}
+          confirmDisabled={cancel.isPending}
+          onConfirm={handleCancel}
+          onCancel={() => setShowCancelConfirm(false)}
+        />
       </div>
     )
   }
@@ -179,17 +175,16 @@ function ContractCancelAction({ contract }: { contract: Contract }) {
       >
         {t('cancelContract.action')}
       </Button>
-      <Modal open={showConfirm} onClose={() => setShowConfirm(false)} title={t('cancelContract.confirmTitle')}>
-        <p className="mb-4 text-sm text-foreground">{t('cancelContract.confirmMessage')}</p>
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={() => setShowConfirm(false)}>
-            {t('common:actions.cancel', { ns: 'common' })}
-          </Button>
-          <Button type="button" onClick={handleCancel} disabled={cancelContract.isPending}>
-            {t('cancelContract.confirm')}
-          </Button>
-        </div>
-      </Modal>
+      <ConfirmDialog
+        open={showConfirm}
+        title={t('cancelContract.confirmTitle')}
+        message={t('cancelContract.confirmMessage')}
+        confirmLabel={t('cancelContract.confirm')}
+        cancelLabel={t('common:actions.cancel', { ns: 'common' })}
+        confirmDisabled={cancelContract.isPending}
+        onConfirm={handleCancel}
+        onCancel={() => setShowConfirm(false)}
+      />
     </>
   )
 }
