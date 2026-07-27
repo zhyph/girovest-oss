@@ -91,7 +91,7 @@ export function RowActions({ allocation }: { allocation: Allocation }) {
     try {
       await checkOut.mutateAsync({ id: allocation.id, conditionNotesOut, depositCollected, allowEarly: true })
       setShowEarlyConfirm(false)
-      setShowCheckOutDialog(false)
+      closeCheckOutDialog()
     } catch (error) {
       setShowEarlyConfirm(false)
       showActionError(error)
