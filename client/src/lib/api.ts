@@ -1,4 +1,4 @@
-import { getToken, clearToken } from './auth.ts'
+import { getToken, setToken, clearToken } from './auth.ts'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000'
 
@@ -24,6 +24,19 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   }
 
   const response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers })
+
+  // Sliding session renewal. The server re-issues the JWT on this header once
+  // the presented one is past its half-life, so someone who keeps working is
+  // never logged out mid-shift. Deliberately above the 204 early return —
+  // otherwise every DELETE would silently drop its renewal.
+  // No state update is needed: every token reader calls getToken() fresh, so
+  // the swap is invisible and causes no re-render or refetch.
+  // `.headers` is optional-chained because several test suites mock fetch with
+  // a bare { ok, status, json } object.
+  const renewedToken = response.headers?.get('X-Renewed-Token')
+  if (renewedToken) {
+    setToken(renewedToken)
+  }
 
   if (response.status === 204) {
     return undefined as T

@@ -50,3 +50,77 @@ describe('apiFetch', () => {
     expect(getToken()).toBeNull()
   })
 })
+
+describe('apiFetch session renewal', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    vi.stubGlobal('fetch', vi.fn())
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('stores the token the server hands back on X-Renewed-Token', async () => {
+    setToken('old-token')
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'X-Renewed-Token': 'fresh-token' },
+      }),
+    )
+
+    await apiFetch('/api/clients')
+
+    expect(getToken()).toBe('fresh-token')
+  })
+
+  it('leaves the stored token alone when the server sends no renewal', async () => {
+    setToken('old-token')
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }))
+
+    await apiFetch('/api/clients')
+
+    expect(getToken()).toBe('old-token')
+  })
+
+  // A 204 returns early, before the body is ever read — a renewal riding on a
+  // DELETE must not be dropped on the floor.
+  it('stores a renewed token that arrives on a 204 response', async () => {
+    setToken('old-token')
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(null, { status: 204, headers: { 'X-Renewed-Token': 'fresh-token' } }),
+    )
+
+    await apiFetch('/api/products/abc')
+
+    expect(getToken()).toBe('fresh-token')
+  })
+
+  it('does not resurrect the token when a 401 carries a renewal header', async () => {
+    setToken('old-token')
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify({ code: 'UNAUTHORIZED', message: 'Invalid token' }), {
+        status: 401,
+        headers: { 'X-Renewed-Token': 'fresh-token' },
+      }),
+    )
+
+    await expect(apiFetch('/api/clients')).rejects.toBeInstanceOf(ApiError)
+    expect(getToken()).toBeNull()
+  })
+
+  // Other suites mock fetch with a bare { ok, status, json } object that has no
+  // headers at all; reading them unguarded would break those tests.
+  it('tolerates a response object with no headers', async () => {
+    setToken('old-token')
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ ok: true }),
+    } as unknown as Response)
+
+    await expect(apiFetch('/api/clients')).resolves.toEqual({ ok: true })
+    expect(getToken()).toBe('old-token')
+  })
+})
