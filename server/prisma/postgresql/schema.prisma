@@ -18,10 +18,11 @@ model Location {
   phone     String?
   createdAt DateTime @default(now())
 
-  staff           Staff[]
-  products        Product[]
-  contracts       Contract[]
-  contractClauses LocationContractClause[]
+  staff                Staff[]
+  products             Product[]
+  contracts            Contract[]
+  contractClauses      LocationContractClause[]
+  productPhotoTokens   ProductPhotoToken[]
 }
 
 model Staff {
@@ -33,9 +34,10 @@ model Staff {
   locationId   String
   createdAt    DateTime @default(now())
 
-  location    Location     @relation(fields: [locationId], references: [id])
-  allocations Allocation[]
-  contracts   Contract[]
+  location              Location     @relation(fields: [locationId], references: [id])
+  allocations           Allocation[]
+  contracts             Contract[]
+  productPhotoTokens    ProductPhotoToken[]
 }
 
 model Client {
@@ -71,21 +73,22 @@ model Product {
 }
 
 model Allocation {
-  id                String    @id @default(uuid())
-  productId         String
-  clientId          String
-  staffId           String
-  contractId        String?
-  checkoutDate      DateTime
-  dueDate           DateTime
-  actualReturnDate  DateTime?
-  status            String
-  priceCharged      Float
-  depositCollected  Float?
-  depositReturned   Float?
-  conditionNotesOut String?
-  conditionNotesIn  String?
-  createdAt         DateTime  @default(now())
+  id                 String    @id @default(uuid())
+  productId          String
+  clientId           String
+  staffId            String
+  contractId         String?
+  checkoutDate       DateTime
+  actualCheckoutDate DateTime?
+  dueDate            DateTime
+  actualReturnDate   DateTime?
+  status             String
+  priceCharged       Float
+  depositCollected   Float?
+  depositReturned    Float?
+  conditionNotesOut  String?
+  conditionNotesIn   String?
+  createdAt          DateTime  @default(now())
 
   product  Product   @relation(fields: [productId], references: [id])
   client   Client    @relation(fields: [clientId], references: [id])
@@ -111,8 +114,32 @@ model Contract {
   staff        Staff         @relation(fields: [staffId], references: [id])
   allocations  Allocation[]
   installments Installment[]
+  signingTokens SigningToken[]
 
   @@unique([locationId, number])
+}
+
+model SigningToken {
+  id         String    @id @default(uuid())
+  token      String    @unique
+  contractId String
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+}
+
+model ProductPhotoToken {
+  id         String   @id @default(uuid())
+  token      String   @unique
+  staffId    String
+  locationId String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  staff    Staff    @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
 }
 
 model Installment {

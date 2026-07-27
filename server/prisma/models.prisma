@@ -61,21 +61,22 @@ model Product {
 }
 
 model Allocation {
-  id                String    @id @default(uuid())
-  productId         String
-  clientId          String
-  staffId           String
-  contractId        String?
-  checkoutDate      DateTime
-  dueDate           DateTime
-  actualReturnDate  DateTime?
-  status            String
-  priceCharged      Float
-  depositCollected  Float?
-  depositReturned   Float?
-  conditionNotesOut String?
-  conditionNotesIn  String?
-  createdAt         DateTime  @default(now())
+  id                 String    @id @default(uuid())
+  productId          String
+  clientId           String
+  staffId            String
+  contractId         String?
+  checkoutDate       DateTime
+  actualCheckoutDate DateTime?
+  dueDate            DateTime
+  actualReturnDate   DateTime?
+  status             String
+  priceCharged       Float
+  depositCollected   Float?
+  depositReturned    Float?
+  conditionNotesOut  String?
+  conditionNotesIn   String?
+  createdAt          DateTime  @default(now())
 
   product  Product   @relation(fields: [productId], references: [id])
   client   Client    @relation(fields: [clientId], references: [id])

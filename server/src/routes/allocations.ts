@@ -23,6 +23,8 @@ allocationsRouter.get('/', async (_req, res) => {
 const checkOutSchema = z.object({
   conditionNotesOut: z.string().optional(),
   depositCollected: z.number().nonnegative().optional(),
+  // Set only after the operator confirmed the early pickup in the UI.
+  allowEarly: z.boolean().optional(),
 })
 
 const returnSchema = z.object({

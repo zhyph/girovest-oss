@@ -7,6 +7,7 @@ describe('isOccupiedForRange', () => {
       {
         status: 'reserved',
         checkoutDate: new Date('2026-08-01'),
+        actualCheckoutDate: null,
         dueDate: new Date('2026-08-05'),
         actualReturnDate: null,
       },
@@ -19,6 +20,7 @@ describe('isOccupiedForRange', () => {
       {
         status: 'returned',
         checkoutDate: new Date('2026-08-01'),
+        actualCheckoutDate: null,
         dueDate: new Date('2026-08-05'),
         actualReturnDate: new Date('2026-08-04'),
       },
@@ -31,6 +33,7 @@ describe('isOccupiedForRange', () => {
       {
         status: 'checked_out',
         checkoutDate: new Date('2026-08-01'),
+        actualCheckoutDate: null,
         dueDate: new Date('2026-08-05'),
         actualReturnDate: null,
       },
@@ -45,6 +48,7 @@ describe('isOccupiedForRange', () => {
       {
         status: 'cancelled',
         checkoutDate: new Date('2026-08-01'),
+        actualCheckoutDate: null,
         dueDate: new Date('2026-08-05'),
         actualReturnDate: null,
       },
@@ -57,6 +61,7 @@ describe('isOccupiedForRange', () => {
       {
         status: 'reserved',
         checkoutDate: new Date('2026-08-10'),
+        actualCheckoutDate: null,
         dueDate: new Date('2026-08-15'),
         actualReturnDate: null,
       },
@@ -69,6 +74,7 @@ describe('isOccupiedForRange', () => {
       {
         status: 'reserved',
         checkoutDate: new Date('2026-08-01'),
+        actualCheckoutDate: null,
         dueDate: new Date('2026-08-05'),
         actualReturnDate: null,
       },
@@ -81,6 +87,7 @@ describe('isOccupiedForRange', () => {
       {
         status: 'reserved',
         checkoutDate: new Date('2026-08-01'),
+        actualCheckoutDate: null,
         dueDate: new Date('2026-08-05'),
         actualReturnDate: null,
       },
@@ -99,6 +106,7 @@ describe('derivedAvailability', () => {
       {
         status: 'checked_out',
         checkoutDate: new Date('2026-08-01'),
+        actualCheckoutDate: null,
         dueDate: new Date('2026-08-05'),
         actualReturnDate: null,
       },
@@ -111,10 +119,69 @@ describe('derivedAvailability', () => {
       {
         status: 'reserved',
         checkoutDate: new Date('2026-08-01'),
+        actualCheckoutDate: null,
         dueDate: new Date('2026-08-05'),
         actualReturnDate: null,
       },
     ]
     expect(derivedAvailability(allocations, new Date('2026-08-03'))).toBe('reserved')
+  })
+})
+
+describe('early check-out occupancy', () => {
+  it('CRITICAL: an early check-out occupies the dress from the actual pickup, not from the planned checkout date', () => {
+    const allocations: AllocationWindow[] = [
+      {
+        status: 'checked_out',
+        checkoutDate: new Date('2026-08-10'),
+        actualCheckoutDate: new Date('2026-08-03'),
+        dueDate: new Date('2026-08-15'),
+        actualReturnDate: null,
+      },
+    ]
+    // The dress physically left the store on Aug 3; the window between the
+    // real pickup and the planned checkout date must not read as free.
+    expect(isOccupiedForRange(allocations, new Date('2026-08-04'), new Date('2026-08-06'))).toBe(true)
+  })
+
+  it('reports a dress picked up early as rented on a date before its planned checkout date', () => {
+    const allocations: AllocationWindow[] = [
+      {
+        status: 'checked_out',
+        checkoutDate: new Date('2026-08-10'),
+        actualCheckoutDate: new Date('2026-08-03'),
+        dueDate: new Date('2026-08-15'),
+        actualReturnDate: null,
+      },
+    ]
+    expect(derivedAvailability(allocations, new Date('2026-08-05'))).toBe('rented')
+  })
+
+  it('falls back to the planned checkout date when no actual check-out instant was recorded', () => {
+    const allocations: AllocationWindow[] = [
+      {
+        status: 'checked_out',
+        checkoutDate: new Date('2026-08-10'),
+        actualCheckoutDate: null,
+        dueDate: new Date('2026-08-15'),
+        actualReturnDate: null,
+      },
+    ]
+    expect(isOccupiedForRange(allocations, new Date('2026-08-04'), new Date('2026-08-06'))).toBe(false)
+    expect(derivedAvailability(allocations, new Date('2026-08-05'))).toBe('available')
+  })
+
+  it('never shrinks occupancy when the dress was picked up LATE — the reserved days stay blocked', () => {
+    const allocations: AllocationWindow[] = [
+      {
+        status: 'checked_out',
+        checkoutDate: new Date('2026-08-10'),
+        actualCheckoutDate: new Date('2026-08-12'),
+        dueDate: new Date('2026-08-15'),
+        actualReturnDate: null,
+      },
+    ]
+    expect(isOccupiedForRange(allocations, new Date('2026-08-10'), new Date('2026-08-11'))).toBe(true)
+    expect(derivedAvailability(allocations, new Date('2026-08-11'))).toBe('rented')
   })
 })
