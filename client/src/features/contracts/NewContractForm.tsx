@@ -8,8 +8,10 @@ import { CurrencyInput } from '../../components/ui/currency-input.tsx'
 import { DateInput } from '../../components/ui/date-input.tsx'
 import { Select } from '../../components/ui/select.tsx'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose, SheetBody } from '../../components/ui/sheet.tsx'
+import { ConfirmDialog } from '../../components/ui/confirm-dialog.tsx'
 import { showErrorToast } from '../../lib/toast.ts'
 import { useLocale } from '../../lib/LocaleContext.tsx'
+import { useUnsavedChangesGuard } from '../../lib/useUnsavedChangesGuard.ts'
 import { getMissingRequiredFields } from '../../lib/clientReadiness.ts'
 import { getPaymentMethods } from '../../lib/paymentMethodTemplate.ts'
 import { useClients } from '../clients/useClients.ts'
@@ -134,7 +136,7 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
     handleSubmit,
     control,
     watch,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<NewContractFormValues>({
     resolver: zodResolver(newContractSchema),
     defaultValues: {
@@ -148,6 +150,7 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
 
   const items = useFieldArray({ control, name: 'items' })
   const installments = useFieldArray({ control, name: 'installments' })
+  const discardGuard = useUnsavedChangesGuard({ isDirty, onConfirmDiscard: onClose })
   const selectedClientId = watch('clientId')
   const selectedClient = clients?.find((client) => client.id === selectedClientId) ?? null
   const missingFields = selectedClient ? getMissingRequiredFields(selectedClient, locale) : []
@@ -167,7 +170,7 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
 
   return (
     <>
-    <Sheet open onOpenChange={(next) => !next && onClose()}>
+    <Sheet open onOpenChange={(next) => !next && discardGuard.requestClose()}>
       <SheetContent className="w-[36rem]" aria-describedby={undefined}>
         <SheetHeader>
           <SheetTitle>{t('newContract')}</SheetTitle>
@@ -314,7 +317,7 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
             </Button>
           </div>
           <div className="mt-2 flex justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={onClose}>
+            <Button type="button" variant="secondary" onClick={discardGuard.requestClose}>
               {t('common:actions.cancel', { ns: 'common' })}
             </Button>
             <Button type="submit" disabled={createContract.isPending}>
@@ -322,6 +325,16 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
             </Button>
           </div>
         </form>
+        <ConfirmDialog
+          open={discardGuard.isConfirmingDiscard}
+          title={t('common:confirmDiscard.title', { ns: 'common' })}
+          message={t('common:confirmDiscard.message', { ns: 'common' })}
+          confirmLabel={t('common:confirmDiscard.confirm', { ns: 'common' })}
+          cancelLabel={t('common:confirmDiscard.cancel', { ns: 'common' })}
+          confirmVariant="danger"
+          onConfirm={discardGuard.confirmDiscard}
+          onCancel={discardGuard.cancelDiscard}
+        />
         </SheetBody>
       </SheetContent>
     </Sheet>
