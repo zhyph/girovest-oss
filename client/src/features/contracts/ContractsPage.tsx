@@ -6,9 +6,11 @@ import { Button } from '../../components/ui/button.tsx'
 import { Input } from '../../components/ui/input.tsx'
 import { CurrencyInput } from '../../components/ui/currency-input.tsx'
 import { Modal } from '../../components/ui/modal.tsx'
+import { ConfirmDialog } from '../../components/ui/confirm-dialog.tsx'
 import { parseDateOnly, formatDate } from '../../lib/date.ts'
 import { useLocale } from '../../lib/LocaleContext.tsx'
 import { showErrorToast } from '../../lib/toast.ts'
+import { useUnsavedChangesGuard } from '../../lib/useUnsavedChangesGuard.ts'
 import { useClients } from '../clients/useClients.ts'
 import { useProducts } from '../products/useProducts.ts'
 import {
@@ -41,6 +43,29 @@ export function RowActions({ allocation }: { allocation: Allocation }) {
   const [conditionNotesIn, setConditionNotesIn] = useState('')
   const [depositReturned, setDepositReturned] = useState(0)
 
+  // These dialogs hold their input in plain state, so closing them has to clear
+  // it explicitly — otherwise reopening shows whatever was typed last time.
+  function closeCheckOutDialog() {
+    setShowCheckOutDialog(false)
+    setConditionNotesOut('')
+    setDepositCollected(0)
+  }
+
+  function closeReturnDialog() {
+    setShowReturnDialog(false)
+    setConditionNotesIn('')
+    setDepositReturned(0)
+  }
+
+  const checkOutGuard = useUnsavedChangesGuard({
+    isDirty: conditionNotesOut.trim() !== '' || depositCollected !== 0,
+    onConfirmDiscard: closeCheckOutDialog,
+  })
+  const returnGuard = useUnsavedChangesGuard({
+    isDirty: conditionNotesIn.trim() !== '' || depositReturned !== 0,
+    onConfirmDiscard: closeReturnDialog,
+  })
+
   function showActionError(error: unknown) {
     const code = resolveErrorCode(error)
     showErrorToast(t(`errors.${code}`, { defaultValue: t('common:errors.UNKNOWN', { ns: 'common' }) }))
@@ -49,7 +74,7 @@ export function RowActions({ allocation }: { allocation: Allocation }) {
   async function handleCheckOut() {
     try {
       await checkOut.mutateAsync({ id: allocation.id, conditionNotesOut, depositCollected })
-      setShowCheckOutDialog(false)
+      closeCheckOutDialog()
     } catch (error) {
       // Being early is a decision for the shop to make, not a dead end — ask
       // instead of toasting. The server clock stays the only authority on
@@ -76,7 +101,7 @@ export function RowActions({ allocation }: { allocation: Allocation }) {
   async function handleReturn() {
     try {
       await returnAllocation.mutateAsync({ id: allocation.id, conditionNotesIn, depositReturned })
-      setShowReturnDialog(false)
+      closeReturnDialog()
     } catch (error) {
       showActionError(error)
     }
@@ -102,7 +127,7 @@ export function RowActions({ allocation }: { allocation: Allocation }) {
             {t('actions.cancel')}
           </Button>
         </div>
-        <Modal open={showCheckOutDialog} onClose={() => setShowCheckOutDialog(false)} title={t('checkOutDialog.title')}>
+        <Modal open={showCheckOutDialog} onClose={checkOutGuard.requestClose} title={t('checkOutDialog.title')}>
           <div className="flex flex-col gap-3">
             <label className="flex flex-col gap-1 text-sm">
               {t('fields.conditionNotesOut')}
@@ -113,13 +138,23 @@ export function RowActions({ allocation }: { allocation: Allocation }) {
               <CurrencyInput value={depositCollected} onChange={setDepositCollected} aria-label={t('fields.depositCollected')} />
             </label>
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="secondary" onClick={() => setShowCheckOutDialog(false)}>
+              <Button type="button" variant="secondary" onClick={checkOutGuard.requestClose}>
                 {t('common:actions.cancel', { ns: 'common' })}
               </Button>
               <Button type="button" onClick={handleCheckOut} disabled={checkOut.isPending}>
                 {t('checkOutDialog.confirm')}
               </Button>
             </div>
+            <ConfirmDialog
+              open={checkOutGuard.isConfirmingDiscard}
+              title={t('common:confirmDiscard.title', { ns: 'common' })}
+              message={t('common:confirmDiscard.message', { ns: 'common' })}
+              confirmLabel={t('common:confirmDiscard.confirm', { ns: 'common' })}
+              cancelLabel={t('common:confirmDiscard.cancel', { ns: 'common' })}
+              confirmVariant="danger"
+              onConfirm={checkOutGuard.confirmDiscard}
+              onCancel={checkOutGuard.cancelDiscard}
+            />
           </div>
         </Modal>
         <Modal open={showEarlyConfirm} onClose={() => setShowEarlyConfirm(false)} title={t('checkOutDialog.earlyTitle')}>
@@ -141,21 +176,16 @@ export function RowActions({ allocation }: { allocation: Allocation }) {
             </Button>
           </div>
         </Modal>
-        <Modal
+        <ConfirmDialog
           open={showCancelConfirm}
-          onClose={() => setShowCancelConfirm(false)}
           title={t('common:confirmCancelAllocation.title', { ns: 'common' })}
-        >
-          <p className="mb-4 text-sm text-foreground">{t('common:confirmCancelAllocation.message', { ns: 'common' })}</p>
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={() => setShowCancelConfirm(false)}>
-              {t('common:actions.cancel', { ns: 'common' })}
-            </Button>
-            <Button type="button" onClick={handleCancel} disabled={cancel.isPending}>
-              {t('common:confirmCancelAllocation.confirm', { ns: 'common' })}
-            </Button>
-          </div>
-        </Modal>
+          message={t('common:confirmCancelAllocation.message', { ns: 'common' })}
+          confirmLabel={t('common:confirmCancelAllocation.confirm', { ns: 'common' })}
+          cancelLabel={t('common:actions.cancel', { ns: 'common' })}
+          confirmDisabled={cancel.isPending}
+          onConfirm={handleCancel}
+          onCancel={() => setShowCancelConfirm(false)}
+        />
       </div>
     )
   }
@@ -165,7 +195,7 @@ export function RowActions({ allocation }: { allocation: Allocation }) {
         <Button size="sm" onClick={() => setShowReturnDialog(true)} disabled={returnAllocation.isPending}>
           {t('actions.return')}
         </Button>
-        <Modal open={showReturnDialog} onClose={() => setShowReturnDialog(false)} title={t('returnDialog.title')}>
+        <Modal open={showReturnDialog} onClose={returnGuard.requestClose} title={t('returnDialog.title')}>
           <div className="flex flex-col gap-3">
             <label className="flex flex-col gap-1 text-sm">
               {t('fields.conditionNotesIn')}
@@ -176,13 +206,23 @@ export function RowActions({ allocation }: { allocation: Allocation }) {
               <CurrencyInput value={depositReturned} onChange={setDepositReturned} aria-label={t('fields.depositReturned')} />
             </label>
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="secondary" onClick={() => setShowReturnDialog(false)}>
+              <Button type="button" variant="secondary" onClick={returnGuard.requestClose}>
                 {t('common:actions.cancel', { ns: 'common' })}
               </Button>
               <Button type="button" onClick={handleReturn} disabled={returnAllocation.isPending}>
                 {t('returnDialog.confirm')}
               </Button>
             </div>
+            <ConfirmDialog
+              open={returnGuard.isConfirmingDiscard}
+              title={t('common:confirmDiscard.title', { ns: 'common' })}
+              message={t('common:confirmDiscard.message', { ns: 'common' })}
+              confirmLabel={t('common:confirmDiscard.confirm', { ns: 'common' })}
+              cancelLabel={t('common:confirmDiscard.cancel', { ns: 'common' })}
+              confirmVariant="danger"
+              onConfirm={returnGuard.confirmDiscard}
+              onCancel={returnGuard.cancelDiscard}
+            />
           </div>
         </Modal>
       </div>
@@ -218,17 +258,16 @@ function ContractCancelAction({ contract }: { contract: Contract }) {
       >
         {t('cancelContract.action')}
       </Button>
-      <Modal open={showConfirm} onClose={() => setShowConfirm(false)} title={t('cancelContract.confirmTitle')}>
-        <p className="mb-4 text-sm text-foreground">{t('cancelContract.confirmMessage')}</p>
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={() => setShowConfirm(false)}>
-            {t('common:actions.cancel', { ns: 'common' })}
-          </Button>
-          <Button type="button" onClick={handleCancel} disabled={cancelContract.isPending}>
-            {t('cancelContract.confirm')}
-          </Button>
-        </div>
-      </Modal>
+      <ConfirmDialog
+        open={showConfirm}
+        title={t('cancelContract.confirmTitle')}
+        message={t('cancelContract.confirmMessage')}
+        confirmLabel={t('cancelContract.confirm')}
+        cancelLabel={t('common:actions.cancel', { ns: 'common' })}
+        confirmDisabled={cancelContract.isPending}
+        onConfirm={handleCancel}
+        onCancel={() => setShowConfirm(false)}
+      />
     </>
   )
 }

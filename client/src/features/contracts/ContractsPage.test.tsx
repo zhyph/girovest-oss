@@ -239,3 +239,143 @@ describe('ContractsPage', () => {
     expect(listSpy).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, search: 'maria' }))
   })
 })
+
+const checkedOutContract: Contract = {
+  ...contract,
+  allocations: [{ ...contract.allocations[0], status: 'checked_out' }],
+}
+
+function mockAllocationHooks(
+  overrides: {
+    checkOutImpl?: (...args: never[]) => Promise<unknown>
+    returnImpl?: (...args: never[]) => Promise<unknown>
+    cancelAllocationImpl?: (...args: never[]) => Promise<unknown>
+  } = {},
+) {
+  vi.spyOn(useAllocationsModule, 'useCheckOutAllocation').mockReturnValue({
+    mutateAsync: overrides.checkOutImpl ?? vi.fn().mockResolvedValue(undefined),
+    isPending: false,
+  } as never)
+  vi.spyOn(useAllocationsModule, 'useReturnAllocation').mockReturnValue({
+    mutateAsync: overrides.returnImpl ?? vi.fn().mockResolvedValue(undefined),
+    isPending: false,
+  } as never)
+  vi.spyOn(useAllocationsModule, 'useCancelAllocation').mockReturnValue({
+    mutateAsync: overrides.cancelAllocationImpl ?? vi.fn().mockResolvedValue(undefined),
+    isPending: false,
+  } as never)
+}
+
+// The pt-BR currency formatter separates symbol and amount with a non-breaking
+// space, so normalise before comparing against a plain-space literal.
+function currencyValue(label: string) {
+  return (screen.getByLabelText(label) as HTMLInputElement).value.replace(/\u00a0/g, ' ')
+}
+
+describe('ContractsPage allocation dialogs', () => {
+  it('prompts before discarding typed check-out notes', async () => {
+    mockHooks()
+    mockAllocationHooks()
+    renderWithProviders(<ContractsPage />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Check-out' }))
+    await userEvent.type(screen.getByLabelText('Estado do produto na saída'), 'pequeno rasgo')
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+    expect(screen.getByText('Descartar alterações?')).toBeInTheDocument()
+    expect(screen.getByLabelText('Estado do produto na saída')).toHaveValue('pequeno rasgo')
+  })
+
+  it('keeps the check-out notes when Continuar editando is chosen', async () => {
+    mockHooks()
+    mockAllocationHooks()
+    renderWithProviders(<ContractsPage />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Check-out' }))
+    await userEvent.type(screen.getByLabelText('Estado do produto na saída'), 'pequeno rasgo')
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Continuar editando' }))
+
+    expect(screen.queryByText('Descartar alterações?')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Estado do produto na saída')).toHaveValue('pequeno rasgo')
+  })
+
+  it('clears the check-out fields after discarding, so reopening starts fresh', async () => {
+    mockHooks()
+    mockAllocationHooks()
+    renderWithProviders(<ContractsPage />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Check-out' }))
+    await userEvent.type(screen.getByLabelText('Estado do produto na saída'), 'pequeno rasgo')
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Descartar' }))
+
+    expect(screen.queryByLabelText('Estado do produto na saída')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Check-out' }))
+
+    expect(screen.getByLabelText('Estado do produto na saída')).toHaveValue('')
+    expect(currencyValue('Caução recebida')).toBe('R$ 0,00')
+  })
+
+  it('closes the check-out dialog straight away when nothing was typed', async () => {
+    mockHooks()
+    mockAllocationHooks()
+    renderWithProviders(<ContractsPage />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Check-out' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+    expect(screen.queryByText('Descartar alterações?')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Estado do produto na saída')).not.toBeInTheDocument()
+  })
+
+  it('clears the check-out fields after a successful check-out', async () => {
+    mockHooks()
+    const checkOutImpl = vi.fn().mockResolvedValue(undefined)
+    mockAllocationHooks({ checkOutImpl })
+    renderWithProviders(<ContractsPage />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Check-out' }))
+    await userEvent.type(screen.getByLabelText('Estado do produto na saída'), 'pequeno rasgo')
+    await userEvent.click(screen.getByRole('button', { name: 'Confirmar check-out' }))
+
+    expect(checkOutImpl).toHaveBeenCalledOnce()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Check-out' }))
+    expect(screen.getByLabelText('Estado do produto na saída')).toHaveValue('')
+  })
+
+  it('prompts before discarding typed return notes, and clears them after discarding', async () => {
+    mockHooks({ contracts: [checkedOutContract] })
+    mockAllocationHooks()
+    renderWithProviders(<ContractsPage />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Devolver' }))
+    await userEvent.type(screen.getByLabelText('Estado do produto na devolução'), 'tudo certo')
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+    expect(screen.getByText('Descartar alterações?')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Descartar' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Devolver' }))
+
+    expect(screen.getByLabelText('Estado do produto na devolução')).toHaveValue('')
+    expect(currencyValue('Caução devolvida')).toBe('R$ 0,00')
+  })
+
+  it('does not guard the pure cancel-allocation confirmation, which carries no input', async () => {
+    mockHooks()
+    const cancelAllocationImpl = vi.fn().mockResolvedValue(undefined)
+    mockAllocationHooks({ cancelAllocationImpl })
+    renderWithProviders(<ContractsPage />)
+
+    const rowCancel = screen.getAllByRole('button', { name: 'Cancelar' })[0]
+    await userEvent.click(rowCancel)
+    const dialog = screen.getByRole('dialog')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Sim, cancelar' }))
+
+    expect(cancelAllocationImpl).toHaveBeenCalledWith('a1')
+    expect(screen.queryByText('Descartar alterações?')).not.toBeInTheDocument()
+  })
+})

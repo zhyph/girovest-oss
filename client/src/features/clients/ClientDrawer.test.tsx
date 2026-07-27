@@ -37,6 +37,96 @@ describe('ClientDrawer', () => {
     expect(onClose).toHaveBeenCalledOnce()
   })
 
+  it('closes immediately when Cancelar is clicked on a pristine drawer', async () => {
+    const onClose = vi.fn()
+    mockClientHooks()
+    renderWithToast(<ClientDrawer client={null} onClose={onClose} />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+    expect(screen.queryByText('Descartar alterações?')).not.toBeInTheDocument()
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('asks to confirm before discarding typed input when Cancelar is clicked', async () => {
+    const onClose = vi.fn()
+    mockClientHooks()
+    renderWithToast(<ClientDrawer client={null} onClose={onClose} />)
+
+    await userEvent.type(screen.getByLabelText('Nome'), 'Nova Cliente')
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+    expect(screen.getByText('Descartar alterações?')).toBeInTheDocument()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('discards and closes once Descartar is confirmed', async () => {
+    const onClose = vi.fn()
+    mockClientHooks()
+    renderWithToast(<ClientDrawer client={null} onClose={onClose} />)
+
+    await userEvent.type(screen.getByLabelText('Nome'), 'Nova Cliente')
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Descartar' }))
+
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('keeps the drawer and the typed value when Continuar editando is chosen', async () => {
+    const onClose = vi.fn()
+    mockClientHooks()
+    renderWithToast(<ClientDrawer client={null} onClose={onClose} />)
+
+    await userEvent.type(screen.getByLabelText('Nome'), 'Nova Cliente')
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Continuar editando' }))
+
+    expect(screen.queryByText('Descartar alterações?')).not.toBeInTheDocument()
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByLabelText('Nome')).toHaveValue('Nova Cliente')
+  })
+
+  it('prompts instead of closing when the backdrop is clicked with unsaved input', async () => {
+    const onClose = vi.fn()
+    mockClientHooks()
+    renderWithToast(<ClientDrawer client={null} onClose={onClose} />)
+
+    await userEvent.type(screen.getByLabelText('Nome'), 'Nova Cliente')
+    await userEvent.click(document.querySelector('[data-slot="sheet-overlay"]')!)
+
+    expect(screen.getByText('Descartar alterações?')).toBeInTheDocument()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('prompts instead of closing when Escape is pressed with unsaved input', async () => {
+    const onClose = vi.fn()
+    mockClientHooks()
+    renderWithToast(<ClientDrawer client={null} onClose={onClose} />)
+
+    await userEvent.type(screen.getByLabelText('Nome'), 'Nova Cliente')
+    await userEvent.keyboard('{Escape}')
+
+    expect(screen.getByText('Descartar alterações?')).toBeInTheDocument()
+    expect(onClose).not.toHaveBeenCalled()
+
+    // Dismissing the prompt hands the drawer back, still open and still filled.
+    await userEvent.click(screen.getByRole('button', { name: 'Continuar editando' }))
+    expect(screen.getByRole('dialog', { name: 'Novo cliente' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Nome')).toHaveValue('Nova Cliente')
+  })
+
+  it('prompts instead of closing when the header X is clicked with unsaved input', async () => {
+    const onClose = vi.fn()
+    mockClientHooks()
+    renderWithToast(<ClientDrawer client={null} onClose={onClose} />)
+
+    await userEvent.type(screen.getByLabelText('Nome'), 'Nova Cliente')
+    await userEvent.click(screen.getByRole('button', { name: 'Fechar' }))
+
+    expect(screen.getByText('Descartar alterações?')).toBeInTheDocument()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
   it('does not show a delete button in create mode', () => {
     mockClientHooks(vi.fn())
     renderWithToast(<ClientDrawer client={null} onClose={vi.fn()} />)

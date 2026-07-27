@@ -35,5 +35,11 @@
     "title": "Cancelar esta alocação?",
     "message": "A reserva será cancelada e o produto ficará disponível novamente.",
     "confirm": "Sim, cancelar"
+  },
+  "confirmDiscard": {
+    "title": "Descartar alterações?",
+    "message": "As alterações que você fez não foram salvas e serão perdidas.",
+    "confirm": "Descartar",
+    "cancel": "Continuar editando"
   }
 }
