@@ -97,7 +97,7 @@ Quando a loja é nova (sem nenhum cliente e nenhum produto), o Painel mostra o c
 1. Abra **"Clientes"** no menu e clique em **"Novo"**.
 2. Preencha **"Nome"** e **"Telefone"** (obrigatórios). O telefone se formata sozinho enquanto você digita: (DD) NNNNN-NNNN.
 3. Se quiser, preencha **"E-mail"** e **"Observações"**.
-4. Em **"Documentos de Identificação"**, já vêm prontas as linhas de **CPF** e **RG**. Digite só os números; a pontuação entra sozinha (000.000.000-00 e 00.000.000-0). Precisa de outro documento? Clique em **"Adicionar documento"** e preencha Rótulo e Valor.
+4. Em **"Documentos de Identificação"**, já vêm prontas as linhas de **CPF** e **RG**. Digite só os números; a pontuação entra sozinha (000.000.000-00 e 00.000.000-0). Precisa de outro documento? Clique em **"Adicionar documento"**: a linha nova traz dois campos, o da esquerda (estreito) para o nome do documento e o da direita para o número.
 5. Em **"Endereço"**, já vêm as linhas **Endereço**, **Bairro**, **Cidade** e **Estado**. Para mais linhas, use **"Adicionar linha de endereço"**.
 6. Clique em **"Salvar"**.
 

@@ -143,18 +143,17 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
           {identityDocuments.fields.map((field, index) => {
             const isDefaultField = template.identityDocuments[index]?.label === field.label
             return (
-            <div key={field.id} className="flex items-end gap-2">
-              <label className="flex w-24 shrink-0 flex-col gap-1 text-sm">
-                {t('identityDocuments.label')}
+            <div key={field.id} className="flex items-center gap-2">
+              <div className="w-24 shrink-0">
                 <Input
                   {...register(`identityDocuments.${index}.label`)}
                   aria-label={t('identityDocuments.labelFieldAria')}
+                  placeholder={t('identityDocuments.labelPlaceholder')}
                   readOnly={isDefaultField}
                   className={isDefaultField ? 'cursor-default bg-muted text-muted-foreground' : undefined}
                 />
-              </label>
-              <label className="flex flex-1 flex-col gap-1 text-sm">
-                {t('identityDocuments.value')}
+              </div>
+              <div className="flex-1">
                 <Controller
                   name={`identityDocuments.${index}.value`}
                   control={control}
@@ -167,7 +166,7 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
                     />
                   )}
                 />
-              </label>
+              </div>
               <Button
                 type="button"
                 variant="ghost"
@@ -192,18 +191,17 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
           {addressLines.fields.map((field, index) => {
             const isDefaultField = template.addressLines[index]?.label === field.label
             return (
-            <div key={field.id} className="flex items-end gap-2">
-              <label className="flex w-24 shrink-0 flex-col gap-1 text-sm">
-                {t('addressLines.label')}
+            <div key={field.id} className="flex items-center gap-2">
+              <div className="w-24 shrink-0">
                 <Input
                   {...register(`addressLines.${index}.label`)}
                   aria-label={t('addressLines.labelFieldAria')}
+                  placeholder={t('addressLines.labelPlaceholder')}
                   readOnly={isDefaultField}
                   className={isDefaultField ? 'cursor-default bg-muted text-muted-foreground' : undefined}
                 />
-              </label>
-              <label className="flex flex-1 flex-col gap-1 text-sm">
-                {t('addressLines.value')}
+              </div>
+              <div className="flex-1">
                 <Controller
                   name={`addressLines.${index}.value`}
                   control={control}
@@ -216,7 +214,7 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
                     />
                   )}
                 />
-              </label>
+              </div>
               <Button
                 type="button"
                 variant="ghost"

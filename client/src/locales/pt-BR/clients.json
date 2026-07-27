@@ -19,8 +19,7 @@
   },
   "identityDocuments": {
     "title": "Documentos de Identificação",
-    "label": "Rótulo",
-    "value": "Valor",
+    "labelPlaceholder": "Documento",
     "labelFieldAria": "Rótulo do documento",
     "valueFieldAria": "Valor do documento",
     "add": "Adicionar documento",
@@ -28,8 +27,7 @@
   },
   "addressLines": {
     "title": "Endereço",
-    "label": "Rótulo",
-    "value": "Valor",
+    "labelPlaceholder": "Campo",
     "labelFieldAria": "Rótulo da linha de endereço",
     "valueFieldAria": "Valor da linha de endereço",
     "add": "Adicionar linha de endereço",
