@@ -3,6 +3,7 @@ import request from 'supertest'
 import { app } from '../app.js'
 import { prisma } from '../db/client.js'
 import { hashPassword } from './passwords.js'
+import { BACKGROUND_REQUEST_HEADER } from './authMiddleware.js'
 
 describe('POST /api/auth/login', () => {
   let locationId: string
@@ -127,5 +128,20 @@ describe('CORS', () => {
   it('exposes the session renewal header to cross-origin callers', async () => {
     const response = await request(app).get('/health')
     expect(response.headers['access-control-expose-headers']).toContain('X-Renewed-Token')
+  })
+
+  // The mirror image of the above: X-Background-Request travels the other way,
+  // so the preflight has to allow it. cors() reflects Access-Control-Request-
+  // Headers by default — this pins that, because pinning an explicit
+  // allowedHeaders list later would silently drop the marker and every polling
+  // screen would quietly start renewing the session again.
+  it('allows the background-request marker on a preflight', async () => {
+    const response = await request(app)
+      .options('/api/auth/me')
+      .set('Origin', 'null')
+      .set('Access-Control-Request-Method', 'GET')
+      .set('Access-Control-Request-Headers', `authorization,${BACKGROUND_REQUEST_HEADER}`)
+
+    expect(response.headers['access-control-allow-headers']).toContain(BACKGROUND_REQUEST_HEADER)
   })
 })

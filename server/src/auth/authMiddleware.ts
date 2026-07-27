@@ -14,6 +14,16 @@ export const RENEWED_TOKEN_HEADER = 'X-Renewed-Token'
 // `productsRouter.use(...)` and `req.path` alone would be router-relative.
 export const RENEWAL_EXCLUDED_PATHS = new Set(['/api/products/events/ticket'])
 
+// The path allowlist above can only cover URLs that are ALWAYS unattended. Some
+// URLs are both: GET /api/contracts/:id is what opening a contract produces and
+// what SignRemotelyModal polls every 3 seconds for as long as it is left open —
+// which is until someone closes it, possibly the next morning. The server has
+// no way to tell those two apart, so the client labels its own timer-driven
+// traffic with this header and we skip renewal when we see it. Trusting the
+// client here is safe: the header can only ever shorten a session, never
+// extend one.
+export const BACKGROUND_REQUEST_HEADER = 'X-Background-Request'
+
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {
   const header = req.header('authorization')
   if (!header?.startsWith('Bearer ')) {
@@ -37,7 +47,11 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
   // in production only.
   // Re-sign from staffId/role only: handing the verified payload straight back
   // to jwt.sign throws, because it already carries an `exp` claim.
-  if (shouldRenewToken(payload, Date.now()) && !RENEWAL_EXCLUDED_PATHS.has(req.baseUrl + req.path)) {
+  const isBackgroundRequest =
+    req.header(BACKGROUND_REQUEST_HEADER) !== undefined ||
+    RENEWAL_EXCLUDED_PATHS.has(req.baseUrl + req.path)
+
+  if (shouldRenewToken(payload, Date.now()) && !isBackgroundRequest) {
     res.setHeader(
       RENEWED_TOKEN_HEADER,
       signStaffToken({ staffId: payload.staffId, role: payload.role }),

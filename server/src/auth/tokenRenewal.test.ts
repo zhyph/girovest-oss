@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken'
 import { app } from '../app.js'
 import { prisma } from '../db/client.js'
 import { SESSION_TTL_SECONDS, signStaffToken, verifyStaffToken } from './jwt.js'
+import { BACKGROUND_REQUEST_HEADER } from './authMiddleware.js'
 
 // jsonwebtoken honours a caller-supplied `iat` and derives `exp` from it, so we
 // can mint a token that is genuinely N hours old without touching timers.
@@ -77,6 +78,21 @@ describe('sliding session renewal', () => {
     expect(second.status).toBe(200)
     expect(second.body.id).toBe(staffId)
     expect(second.headers['x-renewed-token']).toBeUndefined()
+  })
+
+  // Some URLs are hit both by a person and by a timer: GET /api/contracts/:id
+  // is what opening a contract produces AND what SignRemotelyModal polls every
+  // 3 seconds for as long as it is left open, which can be all night on an
+  // empty shop floor. The server cannot tell the two apart by path, so the
+  // client labels its own unattended traffic and renewal skips it.
+  it('does not renew a request the client marked as a background poll', async () => {
+    const response = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${signAgedToken(staffId, 7 * 60 * 60)}`)
+      .set(BACKGROUND_REQUEST_HEADER, '1')
+
+    expect(response.status).toBe(200)
+    expect(response.headers['x-renewed-token']).toBeUndefined()
   })
 
   it('still rejects a genuinely expired token', async () => {
