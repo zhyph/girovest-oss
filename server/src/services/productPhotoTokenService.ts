@@ -5,6 +5,7 @@ import { prisma } from '../db/client.js'
 import { AppError } from '../errors/AppError.js'
 import { ErrorCodes } from '../errors/errorCodes.js'
 import { productPhotoEvents } from '../events/productPhotoEvents.js'
+import { createProduct, type CreateProductInput, type ProductDTO } from './productService.js'
 
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000
 
@@ -37,11 +38,7 @@ export async function checkTokenValidity(token: string): Promise<'valid' | 'expi
 // token is intentionally reusable — no claim/consume step. Only expiry
 // invalidates it. See docs/superpowers/specs/2026-07-24-photo-intake-session-redesign.md
 // for why this tradeoff is accepted (LAN-only, shift-bound TTL).
-export async function submitPhotos(
-  token: string,
-  productId: string,
-  photos: string[],
-): Promise<{ photos: string[] }> {
+async function requireValidToken(token: string): Promise<{ locationId: string }> {
   const photoToken = await prisma.productPhotoToken.findUnique({ where: { token } })
   if (!photoToken) {
     throw new AppError(ErrorCodes.NOT_FOUND, 404, 'Photo token not found')
@@ -49,6 +46,15 @@ export async function submitPhotos(
   if (photoToken.expiresAt.getTime() < Date.now()) {
     throw new AppError(ErrorCodes.PHOTO_TOKEN_INVALID, 410, 'Photo token is expired')
   }
+  return photoToken
+}
+
+export async function submitPhotos(
+  token: string,
+  productId: string,
+  photos: string[],
+): Promise<{ photos: string[] }> {
+  const photoToken = await requireValidToken(token)
 
   const product = await prisma.product.findUnique({ where: { id: productId } })
   if (!product || product.locationId !== photoToken.locationId) {
@@ -77,4 +83,32 @@ export async function submitPhotos(
   productPhotoEvents.emit('photo', { productId, locationId: photoToken.locationId, photos: updatedPhotos })
 
   return { photos: updatedPhotos }
+}
+
+export type CreateProductFromPhotoTokenInput = Omit<CreateProductInput, 'locationId' | 'photos'>
+
+// The token is the ONLY credential the phone has, so every field that decides
+// *where* the row lands must come from the token row rather than the request.
+// Each field is passed explicitly (no spread) so a hostile body carrying its
+// own `locationId` can never reach Prisma.
+export async function createProductFromPhotoToken(
+  token: string,
+  input: CreateProductFromPhotoTokenInput,
+): Promise<ProductDTO> {
+  const photoToken = await requireValidToken(token)
+
+  const product = await createProduct({
+    locationId: photoToken.locationId,
+    name: input.name,
+    description: input.description,
+    category: input.category,
+    size: input.size,
+    color: input.color,
+    rentalPrice: input.rentalPrice,
+    depositAmount: input.depositAmount,
+  })
+
+  productPhotoEvents.emit('product-created', { locationId: photoToken.locationId, product })
+
+  return product
 }
