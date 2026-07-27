@@ -47,6 +47,24 @@ export function useProductPhotoEvents(): void {
           )
         }
 
+        // Products created from the phone's photo-intake page arrive as a
+        // named frame (onmessage only ever sees unnamed ones). The list is
+        // ordered createdAt desc and has no refetchInterval, so without this
+        // the new row would stay invisible until something else invalidated
+        // the query. Registered inside connect() so it survives every ticket
+        // rotation, which builds a brand-new EventSource.
+        source.addEventListener('product-created', (event) => {
+          const product = JSON.parse((event as MessageEvent<string>).data) as Product
+          queryClient.setQueryData<Product[]>(PRODUCTS_KEY, (old) => {
+            if (!old) return old
+            // The desktop's own create already invalidates the query, and SSE
+            // has no delivery guarantee against a concurrent refetch, so a
+            // row that is already there must never be duplicated.
+            if (old.some((existing) => existing.id === product.id)) return old
+            return [product, ...old]
+          })
+        })
+
         const rotateInMs = Math.max(0, expiresAt - Date.now() - ROTATE_BEFORE_EXPIRY_MS)
         rotateTimer = setTimeout(() => {
           source?.close()
