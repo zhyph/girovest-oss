@@ -1,0 +1,33 @@
+{
+  // Config separado do tsconfig.json, que e o do renderer. Juntar os dois seria
+  // pior que nao checar nada: o processo main rodaria com `lib: DOM` e o
+  // compilador aceitaria `window`, `document` ou `localStorage` no codigo que
+  // roda sob Node, justamente o erro que um typecheck existe para pegar. E o
+  // renderer ganharia os globais de Node no sentido inverso.
+  //
+  // Ate a criacao deste arquivo, nada em electron/ passava por tsc: o
+  // tsconfig.json inclui apenas ["src"], e o electron-vite so faz strip de
+  // tipos com esbuild, sem verificar. Todo o processo main (main.ts,
+  // preload.ts, updater.ts, installId.ts, backup.ts) era codigo nao checado.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    // O codigo em electron/ importa com extensao (`./backup.ts`), que e o que
+    // electron-vite espera; sem esta flag cada import vira erro.
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true,
+    // Sem "vite/client": o main nao tem import.meta.env do Vite. As constantes
+    // injetadas pelo `define` sao declaradas a mao em updater.ts.
+    "types": ["node"]
+  },
+  "include": ["electron"]
+}

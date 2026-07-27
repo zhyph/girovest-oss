@@ -81,19 +81,23 @@ export async function setupAutoUpdater(installId: string): Promise<void> {
     useMultipleRangeRequest: false,
   })
 
-  // Order is load-bearing, and it is the opposite of what the names suggest.
+  // The spread is load-bearing; the order of these two statements is not.
   // Read from electron-updater 6.8.9's AppUpdater source:
   //   - setFeedURL() never touches requestHeaders (only the constructor does,
   //     and only from its own options object), so it is safe on either side.
   //   - addAuthHeader(token) is not an "add": it does
   //     `this.requestHeaders = Object.assign({}, this.requestHeaders, {...})`,
-  //     i.e. it REPLACES the object with a merged copy.
-  // So addAuthHeader must come first and the install header must be applied
-  // as a spread of the current value. Assigning requestHeaders wholesale
-  // afterwards (or calling addAuthHeader last with a plain assignment before
-  // it) would drop one of the two headers. Both are read lazily, at check and
-  // download time (computeFinalHeaders / computeRequestHeaders), so mutating
-  // them after setFeedURL still applies to the very first check.
+  //     i.e. it REPLACES the object with a merged copy. Because that copy
+  //     preserves whatever was already there, swapping these two statements
+  //     keeps both headers -- verified by mutating the order and watching the
+  //     test still pass.
+  // What does break is assigning requestHeaders WITHOUT spreading the current
+  // value: that silently drops the authorization header addAuthHeader put
+  // there, and the app starts taking 403s. updater.test.ts asserts on the
+  // final object for exactly that reason.
+  // Both are read lazily, at check and download time (computeFinalHeaders /
+  // computeRequestHeaders), so mutating them after setFeedURL still applies to
+  // the very first check.
   //
   // Accepted and deliberate: the key ships inside the asar and can be
   // extracted. This is identification with server-side revocation, not
