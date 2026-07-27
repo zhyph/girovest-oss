@@ -6,6 +6,7 @@ import { requireAuth } from '../auth/authMiddleware.js'
 import { AppError } from '../errors/AppError.js'
 import { ErrorCodes } from '../errors/errorCodes.js'
 import { prisma } from '../db/client.js'
+import { productCreateSchema } from '../lib/productValidation.js'
 import {
   createProduct,
   listProducts,
@@ -20,15 +21,11 @@ import { reachableSigningCandidates } from './contracts.js'
 export const productsRouter = Router()
 productsRouter.use(requireAuth)
 
-const createSchema = z.object({
+// Shared with the phone's token-authorized create route so both paths accept
+// exactly the same product; only the two fields the phone can't supply are
+// added here.
+const createSchema = productCreateSchema.extend({
   locationId: z.string().min(1),
-  name: z.string().min(1),
-  description: z.string().optional(),
-  category: z.string().min(1),
-  size: z.string().min(1),
-  color: z.string().min(1),
-  rentalPrice: z.number().nonnegative(),
-  depositAmount: z.number().nonnegative(),
   photos: z.array(z.string()).optional(),
 })
 
