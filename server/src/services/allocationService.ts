@@ -55,6 +55,23 @@ export async function checkOutAllocation(id: string, data: CheckOutInput, asOf: 
       'Cannot check out before the allocation\'s checkout date',
     )
   }
+  if (asOf.getTime() < allocation.checkoutDate.getTime()) {
+    // Leaving early does not just move a date — it claims the days between now
+    // and the contracted pickup, days nobody checked when this allocation was
+    // created. If another booking already holds them, confirming the override
+    // would promise one physical dress to two customers, so this block is NOT
+    // overridable: only moving the other booking can clear it.
+    const others = await prisma.allocation.findMany({
+      where: { productId: allocation.productId, status: { in: ACTIVE_STATUSES }, id: { not: allocation.id } },
+    })
+    if (isOccupiedForRange(others.map(toWindow), asOf, allocation.checkoutDate)) {
+      throw new AppError(
+        ErrorCodes.EARLY_CHECKOUT_CONFLICT,
+        409,
+        'Another allocation holds this product between now and its checkout date',
+      )
+    }
+  }
   const result = await prisma.allocation.updateMany({
     where: { id, status: 'reserved' },
     data: {

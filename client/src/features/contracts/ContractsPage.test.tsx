@@ -162,6 +162,25 @@ describe('ContractsPage', () => {
     expect(toastSpy).toHaveBeenCalledWith('Esta ação não é permitida no status atual.')
   })
 
+  it('names the real reason when the confirmed early pickup collides with another booking', async () => {
+    const toastSpy = vi.spyOn(toastModule, 'showErrorToast').mockImplementation(() => {})
+    const checkOutImpl = vi
+      .fn()
+      .mockRejectedValueOnce({ code: 'CHECKOUT_TOO_EARLY' })
+      .mockRejectedValueOnce({ code: 'EARLY_CHECKOUT_CONFLICT' })
+    mockHooks({ checkOutImpl })
+    renderWithProviders(<ContractsPage />)
+
+    await openCheckOutAndConfirm()
+    await userEvent.click(screen.getByRole('button', { name: 'Retirar mesmo assim' }))
+
+    // Not the generic "erro inesperado" — the operator has to know the dress is
+    // promised to someone else, otherwise they just try again.
+    expect(toastSpy).toHaveBeenCalledWith(
+      'Este produto está reservado para outro cliente antes da data de saída marcada. Só é possível retirar agora se essa outra reserva for alterada.',
+    )
+  })
+
   it('shows a cancel-contract action when the contract has a reserved item, and cancels on confirm', async () => {
     const cancelImpl = vi.fn().mockResolvedValue(undefined)
     mockHooks({ cancelImpl })

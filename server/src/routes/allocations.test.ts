@@ -39,14 +39,16 @@ afterEach(async () => {
   await prisma.location.deleteMany()
 })
 
-function seedReservedAllocation() {
+function seedReservedAllocation(
+  dates: { checkoutDate: Date; dueDate: Date } = { checkoutDate: FUTURE_CHECKOUT, dueDate: FUTURE_DUE },
+) {
   return prisma.allocation.create({
     data: {
       productId,
       clientId,
       staffId,
-      checkoutDate: FUTURE_CHECKOUT,
-      dueDate: FUTURE_DUE,
+      checkoutDate: dates.checkoutDate,
+      dueDate: dates.dueDate,
       status: 'reserved',
       priceCharged: 100,
     },
@@ -89,6 +91,23 @@ describe('POST /api/allocations/:id/check-out', () => {
     expect(new Date(response.body.checkoutDate)).toEqual(FUTURE_CHECKOUT)
     // allowEarly is an intent, never a stored column.
     expect(response.body).not.toHaveProperty('allowEarly')
+  })
+
+  it('refuses the override when the days it would claim belong to another booking', async () => {
+    // Same dress, promised to someone else between now and this pickup date.
+    await seedReservedAllocation({
+      checkoutDate: new Date('2098-12-01T00:00:00.000Z'),
+      dueDate: new Date('2098-12-05T00:00:00.000Z'),
+    })
+    const allocation = await seedReservedAllocation()
+
+    const response = await request(app)
+      .post(`/api/allocations/${allocation.id}/check-out`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({ allowEarly: true })
+
+    expect(response.status).toBe(409)
+    expect(response.body.code).toBe('EARLY_CHECKOUT_CONFLICT')
   })
 
   it('rejects a non-boolean override', async () => {

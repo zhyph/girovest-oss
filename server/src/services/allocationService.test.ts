@@ -126,6 +126,43 @@ describe('allocationService', () => {
     expect(await getProductAvailability(productId, new Date('2026-08-29'))).toBe('rented')
   })
 
+  it('CRITICAL: refuses an early checkout that would take days already promised to someone else', async () => {
+    // Another customer has this same dress reserved for Sep 26-28.
+    const other = await seedReservedAllocation({ checkoutDate: new Date('2026-09-26'), dueDate: new Date('2026-09-28') })
+    // This customer's own pickup is Oct 2, but they turn up on Sep 25.
+    const allocation = await seedReservedAllocation({ checkoutDate: new Date('2026-10-02'), dueDate: new Date('2026-10-06') })
+
+    // Confirming "retirar mesmo assim" cannot conjure a second physical dress.
+    await expect(
+      checkOutAllocation(allocation.id, { allowEarly: true }, new Date('2026-09-25T09:00:00.000Z')),
+    ).rejects.toMatchObject({ code: 'EARLY_CHECKOUT_CONFLICT' })
+
+    const untouched = await prisma.allocation.findUniqueOrThrow({ where: { id: allocation.id } })
+    expect(untouched.status).toBe('reserved')
+    expect(untouched.actualCheckoutDate).toBeNull()
+    const stillReserved = await prisma.allocation.findUniqueOrThrow({ where: { id: other.id } })
+    expect(stillReserved.status).toBe('reserved')
+  })
+
+  it('allows an early checkout when the days it claims are free', async () => {
+    // An unrelated booking of the same dress, well clear of the claimed days.
+    await seedReservedAllocation({ checkoutDate: new Date('2026-11-10'), dueDate: new Date('2026-11-12') })
+    const allocation = await seedReservedAllocation({ checkoutDate: new Date('2026-10-02'), dueDate: new Date('2026-10-06') })
+
+    const result = await checkOutAllocation(allocation.id, { allowEarly: true }, new Date('2026-09-25T09:00:00.000Z'))
+    expect(result.status).toBe('checked_out')
+  })
+
+  it('does not consult later bookings when the checkout is not early', async () => {
+    // The next customer's reservation starts after this one is due back; an
+    // on-time pickup claims no extra days, so it must not be blocked by it.
+    await seedReservedAllocation({ checkoutDate: new Date('2026-09-20'), dueDate: new Date('2026-09-25') })
+    const allocation = await seedReservedAllocation({ checkoutDate: new Date('2026-09-01'), dueDate: new Date('2026-09-05') })
+
+    const result = await checkOutAllocation(allocation.id, {}, new Date('2026-09-01T09:00:00.000Z'))
+    expect(result.status).toBe('checked_out')
+  })
+
   it('does not let the early override bypass the status guard', async () => {
     const allocation = await seedReservedAllocation({ checkoutDate: new Date('2026-09-01'), dueDate: new Date('2026-09-05') })
     await checkOutAllocation(allocation.id, { allowEarly: true }, new Date('2026-08-28'))

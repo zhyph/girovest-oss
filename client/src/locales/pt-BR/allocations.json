@@ -46,7 +46,8 @@
     "PRODUCT_NOT_IN_CIRCULATION": "Este produto não está disponível para aluguel.",
     "DUE_DATE_BEFORE_CHECKOUT": "A data de devolução deve ser após a data de saída.",
     "INVALID_ALLOCATION_TRANSITION": "Esta ação não é permitida no status atual.",
-    "CHECKOUT_TOO_EARLY": "Não é possível fazer check-out antes da data de saída."
+    "CHECKOUT_TOO_EARLY": "Não é possível fazer check-out antes da data de saída.",
+    "EARLY_CHECKOUT_CONFLICT": "Este produto está reservado para outro cliente antes da data de saída marcada. Só é possível retirar agora se essa outra reserva for alterada."
   },
   "empty": "Nenhuma alocação registrada ainda."
 }
