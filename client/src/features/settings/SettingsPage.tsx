@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/button.tsx'
 import { PhoneInput } from '../../components/ui/phone-input.tsx'
 import { showErrorToast, showSuccessToast } from '../../lib/toast.ts'
 import { useTheme, type ThemePreference } from '../../lib/useTheme.ts'
+import { useInstallId } from '../../lib/useInstallId.ts'
 import { locationSettingsSchema, type LocationSettingsFormValues } from './settingsSchemas.ts'
 import { useLocationSettings, useUpdateLocationSettings } from './useLocationSettings.ts'
 
@@ -17,6 +18,18 @@ export function SettingsPage() {
   const { data: settings, isLoading } = useLocationSettings()
   const updateSettings = useUpdateLocationSettings()
   const { theme, setTheme } = useTheme()
+  const installId = useInstallId()
+
+  // navigator.clipboard não existe em contexto inseguro nem em todo ambiente de
+  // teste, e o código continua selecionável na tela de qualquer forma: falha
+  // aqui não merece toast de erro, só não confirmar a cópia.
+  const copyInstallId = () => {
+    if (installId === null) return
+    void navigator.clipboard
+      ?.writeText(installId)
+      .then(() => showSuccessToast(t('install.copied')))
+      .catch(() => undefined)
+  }
 
   const { handleSubmit, control, register, reset } = useForm<LocationSettingsFormValues>({
     resolver: zodResolver(locationSettingsSchema),
@@ -109,6 +122,21 @@ export function SettingsPage() {
             </Button>
           </div>
         </form>
+        {/* Fora do <form> de propósito: não é dado editável da loja, é um
+            identificador só de leitura. Some inteiro no build web, onde não
+            existe instalação a identificar. */}
+        {installId !== null && (
+          <div className="mt-6 flex flex-col gap-2 border-t border-border pt-4">
+            <span className="text-sm font-medium">{t('install.title')}</span>
+            <p className="text-sm text-muted-foreground">{t('install.help')}</p>
+            <div className="flex items-center gap-2">
+              <code className="select-all rounded-md bg-muted px-2 py-1 font-mono text-xs">{installId}</code>
+              <Button type="button" variant="secondary" size="sm" onClick={copyInstallId}>
+                {t('install.copy')}
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

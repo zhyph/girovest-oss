@@ -17,5 +17,11 @@
     "add": "Adicionar cláusula",
     "remove": "Remover cláusula"
   },
-  "saved": "Configurações salvas."
+  "saved": "Configurações salvas.",
+  "install": {
+    "title": "Identificador desta instalação",
+    "help": "Informe este código ao suporte quando solicitado. Ele identifica este computador e não contém nenhum dado da loja ou de clientes.",
+    "copy": "Copiar",
+    "copied": "Identificador copiado."
+  }
 }

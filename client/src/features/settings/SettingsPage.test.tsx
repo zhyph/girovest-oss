@@ -104,3 +104,29 @@ describe('SettingsPage', () => {
     })
   })
 })
+
+describe('identificador da instalação', () => {
+  const INSTALL = 'b2a4f6c8-1111-4222-8333-444455556666'
+  type Bridge = { getInstallId?: () => Promise<string | null> }
+
+  afterEach(() => {
+    delete (window as Window & { girovest?: Bridge }).girovest
+  })
+
+  it('não mostra a seção no build web, onde não há ponte', async () => {
+    mockSettingsHooks()
+    renderWithToast(<SettingsPage />)
+    await screen.findByText('Configurações')
+    expect(screen.queryByText('Identificador desta instalação')).not.toBeInTheDocument()
+  })
+
+  it('mostra o identificador quando o app desktop o fornece', async () => {
+    ;(window as Window & { girovest?: Bridge }).girovest = {
+      getInstallId: () => Promise.resolve(INSTALL),
+    }
+    mockSettingsHooks()
+    renderWithToast(<SettingsPage />)
+    expect(await screen.findByText(INSTALL)).toBeInTheDocument()
+    expect(screen.getByText('Identificador desta instalação')).toBeInTheDocument()
+  })
+})
