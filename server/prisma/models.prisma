@@ -6,6 +6,11 @@ model Location {
   phone     String?
   createdAt DateTime @default(now())
 
+  /// Days a piece stays unavailable after it comes back, for cleaning and
+  /// repairs, before it can go out to the next customer. 0 keeps the original
+  /// behaviour: free again the day after the return.
+  maintenanceBufferDays Int @default(0)
+
   staff                Staff[]
   products             Product[]
   contracts            Contract[]

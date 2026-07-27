@@ -225,3 +225,48 @@ describe('listProductsForLocation', () => {
     expect(result.map((p) => p.name)).toEqual(['Vestido Azul'])
   })
 })
+
+describe.sequential('maintenance window across shops', () => {
+  it("does not apply one shop's cleaning window to another shop's pieces", async () => {
+    // listProducts() lists every location at once, so a shop that configured a
+    // long cleaning window must not park a different shop's pieces in
+    // "maintenance" just by sharing a page with them.
+    const slowShop = await prisma.location.create({
+      data: { name: 'Higieniza devagar', address: 'B', maintenanceBufferDays: 10 },
+    })
+    const staff = await prisma.staff.create({
+      data: { name: 'S', login: `s-${Date.now()}`, passwordHash: 'x', role: 'staff', locationId },
+    })
+    const client = await prisma.client.create({ data: { name: 'C', phone: '1', email: 'c@example.com' } })
+
+    const makeReturnedProduct = async (ownerLocationId: string) => {
+      const product = await prisma.product.create({
+        data: {
+          locationId: ownerLocationId, name: 'Vestido', category: 'Festa', size: 'M', color: 'Azul',
+          rentalPrice: 100, depositAmount: 50,
+        },
+      })
+      await prisma.allocation.create({
+        data: {
+          productId: product.id, clientId: client.id, staffId: staff.id,
+          checkoutDate: new Date('2020-01-01'), dueDate: new Date('2020-01-05'),
+          // Yesterday: the cleaning window opens the day AFTER the return, which
+          // is what keeps a buffer of 0 identical to the old "free immediately".
+          actualReturnDate: new Date(Date.now() - 24 * 60 * 60 * 1000),
+          status: 'returned', priceCharged: 100,
+        },
+      })
+      return product.id
+    }
+
+    // Both came back yesterday; only the slow shop configured a window.
+    const noBufferProductId = await makeReturnedProduct(locationId)
+    const slowShopProductId = await makeReturnedProduct(slowShop.id)
+
+    const listed = await listProducts()
+    const availabilityOf = (id: string) => listed.find((product) => product.id === id)?.availability
+
+    expect(availabilityOf(noBufferProductId)).toBe('available')
+    expect(availabilityOf(slowShopProductId)).toBe('maintenance')
+  })
+})

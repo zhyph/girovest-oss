@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { X } from 'lucide-react'
 import { Button } from '../../components/ui/button.tsx'
 import { PhoneInput } from '../../components/ui/phone-input.tsx'
+import { Input } from '../../components/ui/input.tsx'
 import { showErrorToast, showSuccessToast } from '../../lib/toast.ts'
 import { useTheme, type ThemePreference } from '../../lib/useTheme.ts'
 import { useInstallId } from '../../lib/useInstallId.ts'
@@ -33,13 +34,14 @@ export function SettingsPage() {
 
   const { handleSubmit, control, register, reset } = useForm<LocationSettingsFormValues>({
     resolver: zodResolver(locationSettingsSchema),
-    defaultValues: { phone: '', clauses: [] },
+    defaultValues: { phone: '', maintenanceBufferDays: 0, clauses: [] },
   })
 
   useEffect(() => {
     if (settings) {
       reset({
         phone: settings.phone ?? '',
+        maintenanceBufferDays: settings.maintenanceBufferDays,
         clauses: settings.clauses.map((clause) => ({ text: clause.text })),
       })
     }
@@ -90,6 +92,20 @@ export function SettingsPage() {
                 <PhoneInput value={field.value} onChange={field.onChange} aria-label={t('fields.phone')} />
               )}
             />
+          </label>
+          <label className="flex max-w-xs flex-col gap-1 text-sm">
+            {t('fields.maintenanceBufferDays')}
+            <Input
+              type="number"
+              min={0}
+              max={60}
+              aria-label={t('fields.maintenanceBufferDays')}
+              aria-describedby="maintenance-buffer-help"
+              {...register('maintenanceBufferDays', { valueAsNumber: true })}
+            />
+            <span id="maintenance-buffer-help" className="text-xs text-muted-foreground">
+              {t('maintenanceBufferHelp')}
+            </span>
           </label>
           <div className="flex flex-col gap-2">
             <span className="text-sm font-medium">{t('clauses.title')}</span>

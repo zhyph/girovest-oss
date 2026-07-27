@@ -34,6 +34,7 @@ const AVAILABILITY_TONE: Record<ProductAvailability, 'neutral' | 'success' | 'wa
   available: 'success',
   reserved: 'neutral',
   rented: 'warning',
+  maintenance: 'neutral',
 }
 
 const STATUS_TONE: Record<ProductStatus, 'neutral' | 'success' | 'warning' | 'danger'> = {

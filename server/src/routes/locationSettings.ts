@@ -24,6 +24,9 @@ const clauseSchema = z.object({ text: z.string().min(1) })
 const updateSchema = z.object({
   phone: z.string().nullable().optional(),
   clauses: z.array(clauseSchema).optional(),
+  // Capped because this silently blocks days on every piece in the shop —
+  // a mistyped 300 would take the whole catalogue off the market for a year.
+  maintenanceBufferDays: z.number().int().min(0).max(60).optional(),
 })
 
 locationSettingsRouter.patch('/', async (req, res) => {

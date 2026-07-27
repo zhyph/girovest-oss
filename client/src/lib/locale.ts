@@ -1,3 +1,6 @@
+import { ptBR } from 'react-day-picker/locale'
+import type { Locale as DayPickerLocale } from 'react-day-picker'
+
 export interface DateMaskConfig {
   formatDigits: (digits: string) => string
   digitsToIso: (digits: string) => string
@@ -13,6 +16,8 @@ export interface LocaleConfig {
   currency: string
   date: DateMaskConfig
   phone: PhoneMaskConfig
+  /** Month and weekday names for the calendar popover. */
+  calendar: DayPickerLocale
 }
 
 /**
@@ -69,6 +74,7 @@ function formatPhoneBR(raw: string): string {
 export const LOCALE_CONFIGS: Record<string, LocaleConfig> = {
   'pt-BR': {
     currency: 'BRL',
+    calendar: ptBR,
     date: {
       formatDigits: formatDateDigitsBR,
       digitsToIso: digitsToIsoBR,

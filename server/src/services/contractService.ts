@@ -3,9 +3,9 @@ import { prisma } from '../db/client.js'
 import { AppError } from '../errors/AppError.js'
 import { ErrorCodes } from '../errors/errorCodes.js'
 import { isOccupiedForRange, type AllocationWindow, type AllocationStatus } from '../domain/occupancy.js'
+import { blockingAllocationsWhere, maintenanceBufferForLocation, toWindow } from './occupancyQuery.js'
 
 const MAX_WRITE_CONFLICT_RETRIES = 5
-const ACTIVE_STATUSES: AllocationStatus[] = ['reserved', 'checked_out']
 
 export interface CreateContractItemInput {
   productId: string
@@ -29,22 +29,6 @@ export interface CreateContractInput {
   installments: CreateContractInstallmentInput[]
 }
 
-function toWindow(allocation: {
-  status: string
-  checkoutDate: Date
-  actualCheckoutDate: Date | null
-  dueDate: Date
-  actualReturnDate: Date | null
-}): AllocationWindow {
-  return {
-    status: allocation.status as AllocationStatus,
-    checkoutDate: allocation.checkoutDate,
-    actualCheckoutDate: allocation.actualCheckoutDate,
-    dueDate: allocation.dueDate,
-    actualReturnDate: allocation.actualReturnDate,
-  }
-}
-
 export async function createContract(input: CreateContractInput) {
   if (input.items.length === 0) {
     throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'A contract needs at least one item')
@@ -54,6 +38,8 @@ export async function createContract(input: CreateContractInput) {
       throw new AppError(ErrorCodes.DUE_DATE_BEFORE_CHECKOUT, 400, 'Due date must be on or after checkout date')
     }
   }
+
+  const maintenanceBufferDays = await maintenanceBufferForLocation(input.locationId)
 
   // Occupancy checks below only compare each item against already-persisted
   // Allocations — two items in the SAME request sharing a productId with
@@ -71,7 +57,7 @@ export async function createContract(input: CreateContractInput) {
         dueDate: other.dueDate,
         actualReturnDate: null,
       }))
-    if (isOccupiedForRange(siblingWindows, item.checkoutDate, item.dueDate)) {
+    if (isOccupiedForRange(siblingWindows, item.checkoutDate, item.dueDate, { maintenanceBufferDays })) {
       throw new AppError(
         ErrorCodes.PRODUCT_UNAVAILABLE,
         409,
@@ -101,6 +87,7 @@ export async function createContract(input: CreateContractInput) {
   }
 
   const useSerializable = process.env.DB_PROVIDER === 'postgresql'
+  const asOf = new Date()
 
   for (let attempt = 0; attempt < MAX_WRITE_CONFLICT_RETRIES; attempt++) {
     try {
@@ -108,9 +95,14 @@ export async function createContract(input: CreateContractInput) {
         async (tx) => {
           for (const item of input.items) {
             const existing = await tx.allocation.findMany({
-              where: { productId: item.productId, status: { in: ACTIVE_STATUSES } },
+              where: blockingAllocationsWhere([item.productId], maintenanceBufferDays, item.checkoutDate),
             })
-            if (isOccupiedForRange(existing.map(toWindow), item.checkoutDate, item.dueDate)) {
+            if (
+              isOccupiedForRange(existing.map(toWindow), item.checkoutDate, item.dueDate, {
+                asOf,
+                maintenanceBufferDays,
+              })
+            ) {
               throw new AppError(
                 ErrorCodes.PRODUCT_UNAVAILABLE,
                 409,
@@ -242,4 +234,40 @@ export async function getContract(id: string, locationId: string) {
     throw new AppError(ErrorCodes.NOT_FOUND, 404, `Contract ${id} not found`)
   }
   return contract
+}
+
+/**
+ * Records that an installment was (or was not) paid.
+ *
+ * `paidAt` is derived here rather than taken from the caller: it is a record of
+ * when the shop registered the payment, and letting a client set it would make
+ * the audit trail unreliable. Un-marking clears it so a mistake leaves no
+ * misleading timestamp behind.
+ */
+export async function setInstallmentPaid(
+  contractId: string,
+  installmentId: string,
+  locationId: string,
+  paid: boolean,
+) {
+  // Scoped through the contract so an installment belonging to another
+  // location reads as NOT_FOUND, matching how contracts themselves behave.
+  const installment = await prisma.installment.findUnique({
+    where: { id: installmentId },
+    include: { contract: { select: { id: true, locationId: true } } },
+  })
+  if (
+    !installment ||
+    installment.contract.id !== contractId ||
+    installment.contract.locationId !== locationId
+  ) {
+    throw new AppError(ErrorCodes.NOT_FOUND, 404, `Installment ${installmentId} not found`)
+  }
+
+  await prisma.installment.update({
+    where: { id: installmentId },
+    data: { paid, paidAt: paid ? new Date() : null },
+  })
+
+  return getContract(contractId, locationId)
 }

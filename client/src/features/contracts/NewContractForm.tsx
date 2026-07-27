@@ -11,6 +11,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose, SheetBody } f
 import { ConfirmDialog } from '../../components/ui/confirm-dialog.tsx'
 import { showErrorToast } from '../../lib/toast.ts'
 import { useLocale } from '../../lib/LocaleContext.tsx'
+import { formatCurrency, getLocaleConfig } from '../../lib/locale.ts'
 import { useUnsavedChangesGuard } from '../../lib/useUnsavedChangesGuard.ts'
 import { getMissingRequiredFields } from '../../lib/clientReadiness.ts'
 import { getPaymentMethods } from '../../lib/paymentMethodTemplate.ts'
@@ -27,6 +28,7 @@ function ItemRow({
   control,
   register,
   activeProducts,
+  setValue,
   onRemove,
   showRemove,
   checkoutDateError,
@@ -35,7 +37,8 @@ function ItemRow({
   index: number
   control: ReturnType<typeof useForm<NewContractFormValues>>['control']
   register: ReturnType<typeof useForm<NewContractFormValues>>['register']
-  activeProducts: { id: string; name: string }[]
+  activeProducts: { id: string; name: string; rentalPrice: number }[]
+  setValue: ReturnType<typeof useForm<NewContractFormValues>>['setValue']
   onRemove: () => void
   showRemove: boolean
   checkoutDateError?: string
@@ -52,7 +55,20 @@ function ItemRow({
       <div className="flex items-end gap-2">
         <label className="flex flex-1 flex-col gap-1 text-sm">
           {t('fields.product')}
-          <Select {...register(`items.${index}.productId`)} aria-label={t('fields.product')}>
+          <Select
+            {...register(`items.${index}.productId`, {
+              onChange: (event) => {
+                // Staff should not have to remember each piece's price. The
+                // field stays editable — a discount or a surcharge is still
+                // just typing over it — but it starts from the real number.
+                const picked = activeProducts.find((product) => product.id === event.target.value)
+                if (picked) {
+                  setValue(`items.${index}.priceCharged`, picked.rentalPrice, { shouldDirty: true })
+                }
+              },
+            })}
+            aria-label={t('fields.product')}
+          >
             <option value="">—</option>
             {activeProducts.map((product) => (
               <option key={product.id} value={product.id}>{product.name}</option>
@@ -136,6 +152,7 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
     handleSubmit,
     control,
     watch,
+    setValue,
     formState: { errors, isDirty },
   } = useForm<NewContractFormValues>({
     resolver: zodResolver(newContractSchema),
@@ -166,6 +183,9 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
   }
 
   const activeProducts = products?.filter((product) => product.status === 'active') ?? []
+  const watchedItems = watch('items')
+  const itemsTotal = (watchedItems ?? []).reduce((sum, item) => sum + (Number(item?.priceCharged) || 0), 0)
+  const currency = getLocaleConfig(locale).currency
   const paymentMethods = getPaymentMethods(locale)
 
   return (
@@ -227,6 +247,7 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
                 control={control}
                 register={register}
                 activeProducts={activeProducts}
+                setValue={setValue}
                 onRemove={() => items.remove(index)}
                 showRemove={items.fields.length > 1}
                 checkoutDateError={
@@ -248,6 +269,12 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
             >
               {t('items.add')}
             </Button>
+            <div className="flex justify-end text-sm">
+              <span className="text-muted-foreground">
+                {t('items.total')}:{' '}
+                <span className="font-medium text-foreground">{formatCurrency(itemsTotal, locale, currency)}</span>
+              </span>
+            </div>
           </div>
           <label className="flex flex-col gap-1 text-sm">
             {t('fields.paymentMethod')}

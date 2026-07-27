@@ -20,7 +20,7 @@ export const productSchema = z.object({
 export type ProductFormValues = z.infer<typeof productSchema>
 
 export type ProductStatus = 'active' | 'maintenance' | 'retired'
-export type ProductAvailability = 'available' | 'reserved' | 'rented'
+export type ProductAvailability = 'available' | 'reserved' | 'rented' | 'maintenance'
 
 export interface Product extends ProductFormValues {
   id: string

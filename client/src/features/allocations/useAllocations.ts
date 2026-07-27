@@ -15,6 +15,11 @@ function invalidateAfterMutation(queryClient: QueryClient) {
   queryClient.invalidateQueries({ queryKey: ALLOCATIONS_KEY })
   queryClient.invalidateQueries({ queryKey: ['calendar'] })
   queryClient.invalidateQueries({ queryKey: ['products'] })
+  // The check-out / return / cancel buttons live inside the contracts list,
+  // which renders each contract's allocations from the CONTRACTS query, not
+  // from this one. Without this the row a staff member just acted on keeps
+  // showing its old status until the page is reloaded.
+  queryClient.invalidateQueries({ queryKey: ['contracts'] })
 }
 
 export function useCheckOutAllocation() {

@@ -33,17 +33,42 @@ describe('DateInput', () => {
     expect(screen.getByLabelText('Data')).toHaveAttribute('type', 'text')
   })
 
-  it('offers a native date picker as a secondary, hidden affordance behind the calendar button', () => {
+  it('opens an in-app calendar instead of the browser\'s native picker', async () => {
     const { container } = render(<DateInput value="2026-08-23" onChange={vi.fn()} aria-label="Data" />)
 
-    // The visible, labelled field the user types into is still the masked
-    // text input above — this hidden native input exists only so the
-    // calendar button can trigger the OS/browser date picker.
-    const nativeDateInput = container.querySelector('input[type="date"]')
-    expect(nativeDateInput).not.toBeNull()
-    expect(nativeDateInput).toHaveAttribute('aria-hidden', 'true')
-    expect(nativeDateInput).toHaveValue('2026-08-23')
-    expect(nativeDateInput).not.toBe(screen.getByLabelText('Data'))
+    // The native input is what dragged the browser's own language and chrome
+    // into a pt-BR app; nothing may fall back to it.
+    expect(container.querySelector('input[type="date"]')).toBeNull()
+
+    await userEvent.click(screen.getByRole('button', { name: /escolher data/i }))
+
+    expect(screen.getByRole('grid')).toBeInTheDocument()
+  })
+
+  it('renders the calendar in the shop locale, not the browser locale', async () => {
+    render(<DateInput value="2026-08-23" onChange={vi.fn()} aria-label="Data" />)
+
+    await userEvent.click(screen.getByRole('button', { name: /escolher data/i }))
+
+    expect(screen.getByText(/agosto/i)).toBeInTheDocument()
+  })
+
+  it('writes the picked day back as a YYYY-MM-DD value', async () => {
+    const onChange = vi.fn()
+    render(<DateInput value="2026-08-23" onChange={onChange} aria-label="Data" />)
+    await userEvent.click(screen.getByRole('button', { name: /escolher data/i }))
+
+    // Addressed by full date because the grid also renders the neighbouring
+    // months' spill-over days, and narrowed to the button because the cell
+    // wrapping it carries the same label.
+    const dayButton = screen
+      .getAllByLabelText(/5 de agosto de 2026/i)
+      .find((element) => element.tagName === 'BUTTON')
+    await userEvent.click(dayButton!)
+
+    // Not toISOString(): that converts to UTC first and, anywhere behind UTC,
+    // hands back the day before the one the operator clicked.
+    expect(onChange).toHaveBeenLastCalledWith('2026-08-05')
   })
 
   it('shows a calendar button that is not part of the tab order (masked field already takes full keyboard entry)', () => {

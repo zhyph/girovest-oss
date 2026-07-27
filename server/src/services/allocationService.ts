@@ -1,25 +1,13 @@
 import { prisma } from '../db/client.js'
 import { AppError } from '../errors/AppError.js'
 import { ErrorCodes } from '../errors/errorCodes.js'
-import { isOccupiedForRange, derivedAvailability, type AllocationWindow, type AllocationStatus } from '../domain/occupancy.js'
-
-const ACTIVE_STATUSES: AllocationStatus[] = ['reserved', 'checked_out']
-
-function toWindow(allocation: {
-  status: string
-  checkoutDate: Date
-  actualCheckoutDate: Date | null
-  dueDate: Date
-  actualReturnDate: Date | null
-}): AllocationWindow {
-  return {
-    status: allocation.status as AllocationStatus,
-    checkoutDate: allocation.checkoutDate,
-    actualCheckoutDate: allocation.actualCheckoutDate,
-    dueDate: allocation.dueDate,
-    actualReturnDate: allocation.actualReturnDate,
-  }
-}
+import { isOccupiedForRange, derivedAvailability } from '../domain/occupancy.js'
+import {
+  blockingAllocationsWhere,
+  loadBlockingWindows,
+  maintenanceBufferForProduct,
+  toWindow,
+} from './occupancyQuery.js'
 
 async function getAllocationOrThrow(id: string) {
   const allocation = await prisma.allocation.findUnique({ where: { id } })
@@ -61,10 +49,16 @@ export async function checkOutAllocation(id: string, data: CheckOutInput, asOf: 
     // created. If another booking already holds them, confirming the override
     // would promise one physical dress to two customers, so this block is NOT
     // overridable: only moving the other booking can clear it.
+    const maintenanceBufferDays = await maintenanceBufferForProduct(allocation.productId)
     const others = await prisma.allocation.findMany({
-      where: { productId: allocation.productId, status: { in: ACTIVE_STATUSES }, id: { not: allocation.id } },
+      where: {
+        ...blockingAllocationsWhere([allocation.productId], maintenanceBufferDays, asOf),
+        id: { not: allocation.id },
+      },
     })
-    if (isOccupiedForRange(others.map(toWindow), asOf, allocation.checkoutDate)) {
+    if (
+      isOccupiedForRange(others.map(toWindow), asOf, allocation.checkoutDate, { asOf, maintenanceBufferDays })
+    ) {
       throw new AppError(
         ErrorCodes.EARLY_CHECKOUT_CONFLICT,
         409,
@@ -151,17 +145,15 @@ export async function cancelAllocation(id: string) {
 }
 
 export async function getProductAvailability(productId: string, asOf: Date = new Date()) {
-  const allocations = await prisma.allocation.findMany({
-    where: { productId, status: { in: ACTIVE_STATUSES } },
-  })
-  return derivedAvailability(allocations.map(toWindow), asOf)
+  const maintenanceBufferDays = await maintenanceBufferForProduct(productId)
+  const windows = await loadBlockingWindows([productId], maintenanceBufferDays, asOf)
+  return derivedAvailability(windows, asOf, { maintenanceBufferDays })
 }
 
 export async function isProductAvailableForRange(productId: string, checkoutDate: Date, dueDate: Date) {
-  const allocations = await prisma.allocation.findMany({
-    where: { productId, status: { in: ACTIVE_STATUSES } },
-  })
-  return !isOccupiedForRange(allocations.map(toWindow), checkoutDate, dueDate)
+  const maintenanceBufferDays = await maintenanceBufferForProduct(productId)
+  const windows = await loadBlockingWindows([productId], maintenanceBufferDays, checkoutDate)
+  return !isOccupiedForRange(windows, checkoutDate, dueDate, { maintenanceBufferDays })
 }
 
 export async function listAllocations() {

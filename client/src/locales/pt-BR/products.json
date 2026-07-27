@@ -27,7 +27,8 @@
   "availability": {
     "available": "Disponível",
     "reserved": "Reservado",
-    "rented": "Alugado"
+    "rented": "Alugado",
+    "maintenance": "Em higienização"
   },
   "validation": {
     "nameRequired": "Nome é obrigatório",

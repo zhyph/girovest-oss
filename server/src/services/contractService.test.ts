@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { prisma } from '../db/client.js'
 import { AppError } from '../errors/AppError.js'
-import { createContract, cancelContract, listContracts, getContract } from './contractService.js'
+import { createContract, cancelContract, listContracts, getContract, setInstallmentPaid } from './contractService.js'
 import { checkOutAllocation } from './allocationService.js'
 
 let locationId: string
@@ -386,5 +386,117 @@ describe('getContract', () => {
     const otherLocation = await prisma.location.create({ data: { name: 'Other', address: 'B' } })
 
     await expect(getContract(created.id, otherLocation.id)).rejects.toThrow(AppError)
+  })
+})
+
+describe('booking a piece that is already out on an active contract', () => {
+  it('accepts a later booking for a piece a customer is currently holding', async () => {
+    const first = await createContract(
+      baseInput({
+        items: [
+          { productId, checkoutDate: new Date('2026-10-02'), dueDate: new Date('2026-10-05'), priceCharged: 100 },
+        ],
+      }),
+    )
+    // The dress physically leaves the store, so the allocation is checked_out
+    // and its planned return is still ahead.
+    await checkOutAllocation(first.allocations[0].id, {}, new Date('2026-10-02'))
+
+    const second = await createContract(
+      baseInput({
+        eventDate: new Date('2026-11-15'),
+        items: [
+          { productId, checkoutDate: new Date('2026-11-14'), dueDate: new Date('2026-11-17'), priceCharged: 100 },
+        ],
+      }),
+    )
+
+    expect(second.allocations).toHaveLength(1)
+    expect(second.allocations[0].productId).toBe(productId)
+  })
+
+  it('still refuses a booking that overlaps the days the piece is out', async () => {
+    const first = await createContract(baseInput())
+    await checkOutAllocation(first.allocations[0].id, {}, new Date('2026-10-02'))
+
+    await expect(
+      createContract(
+        baseInput({
+          items: [
+            { productId, checkoutDate: new Date('2026-10-04'), dueDate: new Date('2026-10-08'), priceCharged: 100 },
+          ],
+        }),
+      ),
+    ).rejects.toThrow(AppError)
+  })
+
+  it('refuses a booking that lands inside the shop\'s cleaning window', async () => {
+    await prisma.location.update({ where: { id: locationId }, data: { maintenanceBufferDays: 3 } })
+    await createContract(baseInput())
+
+    // Due Oct 5 plus three cleaning days blocks through Oct 8.
+    await expect(
+      createContract(
+        baseInput({
+          items: [
+            { productId, checkoutDate: new Date('2026-10-07'), dueDate: new Date('2026-10-09'), priceCharged: 100 },
+          ],
+        }),
+      ),
+    ).rejects.toThrow(AppError)
+
+    const afterCleaning = await createContract(
+      baseInput({
+        items: [
+          { productId, checkoutDate: new Date('2026-10-09'), dueDate: new Date('2026-10-11'), priceCharged: 100 },
+        ],
+      }),
+    )
+    expect(afterCleaning.allocations).toHaveLength(1)
+  })
+})
+
+describe('setInstallmentPaid', () => {
+  it('marks an installment as paid and stamps when it was registered', async () => {
+    const contract = await createContract(baseInput())
+
+    const updated = await setInstallmentPaid(contract.id, contract.installments[0].id, locationId, true)
+
+    expect(updated.installments[0].paid).toBe(true)
+    expect(updated.installments[0].paidAt).toBeInstanceOf(Date)
+  })
+
+  it('clears the timestamp when an installment is un-marked', async () => {
+    const contract = await createContract(baseInput())
+    await setInstallmentPaid(contract.id, contract.installments[0].id, locationId, true)
+
+    const updated = await setInstallmentPaid(contract.id, contract.installments[0].id, locationId, false)
+
+    expect(updated.installments[0].paid).toBe(false)
+    expect(updated.installments[0].paidAt).toBeNull()
+  })
+
+  it('refuses an installment belonging to another location', async () => {
+    const contract = await createContract(baseInput())
+    const otherLocation = await prisma.location.create({ data: { name: 'Outra', address: 'B' } })
+
+    await expect(
+      setInstallmentPaid(contract.id, contract.installments[0].id, otherLocation.id, true),
+    ).rejects.toThrow(AppError)
+  })
+
+  it('refuses an installment that belongs to a different contract', async () => {
+    const first = await createContract(baseInput())
+    const second = await createContract(
+      baseInput({
+        items: [
+          { productId: secondProductId, checkoutDate: new Date('2026-10-02'), dueDate: new Date('2026-10-05'), priceCharged: 150 },
+        ],
+      }),
+    )
+
+    await expect(
+      setInstallmentPaid(second.id, first.installments[0].id, locationId, true),
+    ).rejects.toThrow(AppError)
   })
 })

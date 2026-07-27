@@ -8,13 +8,14 @@ import { Input } from '../../components/ui/input.tsx'
 import { CurrencyInput } from '../../components/ui/currency-input.tsx'
 import { ConfirmDialog } from '../../components/ui/confirm-dialog.tsx'
 import { Select } from '../../components/ui/select.tsx'
+import { AutocompleteInput } from '../../components/ui/autocomplete-input.tsx'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from '../../components/ui/sheet.tsx'
 import { showErrorToast } from '../../lib/toast.ts'
 import { useAuth } from '../../lib/useAuth.ts'
 import { useUnsavedChangesGuard } from '../../lib/useUnsavedChangesGuard.ts'
 import { AuthenticatedPhoto } from '../../components/ui/authenticated-photo.tsx'
 import { productSchema, type Product, type ProductFormValues, type ProductStatus } from './productSchemas.ts'
-import { useCreateProduct, useUpdateProduct, useDeleteProduct } from './useProducts.ts'
+import { useCreateProduct, useUpdateProduct, useDeleteProduct, useProducts } from './useProducts.ts'
 
 const STATUS_OPTIONS: ProductStatus[] = ['active', 'maintenance', 'retired']
 
@@ -38,6 +39,7 @@ export function ProductDrawer({
   const createProduct = useCreateProduct()
   const updateProduct = useUpdateProduct()
   const deleteProduct = useDeleteProduct()
+  const { data: allProducts } = useProducts()
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [status, setStatus] = useState<ProductStatus>(product?.status ?? 'active')
   const [photos, setPhotos] = useState<string[]>(product?.photos ?? [])
@@ -131,6 +133,11 @@ export function ProductDrawer({
     }
   }
 
+  // These three repeat across almost every piece in a shop, so offering what
+  // is already in use keeps the catalogue from drifting into "Festa"/"festa".
+  const suggestionsFor = (field: 'category' | 'size' | 'color') =>
+    (allProducts ?? []).map((item) => item[field]).filter((entry): entry is string => Boolean(entry))
+
   const drawerTitle = product ? t('editTitle') : t('newTitle')
 
   return (
@@ -152,17 +159,59 @@ export function ProductDrawer({
         </label>
         <label className="flex flex-col gap-1 text-sm">
           {t('fields.category')}
-          <Input {...register('category')} aria-invalid={errors.category ? true : undefined} aria-describedby={errors.category ? 'product-category-error' : undefined} />
+          <Controller
+            name="category"
+            control={control}
+            render={({ field }) => (
+              <AutocompleteInput
+                value={field.value ?? ''}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                suggestions={suggestionsFor('category')}
+                aria-label={t('fields.category')}
+                aria-invalid={errors.category ? true : undefined}
+                aria-describedby={errors.category ? 'product-category-error' : undefined}
+              />
+            )}
+          />
           {errors.category && <span id="product-category-error" className="text-xs text-destructive">{t('validation.categoryRequired')}</span>}
         </label>
         <label className="flex flex-col gap-1 text-sm">
           {t('fields.size')}
-          <Input {...register('size')} aria-invalid={errors.size ? true : undefined} aria-describedby={errors.size ? 'product-size-error' : undefined} />
+          <Controller
+            name="size"
+            control={control}
+            render={({ field }) => (
+              <AutocompleteInput
+                value={field.value ?? ''}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                suggestions={suggestionsFor('size')}
+                aria-label={t('fields.size')}
+                aria-invalid={errors.size ? true : undefined}
+                aria-describedby={errors.size ? 'product-size-error' : undefined}
+              />
+            )}
+          />
           {errors.size && <span id="product-size-error" className="text-xs text-destructive">{t('validation.sizeRequired')}</span>}
         </label>
         <label className="flex flex-col gap-1 text-sm">
           {t('fields.color')}
-          <Input {...register('color')} aria-invalid={errors.color ? true : undefined} aria-describedby={errors.color ? 'product-color-error' : undefined} />
+          <Controller
+            name="color"
+            control={control}
+            render={({ field }) => (
+              <AutocompleteInput
+                value={field.value ?? ''}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                suggestions={suggestionsFor('color')}
+                aria-label={t('fields.color')}
+                aria-invalid={errors.color ? true : undefined}
+                aria-describedby={errors.color ? 'product-color-error' : undefined}
+              />
+            )}
+          />
           {errors.color && <span id="product-color-error" className="text-xs text-destructive">{t('validation.colorRequired')}</span>}
         </label>
         <label className="flex flex-col gap-1 text-sm">

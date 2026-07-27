@@ -23,7 +23,8 @@
   "items": {
     "title": "Peças",
     "add": "Adicionar peça",
-    "remove": "Remover peça"
+    "remove": "Remover peça",
+    "total": "Total das peças"
   },
   "installments": {
     "title": "Parcelas",
@@ -85,6 +86,19 @@
     "NOT_FOUND": "Contrato não encontrado.",
     "DUE_DATE_BEFORE_CHECKOUT": "A data de devolução deve ser após a data de retirada.",
     "PRODUCT_UNAVAILABLE": "Produto não disponível para as datas escolhidas.",
-    "PRODUCT_NOT_IN_CIRCULATION": "Este produto não está disponível para aluguel."
+    "PRODUCT_NOT_IN_CIRCULATION": "Este produto não está disponível para aluguel.",
+    "INSTALLMENT_UPDATE_FAILED": "Não foi possível atualizar a parcela. Tente novamente."
+  },
+  "payments": {
+    "title": "Pagamentos",
+    "total": "Total",
+    "paid": "Pago",
+    "outstanding": "Em aberto",
+    "markPaid": "Marcar como pago",
+    "markUnpaid": "Desmarcar",
+    "paidOn": "pago em {{date}}",
+    "settled": "Contrato quitado.",
+    "none": "Nenhuma parcela cadastrada neste contrato.",
+    "paidCount": "{{paid}} de {{total}} pagas"
   }
 }

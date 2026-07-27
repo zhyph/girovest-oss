@@ -4,7 +4,13 @@ import { requireAuth } from '../auth/authMiddleware.js'
 import { AppError } from '../errors/AppError.js'
 import { ErrorCodes } from '../errors/errorCodes.js'
 import { prisma } from '../db/client.js'
-import { createContract, cancelContract, listContracts, getContract } from '../services/contractService.js'
+import {
+  createContract,
+  cancelContract,
+  listContracts,
+  getContract,
+  setInstallmentPaid,
+} from '../services/contractService.js'
 import { issueSigningToken } from '../services/signingService.js'
 import { detectLanCandidates } from '../network/lanNetwork.js'
 import { isoDate } from '../lib/zodDate.js'
@@ -82,6 +88,20 @@ contractsRouter.post('/:id/cancel', async (req, res) => {
   if (!req.staff) throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Unauthorized')
   const locationId = await resolveLocationId(req.staff.staffId)
   res.json(await cancelContract(req.params.id, locationId))
+})
+
+const installmentPaidSchema = z.object({ paid: z.boolean() })
+
+contractsRouter.patch('/:contractId/installments/:installmentId', async (req, res) => {
+  if (!req.staff) throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Unauthorized')
+  const parsed = installmentPaidSchema.safeParse(req.body)
+  if (!parsed.success) {
+    throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'Invalid installment payload')
+  }
+  const locationId = await resolveLocationId(req.staff.staffId)
+  res.json(
+    await setInstallmentPaid(req.params.contractId, req.params.installmentId, locationId, parsed.data.paid),
+  )
 })
 
 contractsRouter.post('/:id/sign-token', async (req, res) => {

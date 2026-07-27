@@ -59,6 +59,18 @@ export function useCancelContract() {
   })
 }
 
+export function useSetInstallmentPaid() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ contractId, installmentId, paid }: { contractId: string; installmentId: string; paid: boolean }) =>
+      apiFetch<ContractDetail>(`/api/contracts/${contractId}/installments/${installmentId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ paid }),
+      }),
+    onSuccess: () => invalidateAfterMutation(queryClient),
+  })
+}
+
 export function useIssueSigningToken() {
   return useMutation({
     mutationFn: (contractId: string) =>

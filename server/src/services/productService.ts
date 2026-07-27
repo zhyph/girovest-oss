@@ -1,9 +1,13 @@
 import { prisma } from '../db/client.js'
 import { AppError } from '../errors/AppError.js'
 import { ErrorCodes } from '../errors/errorCodes.js'
-import { derivedAvailability, type AllocationStatus, type DerivedAvailability } from '../domain/occupancy.js'
-
-const ACTIVE_ALLOCATION_STATUSES: AllocationStatus[] = ['reserved', 'checked_out']
+import { derivedAvailability, type AllocationWindow, type DerivedAvailability } from '../domain/occupancy.js'
+import {
+  blockingAllocationsWhere,
+  loadBlockingWindows,
+  maintenanceBufferForProduct,
+  toWindow,
+} from './occupancyQuery.js'
 
 export type ProductStatus = 'active' | 'maintenance' | 'retired'
 
@@ -74,46 +78,49 @@ function toDTO(row: ProductRow, availability: DerivedAvailability, hasAllocation
 }
 
 async function availabilityFor(productId: string, asOf = new Date()): Promise<DerivedAvailability> {
-  const allocations = await prisma.allocation.findMany({
-    where: { productId, status: { in: ACTIVE_ALLOCATION_STATUSES } },
-  })
-  return derivedAvailability(
-    allocations.map((allocation) => ({
-      status: allocation.status as AllocationStatus,
-      checkoutDate: allocation.checkoutDate,
-      actualCheckoutDate: allocation.actualCheckoutDate,
-      dueDate: allocation.dueDate,
-      actualReturnDate: allocation.actualReturnDate,
-    })),
-    asOf,
-  )
+  const maintenanceBufferDays = await maintenanceBufferForProduct(productId)
+  const windows = await loadBlockingWindows([productId], maintenanceBufferDays, asOf)
+  return derivedAvailability(windows, asOf, { maintenanceBufferDays })
 }
 
 async function availabilityByProductId(productIds: string[]): Promise<Map<string, DerivedAvailability>> {
   const result = new Map<string, DerivedAvailability>()
   if (productIds.length === 0) return result
 
-  const allocations = await prisma.allocation.findMany({
-    where: { productId: { in: productIds }, status: { in: ACTIVE_ALLOCATION_STATUSES } },
+  const asOf = new Date()
+  const products = await prisma.product.findMany({
+    where: { id: { in: productIds } },
+    select: { id: true, location: { select: { maintenanceBufferDays: true } } },
   })
-  const byProduct = new Map<string, typeof allocations>()
-  for (const allocation of allocations) {
-    const list = byProduct.get(allocation.productId) ?? []
-    list.push(allocation)
-    byProduct.set(allocation.productId, list)
+
+  // The cleaning window is a per-shop setting and a listing is NOT guaranteed
+  // to be single-shop — GET /api/products lists every location. Collapsing the
+  // batch to one buffer would apply the longest window in the page to shops
+  // that never configured one, parking their pieces in "maintenance" for days.
+  // Grouped by buffer value rather than by location so the query count follows
+  // the number of distinct settings (one, in every real deployment) instead of
+  // the number of shops.
+  const idsByBuffer = new Map<number, string[]>()
+  for (const product of products) {
+    const buffer = product.location.maintenanceBufferDays
+    idsByBuffer.set(buffer, [...(idsByBuffer.get(buffer) ?? []), product.id])
   }
 
-  const asOf = new Date()
-  for (const productId of productIds) {
-    const windows = (byProduct.get(productId) ?? []).map((allocation) => ({
-      status: allocation.status as AllocationStatus,
-      checkoutDate: allocation.checkoutDate,
-      actualCheckoutDate: allocation.actualCheckoutDate,
-      dueDate: allocation.dueDate,
-      actualReturnDate: allocation.actualReturnDate,
-    }))
-    result.set(productId, derivedAvailability(windows, asOf))
-  }
+  await Promise.all(
+    [...idsByBuffer].map(async ([maintenanceBufferDays, ids]) => {
+      const allocations = await prisma.allocation.findMany({
+        where: blockingAllocationsWhere(ids, maintenanceBufferDays, asOf),
+      })
+      const byProduct = new Map<string, AllocationWindow[]>()
+      for (const allocation of allocations) {
+        byProduct.set(allocation.productId, [...(byProduct.get(allocation.productId) ?? []), toWindow(allocation)])
+      }
+      for (const id of ids) {
+        result.set(id, derivedAvailability(byProduct.get(id) ?? [], asOf, { maintenanceBufferDays }))
+      }
+    }),
+  )
+
   return result
 }
 

@@ -9,7 +9,8 @@
     }
   },
   "fields": {
-    "phone": "Telefone"
+    "phone": "Telefone",
+    "maintenanceBufferDays": "Dias de higienização entre aluguéis"
   },
   "clauses": {
     "title": "Cláusulas do Contrato",
@@ -23,5 +24,6 @@
     "help": "Informe este código ao suporte quando solicitado. Ele identifica este computador e não contém nenhum dado da loja ou de clientes.",
     "copy": "Copiar",
     "copied": "Identificador copiado."
-  }
+  },
+  "maintenanceBufferHelp": "Dias em que a peça fica indisponível depois de voltar, para limpeza e reparos, antes de sair para o próximo cliente. Use 0 para liberar já no dia seguinte à devolução."
 }

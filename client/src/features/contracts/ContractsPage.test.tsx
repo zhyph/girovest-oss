@@ -41,6 +41,7 @@ function mockHooks(
     contracts?: Contract[]
     cancelImpl?: (...args: never[]) => Promise<unknown>
     checkOutImpl?: Mock
+    setPaidImpl?: Mock
   } = {},
 ) {
   const contracts = overrides.contracts ?? [contract]
@@ -66,7 +67,12 @@ function mockHooks(
   } as never)
   vi.spyOn(useAllocationsModule, 'useReturnAllocation').mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
   vi.spyOn(useAllocationsModule, 'useCancelAllocation').mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
-  return { checkOutImpl }
+  const setPaidImpl = overrides.setPaidImpl ?? vi.fn().mockResolvedValue(undefined)
+  vi.spyOn(useContractsModule, 'useSetInstallmentPaid').mockReturnValue({
+    mutateAsync: setPaidImpl,
+    isPending: false,
+  } as never)
+  return { checkOutImpl, setPaidImpl }
 }
 
 async function openCheckOutAndConfirm() {
@@ -377,5 +383,64 @@ describe('ContractsPage allocation dialogs', () => {
 
     expect(cancelAllocationImpl).toHaveBeenCalledWith('a1')
     expect(screen.queryByText('Descartar alterações?')).not.toBeInTheDocument()
+  })
+})
+
+describe('payments summary', () => {
+  it('always shows the money, so a long contract can be scanned without expanding it', () => {
+    mockHooks()
+    renderWithProviders(<ContractsPage />)
+
+    expect(screen.getByText(/Total:/)).toBeInTheDocument()
+    expect(screen.getByText(/Em aberto:/)).toBeInTheDocument()
+    expect(screen.getByText('0 de 1 pagas')).toBeInTheDocument()
+  })
+
+  it('keeps the instalment rows collapsed so a 12x contract cannot swamp the list', () => {
+    mockHooks({
+      contracts: [
+        {
+          ...contract,
+          installments: Array.from({ length: 12 }, (_, index) => ({
+            id: `i${index}`,
+            contractId: 'ct1',
+            dueDate: '2026-09-20',
+            amount: 100,
+            paid: false,
+            paidAt: null,
+          })),
+        },
+      ],
+    })
+    renderWithProviders(<ContractsPage />)
+
+    expect(screen.queryByRole('button', { name: 'Marcar como pago' })).not.toBeInTheDocument()
+    expect(screen.getByText('0 de 12 pagas')).toBeInTheDocument()
+  })
+
+  it('reveals the instalment rows when the summary is opened', async () => {
+    mockHooks()
+    renderWithProviders(<ContractsPage />)
+
+    await userEvent.click(screen.getByRole('button', { name: /Pagamentos/ }))
+
+    expect(screen.getByRole('button', { name: 'Marcar como pago' })).toBeInTheDocument()
+  })
+
+  it('sends the paid flag for the instalment that was toggled', async () => {
+    const { setPaidImpl } = mockHooks({
+      contracts: [
+        {
+          ...contract,
+          installments: [{ id: 'i1', contractId: 'ct1', dueDate: '2026-09-20', amount: 380, paid: false, paidAt: null }],
+        },
+      ],
+    })
+    renderWithProviders(<ContractsPage />)
+    await userEvent.click(screen.getByRole('button', { name: /Pagamentos/ }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Marcar como pago' }))
+
+    expect(setPaidImpl).toHaveBeenCalledWith({ contractId: 'ct1', installmentId: 'i1', paid: true })
   })
 })

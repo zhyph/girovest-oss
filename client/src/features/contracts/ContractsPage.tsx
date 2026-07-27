@@ -1,13 +1,16 @@
-import { useMemo, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { ChevronRight } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router'
 import { Button } from '../../components/ui/button.tsx'
+import { cn } from '../../lib/cn.ts'
 import { Input } from '../../components/ui/input.tsx'
 import { CurrencyInput } from '../../components/ui/currency-input.tsx'
 import { Modal } from '../../components/ui/modal.tsx'
 import { ConfirmDialog } from '../../components/ui/confirm-dialog.tsx'
 import { parseDateOnly, formatDate } from '../../lib/date.ts'
+import { formatCurrency, getLocaleConfig } from '../../lib/locale.ts'
 import { useLocale } from '../../lib/LocaleContext.tsx'
 import { showErrorToast } from '../../lib/toast.ts'
 import { useUnsavedChangesGuard } from '../../lib/useUnsavedChangesGuard.ts'
@@ -19,7 +22,7 @@ import {
   useCancelAllocation,
 } from '../allocations/useAllocations.ts'
 import type { Allocation } from '../allocations/allocationSchemas.ts'
-import { useContractsList, useCancelContract, CONTRACTS_KEY } from './useContracts.ts'
+import { useContractsList, useCancelContract, useSetInstallmentPaid, CONTRACTS_KEY } from './useContracts.ts'
 import type { Contract } from './contractSchemas.ts'
 import { NewContractForm } from './NewContractForm.tsx'
 import { SignRemotelyModal } from './SignRemotelyModal.tsx'
@@ -231,6 +234,106 @@ export function RowActions({ allocation }: { allocation: Allocation }) {
   return null
 }
 
+const SHORT_DATE: Intl.DateTimeFormatOptions = { day: '2-digit', month: '2-digit', year: 'numeric' }
+
+function ContractPayments({ contract }: { contract: Contract }) {
+  const { t } = useTranslation('contracts')
+  const { locale } = useLocale()
+  const currency = getLocaleConfig(locale).currency
+  const setPaid = useSetInstallmentPaid()
+  // Collapsed by default: a contract paid in 12 instalments would otherwise
+  // push every other contract off the screen. The money summary — the part
+  // worth scanning down the list — stays visible either way.
+  const [isExpanded, setIsExpanded] = useState(false)
+  const listId = useId()
+
+  // The contract is worth what its pieces were charged at; installments are
+  // just how the client agreed to pay it. They do not always add up to the
+  // same number, so the outstanding balance is measured against the pieces.
+  const total = contract.allocations.reduce((sum, allocation) => sum + allocation.priceCharged, 0)
+  const paid = contract.installments.reduce(
+    (sum, installment) => (installment.paid ? sum + installment.amount : sum),
+    0,
+  )
+  const outstanding = total - paid
+  const paidCount = contract.installments.filter((installment) => installment.paid).length
+
+  async function toggle(installmentId: string, paidNow: boolean) {
+    try {
+      await setPaid.mutateAsync({ contractId: contract.id, installmentId, paid: paidNow })
+    } catch (error) {
+      showErrorToast(
+        t(`errors.${resolveErrorCode(error)}`, { defaultValue: t('errors.INSTALLMENT_UPDATE_FAILED') }),
+      )
+    }
+  }
+
+  return (
+    <div className="mt-2 flex flex-col gap-1 border-t border-border pt-2">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+        {contract.installments.length > 0 ? (
+          <button
+            type="button"
+            aria-expanded={isExpanded}
+            aria-controls={listId}
+            onClick={() => setIsExpanded((open) => !open)}
+            className="-ml-1 inline-flex items-center gap-1 rounded px-1 py-0.5 font-medium text-foreground transition-colors hover:bg-secondary"
+          >
+            <ChevronRight size={12} className={cn('transition-transform', isExpanded && 'rotate-90')} />
+            {t('payments.title')}
+            <span className="font-normal text-muted-foreground">
+              {t('payments.paidCount', { paid: paidCount, total: contract.installments.length })}
+            </span>
+          </button>
+        ) : (
+          <span className="font-medium">{t('payments.title')}</span>
+        )}
+        <span className="text-muted-foreground">
+          {t('payments.total')}: {formatCurrency(total, locale, currency)}
+        </span>
+        <span className="text-muted-foreground">
+          {t('payments.paid')}: {formatCurrency(paid, locale, currency)}
+        </span>
+        <span className={outstanding > 0 ? 'font-medium text-warning-foreground' : 'text-muted-foreground'}>
+          {t('payments.outstanding')}: {formatCurrency(outstanding, locale, currency)}
+        </span>
+      </div>
+      {contract.installments.length === 0 ? (
+        <span className="text-xs text-muted-foreground">{t('payments.none')}</span>
+      ) : (
+        isExpanded && (
+        <ul id={listId} className="flex flex-col gap-1">
+          {contract.installments.map((installment) => (
+            <li key={installment.id} className="flex items-center justify-between gap-3 text-xs">
+              <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+                <span>{formatDate(parseDateOnly(installment.dueDate), locale, SHORT_DATE)}</span>
+                <span className="font-medium">{formatCurrency(installment.amount, locale, currency)}</span>
+                {installment.paid && installment.paidAt && (
+                  <span className="text-muted-foreground">
+                    {t('payments.paidOn', {
+                      date: formatDate(new Date(installment.paidAt), locale, SHORT_DATE),
+                    })}
+                  </span>
+                )}
+              </span>
+              <Button
+                type="button"
+                size="sm"
+                variant={installment.paid ? 'ghost' : 'secondary'}
+                disabled={setPaid.isPending}
+                onClick={() => toggle(installment.id, !installment.paid)}
+              >
+                {installment.paid ? t('payments.markUnpaid') : t('payments.markPaid')}
+              </Button>
+            </li>
+          ))}
+        </ul>
+        )
+      )}
+    </div>
+  )
+}
+
 function ContractCancelAction({ contract }: { contract: Contract }) {
   const { t } = useTranslation('contracts')
   const cancelContract = useCancelContract()
@@ -392,6 +495,7 @@ export function ContractsPage() {
                   </div>
                 ))}
               </div>
+              <ContractPayments contract={contract} />
             </div>
           ))}
         </div>

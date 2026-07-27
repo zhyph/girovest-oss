@@ -11,6 +11,7 @@ import type { LocationSettings } from './settingsSchemas.ts'
 const settings: LocationSettings = {
   id: 'loc1',
   name: 'Priscila Moda Festa',
+  maintenanceBufferDays: 0,
   phone: '11987654321',
   clauses: [
     { id: 'c1', text: 'Primeira cláusula', sortOrder: 0 },
@@ -100,6 +101,7 @@ describe('SettingsPage', () => {
 
     expect(updateImpl).toHaveBeenCalledWith({
       phone: '11987654321',
+      maintenanceBufferDays: 0,
       clauses: [{ text: 'Primeira cláusula' }, { text: 'Segunda cláusula' }],
     })
   })

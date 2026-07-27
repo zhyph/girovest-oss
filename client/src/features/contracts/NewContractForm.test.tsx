@@ -197,3 +197,27 @@ describe('NewContractForm', () => {
     expect(onClose).toHaveBeenCalledOnce()
   })
 })
+
+describe('pricing', () => {
+  it("fills the charged price with the product's rental price when a piece is picked", async () => {
+    mockHooks()
+    renderWithToast(<NewContractForm onClose={vi.fn()} />)
+
+    await userEvent.selectOptions(screen.getByLabelText(/produto/i), 'p1')
+
+    // Intl formats currency with a non-breaking space, so compare on the number.
+    expect((screen.getByLabelText(/valor/i) as HTMLInputElement).value).toContain('100,00')
+  })
+
+  it('leaves an operator-typed price alone and totals what is actually charged', async () => {
+    mockHooks()
+    renderWithToast(<NewContractForm onClose={vi.fn()} />)
+    await userEvent.selectOptions(screen.getByLabelText(/produto/i), 'p1')
+
+    const priceField = screen.getByLabelText(/valor/i)
+    await userEvent.clear(priceField)
+    await userEvent.type(priceField, '8000')
+
+    expect(screen.getByText(/total das peças/i).parentElement).toHaveTextContent('R$ 80,00')
+  })
+})

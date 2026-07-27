@@ -148,3 +148,70 @@ describe('POST /api/contracts', () => {
     expect(response.status).toBe(400)
   })
 })
+
+describe('PATCH /api/contracts/:contractId/installments/:installmentId', () => {
+  async function createContractWithInstallment() {
+    const product = await prisma.product.create({
+      data: {
+        locationId, name: 'Vestido', category: 'Festa', size: 'M', color: 'Azul',
+        rentalPrice: 100, depositAmount: 50,
+      },
+    })
+    const response = await request(app)
+      .post('/api/contracts')
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({
+        clientId,
+        eventDate: '2026-10-03',
+        paymentMethod: 'PIX',
+        items: [{ productId: product.id, checkoutDate: '2026-10-02', dueDate: '2026-10-05', priceCharged: 100 }],
+        installments: [{ dueDate: '2026-09-20', amount: 100 }],
+      })
+    return response.body as { id: string; installments: { id: string }[] }
+  }
+
+  it('marks an installment as paid', async () => {
+    const contract = await createContractWithInstallment()
+
+    const response = await request(app)
+      .patch(`/api/contracts/${contract.id}/installments/${contract.installments[0].id}`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({ paid: true })
+
+    expect(response.status).toBe(200)
+    expect(response.body.installments[0].paid).toBe(true)
+    expect(response.body.installments[0].paidAt).not.toBeNull()
+  })
+
+  it('requires authentication', async () => {
+    const contract = await createContractWithInstallment()
+
+    const response = await request(app)
+      .patch(`/api/contracts/${contract.id}/installments/${contract.installments[0].id}`)
+      .send({ paid: true })
+
+    expect(response.status).toBe(401)
+  })
+
+  it('rejects a payload without a paid flag', async () => {
+    const contract = await createContractWithInstallment()
+
+    const response = await request(app)
+      .patch(`/api/contracts/${contract.id}/installments/${contract.installments[0].id}`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({})
+
+    expect(response.status).toBe(400)
+  })
+
+  it('404s for an installment that does not exist', async () => {
+    const contract = await createContractWithInstallment()
+
+    const response = await request(app)
+      .patch(`/api/contracts/${contract.id}/installments/does-not-exist`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({ paid: true })
+
+    expect(response.status).toBe(404)
+  })
+})
