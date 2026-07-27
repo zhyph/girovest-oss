@@ -74,14 +74,22 @@ describe('CalendarPage', () => {
       // MonthView mounted). The generous timeout is for transforming
       // react-big-calendar's module graph on first import under Vitest, not
       // for the dynamic import itself.
-      expect(await screen.findByRole('button', { name: 'Hoje' }, { timeout: 9000 })).toBeInTheDocument()
+      //
+      // Raised from 9s after the suite grew: this transform takes ~4.7s on an
+      // idle machine and several times that when the full suite is competing
+      // for CPU, so the old budget failed as soon as enough files ran in
+      // parallel. The real fix is prebundling react-big-calendar via Vitest's
+      // dep optimizer so the cost falls outside the timed assertion; until then
+      // the budget has to cover the worst case, and the cost of a large timeout
+      // is only paid when the test is actually about to fail.
+      expect(await screen.findByRole('button', { name: 'Hoje' }, { timeout: 30000 })).toBeInTheDocument()
       await userEvent.click(screen.getByRole('button', { name: 'Ver agenda' }))
       expect(screen.getByRole('button', { name: 'Ver mês' })).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Hoje' })).not.toBeInTheDocument()
       await userEvent.click(screen.getByRole('button', { name: 'Ver mês' }))
-      expect(await screen.findByRole('button', { name: 'Hoje' }, { timeout: 9000 })).toBeInTheDocument()
+      expect(await screen.findByRole('button', { name: 'Hoje' }, { timeout: 30000 })).toBeInTheDocument()
     },
-    15000,
+    45000,
   )
 
   it('renders the product name looked up from useProducts when the productId matches', () => {

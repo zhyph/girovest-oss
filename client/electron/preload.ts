@@ -15,4 +15,8 @@ contextBridge.exposeInMainWorld('girovest', {
   // which is the correct answer there: the identifier only exists for a desktop
   // installation.
   getInstallId: (): Promise<string | null> => ipcRenderer.invoke('install:id'),
+  // Only the activation screen calls this. It lives on the same bridge because
+  // that screen is a data: URL loaded into the same window, and the preload
+  // applies to it too.
+  retryActivation: (): Promise<string> => ipcRenderer.invoke('activation:retry'),
 })

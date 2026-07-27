@@ -7,6 +7,9 @@ import path from 'path'
 import { backupDatabaseIfNeeded, writeBackupMarker } from './backup.ts'
 import { resolveInstallId } from './installId.ts'
 import { setupAutoUpdater } from './updater.ts'
+import { ensureActivated, type ActivationState } from './activation.ts'
+import { resolveMachineHash } from './machineId.ts'
+import { activationScreenHtml } from './activationScreen.ts'
 
 export function resolveServerCwd(appRoot: string): string {
   return path.resolve(appRoot, '..', 'server')
@@ -224,7 +227,49 @@ async function startServer(): Promise<boolean> {
   return true
 }
 
-function createWindow() {
+// Injected at build time by electron.vite.config.ts, alongside the updater's
+// constants. Empty when the build did not set them, which disables the lock:
+// see the `unverifiable` branch in ensureActivated.
+declare const GIROVEST_UPDATE_URL: string
+declare const GIROVEST_UPDATE_KEY: string
+declare const GIROVEST_ACTIVATION_PUBKEY: string
+declare const GIROVEST_SUPPORT_CONTACT: string
+
+/**
+ * Loads the "not released yet" screen into an existing window.
+ *
+ * A data: URL rather than a file so the screen has no filesystem or network
+ * dependency of its own -- it is precisely the thing that must still render
+ * when everything else failed.
+ */
+function loadActivationScreen(win: BrowserWindow, state: ActivationState): void {
+  const html = activationScreenHtml(state, GIROVEST_SUPPORT_CONTACT || 'suporte')
+  void win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
+}
+
+/**
+ * Runs the activation check and records the outcome in the log.
+ *
+ * The log line matters for support: `unverifiable` and `activated` look
+ * identical to the shop (the app just opens), so without it there is no way to
+ * tell a released installation from one that skipped the check.
+ */
+async function resolveActivation(installId: string, userDataPath: string): Promise<ActivationState> {
+  const state = await ensureActivated({
+    userDataPath,
+    installId,
+    machineHash: resolveMachineHash(),
+    publicKey: GIROVEST_ACTIVATION_PUBKEY,
+    endpoint:
+      GIROVEST_UPDATE_URL && GIROVEST_UPDATE_KEY
+        ? { url: GIROVEST_UPDATE_URL, productKey: GIROVEST_UPDATE_KEY }
+        : null,
+  })
+  console.log(`[activation] ${state.state}`)
+  return state
+}
+
+function createWindow(state: ActivationState): BrowserWindow {
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -237,6 +282,19 @@ function createWindow() {
     },
   })
 
+  loadAppOrActivation(win, state)
+  return win
+}
+
+/** Loads the real app when released, the activation screen otherwise. */
+function loadAppOrActivation(win: BrowserWindow, state: ActivationState): void {
+  // `unverifiable` deliberately loads the app: it means no machine fingerprint
+  // was readable, or this build carries no activation config. Both are our
+  // problem, not the shop's, and neither justifies locking anyone out.
+  if (state.state !== 'activated' && state.state !== 'unverifiable') {
+    loadActivationScreen(win, state)
+    return
+  }
   if (process.env.ELECTRON_RENDERER_URL) {
     win.loadURL(process.env.ELECTRON_RENDERER_URL)
   } else {
@@ -307,11 +365,29 @@ if (app) {
       return
     }
 
-    createWindow()
+    const userDataPath = app.getPath('userData')
     // Resolved here rather than inside setupAutoUpdater so the file lives
     // next to the other userData-backed values and stays independent of
     // whether the updater is enabled in this build.
-    void setupAutoUpdater(resolveInstallId(app.getPath('userData')))
+    const installId = resolveInstallId(userDataPath)
+
+    // Awaited before the window exists on purpose. With a valid stored token
+    // this touches no network at all and returns in microseconds; only a first
+    // run (or a machine change) pays for a round trip, and paying it here beats
+    // flashing the real app for a second before replacing it with a lock screen.
+    const activation = await resolveActivation(installId, userDataPath)
+    const win = createWindow(activation)
+
+    // Retry from the lock screen. Re-runs the whole check rather than trusting
+    // the previous outcome: between the two attempts the owner has typically
+    // just approved the installation in the admin panel.
+    ipcMain.handle('activation:retry', async () => {
+      const next = await resolveActivation(installId, userDataPath)
+      loadAppOrActivation(win, next)
+      return next.state
+    })
+
+    void setupAutoUpdater(installId)
   })
 
   app.on('window-all-closed', () => {

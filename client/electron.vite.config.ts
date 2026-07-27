@@ -23,6 +23,16 @@ export default defineConfig({
     define: {
       GIROVEST_UPDATE_URL: JSON.stringify(process.env.GIROVEST_UPDATE_URL ?? ''),
       GIROVEST_UPDATE_KEY: JSON.stringify(process.env.GIROVEST_UPDATE_KEY ?? ''),
+      // Ed25519 public key (SPKI base64) that verifies activation tokens. Only
+      // the public half ships: the app verifies, it never signs. Empty disables
+      // the activation lock entirely -- see the `unverifiable` branch in
+      // electron/activation.ts.
+      GIROVEST_ACTIVATION_PUBKEY: JSON.stringify(process.env.GIROVEST_ACTIVATION_PUBKEY ?? ''),
+      // Shown on the activation screen so the shop knows who to call. Not a
+      // secret; it is a plain contact string.
+      GIROVEST_SUPPORT_CONTACT: JSON.stringify(
+        process.env.GIROVEST_SUPPORT_CONTACT ?? 'suporte@girovest',
+      ),
     },
     build: {
       rollupOptions: {

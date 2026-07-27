@@ -90,6 +90,11 @@ jobs:
         env:
           GIROVEST_UPDATE_URL: ${{ secrets.GIROVEST_UPDATE_URL }}
           GIROVEST_UPDATE_KEY: ${{ secrets.GIROVEST_UPDATE_KEY }}
+          # Public half of the activation keypair. Deliberately NOT gated by the
+          # fail-early step below: a build without it simply ships with the
+          # activation lock off, which is a degraded product, not a broken one.
+          GIROVEST_ACTIVATION_PUBKEY: ${{ secrets.GIROVEST_ACTIVATION_PUBKEY }}
+          GIROVEST_SUPPORT_CONTACT: ${{ vars.GIROVEST_SUPPORT_CONTACT }}
         run: npm run electron:build --workspace=client
 
       - name: Package with electron-builder
