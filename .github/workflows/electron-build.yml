@@ -94,7 +94,11 @@ jobs:
           # fail-early step below: a build without it simply ships with the
           # activation lock off, which is a degraded product, not a broken one.
           GIROVEST_ACTIVATION_PUBKEY: ${{ secrets.GIROVEST_ACTIVATION_PUBKEY }}
-          GIROVEST_SUPPORT_CONTACT: ${{ vars.GIROVEST_SUPPORT_CONTACT }}
+          # Read from secrets rather than vars: not because the contact string is
+          # sensitive, but because that is where it was created, and a `vars.`
+          # reference to a name that only exists as a secret resolves to an empty
+          # string silently -- the lock screen would just say "suporte".
+          GIROVEST_SUPPORT_CONTACT: ${{ secrets.GIROVEST_SUPPORT_CONTACT }}
         run: npm run electron:build --workspace=client
 
       - name: Package with electron-builder
