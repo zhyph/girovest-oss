@@ -14,7 +14,10 @@
   },
   "checkOutDialog": {
     "title": "Check-out",
-    "confirm": "Confirmar check-out"
+    "confirm": "Confirmar check-out",
+    "earlyTitle": "Retirada antes da data",
+    "earlyMessage": "A saída deste item está marcada para {{date}}. Registrar a retirada mesmo assim? O produto passa a ficar indisponível a partir de agora.",
+    "earlyConfirm": "Retirar mesmo assim"
   },
   "returnDialog": {
     "title": "Devolução",

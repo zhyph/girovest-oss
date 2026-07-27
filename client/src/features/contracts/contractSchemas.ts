@@ -35,6 +35,7 @@ export interface ContractAllocation {
   staffId: string
   contractId: string
   checkoutDate: string
+  actualCheckoutDate: string | null
   dueDate: string
   actualReturnDate: string | null
   status: ContractAllocationStatus

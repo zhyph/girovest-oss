@@ -9,7 +9,7 @@ import type { Product } from '../products/productSchemas.ts'
 function makeAllocation(overrides: Partial<Allocation> = {}): Allocation {
   return {
     id: 'a1', productId: 'p1', clientId: 'c1', staffId: 's1',
-    checkoutDate: '2026-07-01', dueDate: '2026-07-05',
+    checkoutDate: '2026-07-01', actualCheckoutDate: null, dueDate: '2026-07-05',
     actualReturnDate: null, status: 'reserved', priceCharged: 100,
     depositCollected: null, depositReturned: null, conditionNotesOut: null, conditionNotesIn: null,
     createdAt: '2026-07-01',

@@ -6,6 +6,7 @@ export interface Allocation {
   clientId: string
   staffId: string
   checkoutDate: string
+  actualCheckoutDate: string | null
   dueDate: string
   actualReturnDate: string | null
   status: AllocationStatus

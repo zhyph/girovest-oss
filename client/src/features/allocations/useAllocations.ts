@@ -20,10 +20,21 @@ function invalidateAfterMutation(queryClient: QueryClient) {
 export function useCheckOutAllocation() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, conditionNotesOut, depositCollected }: { id: string; conditionNotesOut?: string; depositCollected?: number }) =>
+    mutationFn: ({
+      id,
+      conditionNotesOut,
+      depositCollected,
+      allowEarly,
+    }: {
+      id: string
+      conditionNotesOut?: string
+      depositCollected?: number
+      /** Only set after the operator confirmed a pickup before the contracted date. */
+      allowEarly?: boolean
+    }) =>
       apiFetch<Allocation>(`/api/allocations/${id}/check-out`, {
         method: 'POST',
-        body: JSON.stringify({ conditionNotesOut, depositCollected }),
+        body: JSON.stringify({ conditionNotesOut, depositCollected, allowEarly }),
       }),
     onSuccess: () => invalidateAfterMutation(queryClient),
   })

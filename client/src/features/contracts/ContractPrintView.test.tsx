@@ -38,7 +38,7 @@ const baseContract: ContractDetail = {
   allocations: [
     {
       id: 'al1', productId: 'p1', clientId: 'c1', staffId: 's1', contractId: 'ct1',
-      checkoutDate: '2026-10-02', dueDate: '2026-10-06', actualReturnDate: null,
+      checkoutDate: '2026-10-02', actualCheckoutDate: null, dueDate: '2026-10-06', actualReturnDate: null,
       status: 'reserved', priceCharged: 380, depositCollected: null, depositReturned: null,
       conditionNotesOut: null, conditionNotesIn: null, createdAt: '2026-09-01',
       product: { id: 'p1', name: 'Vestido Azul' },
