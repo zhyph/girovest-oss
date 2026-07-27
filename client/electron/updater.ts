@@ -49,8 +49,8 @@ export async function setupAutoUpdater(installId: string): Promise<void> {
   // visible in the log instead of turning into a silently dead update path.
   if (!GIROVEST_UPDATE_URL || !GIROVEST_UPDATE_KEY) {
     log.warn(
-      'Auto-update desativado: build sem GIROVEST_UPDATE_URL/GIROVEST_UPDATE_KEY. ' +
-        'Nenhum feed configurado (o app-update.yml do pacote foi ignorado de proposito).',
+      'Auto-update disabled: build has no GIROVEST_UPDATE_URL/GIROVEST_UPDATE_KEY. ' +
+        "No feed configured (the package's app-update.yml was ignored on purpose).",
     )
     return
   }

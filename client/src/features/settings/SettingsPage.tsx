@@ -20,9 +20,9 @@ export function SettingsPage() {
   const { theme, setTheme } = useTheme()
   const installId = useInstallId()
 
-  // navigator.clipboard não existe em contexto inseguro nem em todo ambiente de
-  // teste, e o código continua selecionável na tela de qualquer forma: falha
-  // aqui não merece toast de erro, só não confirmar a cópia.
+  // navigator.clipboard is absent in insecure contexts and in some test
+  // environments, and the code stays selectable on screen either way: a failure
+  // here does not deserve an error toast, it just skips the confirmation.
   const copyInstallId = () => {
     if (installId === null) return
     void navigator.clipboard
@@ -122,9 +122,9 @@ export function SettingsPage() {
             </Button>
           </div>
         </form>
-        {/* Fora do <form> de propósito: não é dado editável da loja, é um
-            identificador só de leitura. Some inteiro no build web, onde não
-            existe instalação a identificar. */}
+        {/* Outside the <form> on purpose: this is not editable shop data, it is
+            a read-only identifier. Disappears entirely on the web build, where
+            there is no installation to identify. */}
         {installId !== null && (
           <div className="mt-6 flex flex-col gap-2 border-t border-border pt-4">
             <span className="text-sm font-medium">{t('install.title')}</span>

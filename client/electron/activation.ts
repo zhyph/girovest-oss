@@ -3,28 +3,28 @@ import fs from 'fs'
 import path from 'path'
 
 /**
- * Ativacao do lado do app.
+ * App-side activation.
  *
- * O ponto central: `verifyActivationToken` NAO usa rede. Depois da primeira
- * ativacao o app confere a assinatura localmente em todo boot, para sempre, e e
- * isso que separa esta trava de um kill switch — internet caida, Worker fora do
- * ar ou secret expirado nunca impedem a loja de trabalhar.
+ * The central point: verifyActivationToken uses NO network. After the first
+ * activation the app checks the signature locally on every boot, forever, and
+ * that is what separates this lock from a kill switch — a dead connection, a
+ * Worker outage or an expired secret can never keep the shop from working.
  *
- * A verificacao usa so a chave PUBLICA, embutida no bundle em tempo de build. O
- * app consegue conferir tudo e nao consegue assinar nada.
+ * Verification uses only the PUBLIC key, baked into the bundle at build time.
+ * The app can check everything and sign nothing.
  */
 
 const TOKEN_FILE = 'activation-token'
 
 export type ActivationState =
   | { readonly state: 'activated' }
-  /** Registrada, esperando o LICENCIANTE aprovar no painel. */
+  /** Registered, waiting for the licensor to approve it in the admin panel. */
   | { readonly state: 'pending'; readonly code: string }
-  /** Recusada por revogacao ou por ser outra maquina. */
+  /** Refused because it was revoked, or because this is a different machine. */
   | { readonly state: 'refused'; readonly reason: string }
-  /** Nao deu para falar com o servidor. Difere de recusa: aqui vale tentar de novo. */
+  /** Couldn't reach the server. Distinct from a refusal: retrying is worthwhile. */
   | { readonly state: 'unreachable' }
-  /** Nenhuma fonte de identificacao de maquina respondeu: deixa passar. */
+  /** No machine fingerprint source answered: let it through. */
   | { readonly state: 'unverifiable' }
 
 interface TokenPayload {
@@ -38,11 +38,11 @@ function decodeBase64Url(value: string): Buffer {
 }
 
 /**
- * Confere o token contra esta instalacao e esta maquina.
+ * Checks the token against this installation and this machine.
  *
- * A ordem importa: valida a assinatura ANTES de confiar em qualquer campo do
- * payload. Ler installId/machineHash de um payload nao verificado e depois
- * compara-los seria teatro — quem edita o arquivo edita os dois.
+ * Order matters: the signature is validated BEFORE any payload field is
+ * trusted. Reading installId/machineHash out of an unverified payload and then
+ * comparing them would be theatre — whoever edits the file edits both.
  */
 export function verifyActivationToken(
   token: string | null,
@@ -62,11 +62,11 @@ export function verifyActivationToken(
       format: 'der',
       type: 'spki',
     })
-    // Ed25519: algoritmo null, a assinatura ja cobre o hash internamente.
+    // Ed25519: null algorithm, the signature already covers the hash internally.
     if (!verify(null, data, key, decodeBase64Url(signature))) return false
   } catch {
-    // Base64 quebrado, chave publica invalida, token de outro algoritmo: tudo
-    // isso e token invalido, nao excecao a propagar.
+    // Broken base64, an invalid public key, a token from another algorithm:
+    // all of that is an invalid token, not an exception to propagate.
     return false
   }
 
@@ -92,7 +92,7 @@ export function readStoredToken(userDataPath: string): string | null {
   }
 }
 
-/** Grava o token. Falha de escrita nao e fatal: o app so vai reativar no proximo boot. */
+/** Stores the token. A write failure isn't fatal: the app just reactivates next boot. */
 export function storeToken(userDataPath: string, token: string): boolean {
   try {
     fs.writeFileSync(tokenPath(userDataPath), token, 'utf-8')
@@ -110,13 +110,13 @@ export interface ActivationEndpoint {
 type FetchLike = typeof globalThis.fetch
 
 /**
- * Pede ativacao ao servidor. So e chamada quando o token local nao serve.
+ * Asks the server to activate. Only called when the local token doesn't serve.
  *
- * 202 e "pendente", nao erro: o dono ainda vai aprovar no painel, e o app deve
- * mostrar o codigo e continuar tentando. 403 e recusa definitiva. Qualquer
- * outra coisa, incluindo o 503 de servidor sem chave de assinatura, vira
- * `unreachable`, porque o comum e falta de internet e a acao certa e tentar
- * de novo, nao acusar a lojista de nada.
+ * 202 means "pending", not an error: the owner is still going to approve it in
+ * the panel, and the app should show the code and keep retrying. 403 is a final
+ * refusal. Anything else, including the 503 from a server with no signing key,
+ * becomes `unreachable` — the common case is no internet, and the right move is
+ * to retry rather than accuse the shop of anything.
  */
 export async function requestActivation(
   endpoint: ActivationEndpoint,
@@ -171,15 +171,14 @@ export interface EnsureActivatedInput {
 }
 
 /**
- * Decide se o app pode abrir, e ativa quando preciso.
+ * Decides whether the app may open, activating when needed.
  *
- * Dois casos deixam passar sem token, os dois deliberados:
- *   - `machineHash` nulo: nenhuma fonte de identificacao respondeu (ver
- *     machineId.ts). Bloquear aqui seria transformar peculiaridade de SO em
- *     loja parada.
- *   - endpoint nao configurado no build: e um build de desenvolvimento ou mal
- *     configurado, e travar o proprio desenvolvedor fora do app nao ajuda
- *     ninguem. O aviso fica no log.
+ * Two cases let it through without a token, both deliberate:
+ *   - null machineHash: no fingerprint source answered (see machineId.ts).
+ *     Blocking here would turn an OS quirk into a shop that can't open.
+ *   - no endpoint configured in the build: this is a development or a
+ *     misconfigured build, and locking the developer out of their own app helps
+ *     nobody. The warning goes to the log.
  */
 export async function ensureActivated(input: EnsureActivatedInput): Promise<ActivationState> {
   const { userDataPath, installId, machineHash, publicKey, endpoint } = input
@@ -199,9 +198,9 @@ export async function ensureActivated(input: EnsureActivatedInput): Promise<Acti
     input.fetchImpl ?? globalThis.fetch,
   )
   if (result.state === 'activated' && token != null) {
-    // Reverifica o que o servidor mandou antes de gravar. Token que nao passa na
-    // verificacao local nunca deve virar arquivo: no boot seguinte ele falharia
-    // de novo e o app entraria em ciclo de reativacao sem explicacao.
+    // Re-verify what the server sent before storing it. A token that fails local
+    // verification must never become a file: on the next boot it would fail
+    // again and put the app in an unexplained reactivation loop.
     if (!verifyActivationToken(token, installId, machineHash, publicKey)) {
       return { state: 'refused', reason: 'bad_token' }
     }

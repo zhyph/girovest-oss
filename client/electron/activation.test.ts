@@ -19,7 +19,7 @@ const OUTRA_MAQUINA = 'b'.repeat(64)
 const { privateKey, publicKey } = generateKeyPairSync('ed25519')
 const PUBLIC_SPKI = publicKey.export({ type: 'spki', format: 'der' }).toString('base64')
 
-/** Reproduz o que o Worker faz em mintActivationToken. */
+/** Reproduces what the Worker does in mintActivationToken. */
 function mint(installId: string, machineHash: string, issuedAt = '2026-07-27'): string {
   const canonical = JSON.stringify({ installId, machineHash, issuedAt })
   const data = Buffer.from(canonical, 'utf-8')
@@ -40,25 +40,25 @@ afterEach(() => {
 })
 
 describe('verifyActivationToken', () => {
-  it('aceita token assinado para esta instalacao e esta maquina', () => {
+  it('accepts a token signed for this installation and this machine', () => {
     expect(verifyActivationToken(mint(INSTALL, MACHINE), INSTALL, MACHINE, PUBLIC_SPKI)).toBe(true)
   })
 
-  it('recusa token de outra maquina', () => {
-    // O caso do userData copiado junto com o executavel.
+  it('rejects a token for another machine', () => {
+    // The case of userData copied alongside the executable.
     expect(verifyActivationToken(mint(INSTALL, OUTRA_MAQUINA), INSTALL, MACHINE, PUBLIC_SPKI)).toBe(
       false,
     )
   })
 
-  it('recusa token de outra instalacao', () => {
+  it('rejects a token for another installation', () => {
     const outro = 'c3b5d7e9-2222-4333-8444-555566667777'
     expect(verifyActivationToken(mint(outro, MACHINE), INSTALL, MACHINE, PUBLIC_SPKI)).toBe(false)
   })
 
-  it('recusa payload adulterado, mesmo mantendo a assinatura original', () => {
-    // Editar o payload e a tentativa obvia de quem abre o arquivo. A assinatura
-    // e verificada ANTES de qualquer campo ser lido, entao nao adianta.
+  it('rejects a tampered payload even when the original signature is kept', () => {
+    // Editing the payload is the obvious move for whoever opens the file. The
+    // signature is verified BEFORE any field is read, so it gets them nowhere.
     const token = mint(INSTALL, OUTRA_MAQUINA)
     const [, sig] = token.split('.')
     const forjado = Buffer.from(
@@ -72,7 +72,7 @@ describe('verifyActivationToken', () => {
     expect(verifyActivationToken(`${forjado}.${sig}`, INSTALL, MACHINE, PUBLIC_SPKI)).toBe(false)
   })
 
-  it('recusa assinatura de outra chave', () => {
+  it('rejects a signature from a different key', () => {
     const outra = generateKeyPairSync('ed25519')
     const canonical = JSON.stringify({
       installId: INSTALL,
@@ -86,32 +86,32 @@ describe('verifyActivationToken', () => {
     expect(verifyActivationToken(token, INSTALL, MACHINE, PUBLIC_SPKI)).toBe(false)
   })
 
-  it('recusa lixo sem estourar excecao', () => {
+  it('rejects garbage without throwing', () => {
     for (const token of [null, '', 'sem-ponto', 'a.b', '###.###', `${'x'.repeat(50)}.y`]) {
       expect(verifyActivationToken(token, INSTALL, MACHINE, PUBLIC_SPKI), String(token)).toBe(false)
     }
   })
 
-  it('recusa quando o build nao trouxe chave publica', () => {
+  it('rejects when the build carried no public key', () => {
     expect(verifyActivationToken(mint(INSTALL, MACHINE), INSTALL, MACHINE, '')).toBe(false)
   })
 })
 
-describe('armazenamento do token', () => {
-  it('grava e le de volta', () => {
+describe('token storage', () => {
+  it('writes and reads back', () => {
     const token = mint(INSTALL, MACHINE)
     expect(storeToken(dir, token)).toBe(true)
     expect(readStoredToken(dir)).toBe(token)
     expect(fs.existsSync(tokenPath(dir))).toBe(true)
   })
 
-  it('devolve null quando nao existe ou esta vazio', () => {
+  it('returns null when absent or empty', () => {
     expect(readStoredToken(dir)).toBeNull()
     fs.writeFileSync(tokenPath(dir), '   ')
     expect(readStoredToken(dir)).toBeNull()
   })
 
-  it('nao estoura quando o diretorio nao existe', () => {
+  it('does not throw when the directory does not exist', () => {
     expect(storeToken(path.join(dir, 'nao', 'existe'), 'x')).toBe(false)
   })
 })
@@ -123,13 +123,13 @@ describe('requestActivation', () => {
     return vi.fn(async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch
   }
 
-  it('devolve o token em 200', async () => {
+  it('returns the token on 200', async () => {
     const token = mint(INSTALL, MACHINE)
     const result = await requestActivation(endpoint, INSTALL, MACHINE, fakeFetch(200, { token }))
     expect(result).toEqual({ result: { state: 'activated' }, token })
   })
 
-  it('202 e pendente, com o codigo curto para conferencia', async () => {
+  it('202 is pending, carrying the short code for visual matching', async () => {
     const result = await requestActivation(
       endpoint,
       INSTALL,
@@ -139,7 +139,7 @@ describe('requestActivation', () => {
     expect(result.result).toEqual({ state: 'pending', code: 'B2A4F6C8' })
   })
 
-  it('403 e recusa definitiva, com motivo', async () => {
+  it('403 is a final refusal, with a reason', async () => {
     const result = await requestActivation(
       endpoint,
       INSTALL,
@@ -149,14 +149,14 @@ describe('requestActivation', () => {
     expect(result.result).toEqual({ state: 'refused', reason: 'machine_mismatch' })
   })
 
-  it('503 vira unreachable, nao recusa', async () => {
-    // Servidor sem chave de assinatura e problema do dono, nao da lojista: o app
-    // tenta de novo em vez de mostrar "acesso negado".
+  it('503 becomes unreachable, not a refusal', async () => {
+    // A server with no signing key is the owner's problem, not the shop's: the
+    // app retries instead of showing "access denied".
     const result = await requestActivation(endpoint, INSTALL, MACHINE, fakeFetch(503, {}))
     expect(result.result).toEqual({ state: 'unreachable' })
   })
 
-  it('falha de rede vira unreachable', async () => {
+  it('a network failure becomes unreachable', async () => {
     const boom = vi.fn(async () => {
       throw new Error('offline')
     }) as unknown as typeof fetch
@@ -164,7 +164,7 @@ describe('requestActivation', () => {
     expect(result.result).toEqual({ state: 'unreachable' })
   })
 
-  it('nao duplica a barra ao montar a URL', async () => {
+  it('does not double the slash when building the URL', async () => {
     const spy = fakeFetch(200, { token: mint(INSTALL, MACHINE) })
     await requestActivation(endpoint, INSTALL, MACHINE, spy)
     expect((spy as unknown as { mock: { calls: unknown[][] } }).mock.calls[0]?.[0]).toBe(
@@ -177,22 +177,21 @@ describe('ensureActivated', () => {
   const endpoint = { url: 'https://proxy.exemplo', productKey: 'chave' }
   const base = { userDataPath: '', installId: INSTALL, machineHash: MACHINE, publicKey: PUBLIC_SPKI, endpoint }
 
-  it('deixa passar quando nenhuma fonte de maquina respondeu', async () => {
-    // Falha para o lado seguro: peculiaridade de SO nao pode virar loja parada.
+  it('lets the app through when no machine source answered', async () => {
+    // Fails open: an OS quirk must not become a shop that cannot open.
     const rede = vi.fn() as unknown as typeof fetch
     const state = await ensureActivated({ ...base, userDataPath: dir, machineHash: null, fetchImpl: rede })
     expect(state).toEqual({ state: 'unverifiable' })
     expect(rede).not.toHaveBeenCalled()
   })
 
-  it('deixa passar quando o build nao configurou ativacao', async () => {
+  it('lets the app through when the build configured no activation', async () => {
     const state = await ensureActivated({ ...base, userDataPath: dir, endpoint: null })
     expect(state).toEqual({ state: 'unverifiable' })
   })
 
-  it('token local valido dispensa a rede por completo', async () => {
-    // A propriedade que sustenta o desenho inteiro: depois de ativado, offline
-    // para sempre.
+  it('a valid local token skips the network entirely', async () => {
+    // The property the whole design rests on: once activated, offline forever.
     storeToken(dir, mint(INSTALL, MACHINE))
     const rede = vi.fn() as unknown as typeof fetch
     const state = await ensureActivated({ ...base, userDataPath: dir, fetchImpl: rede })
@@ -200,7 +199,7 @@ describe('ensureActivated', () => {
     expect(rede).not.toHaveBeenCalled()
   })
 
-  it('ativa e grava quando o servidor libera', async () => {
+  it('activates and stores when the server releases it', async () => {
     const token = mint(INSTALL, MACHINE)
     const rede = vi.fn(async () => new Response(JSON.stringify({ token }), { status: 200 })) as unknown as typeof fetch
     const state = await ensureActivated({ ...base, userDataPath: dir, fetchImpl: rede })
@@ -208,9 +207,9 @@ describe('ensureActivated', () => {
     expect(readStoredToken(dir)).toBe(token)
   })
 
-  it('nao grava token que nao passa na verificacao local', async () => {
-    // Token para outra maquina gravado no disco entraria em ciclo de reativacao
-    // sem explicacao a cada boot.
+  it('does not store a token that fails local verification', async () => {
+    // A token for another machine written to disk would put the app in an
+    // unexplained reactivation loop on every boot.
     const rede = vi.fn(
       async () => new Response(JSON.stringify({ token: mint(INSTALL, OUTRA_MAQUINA) }), { status: 200 }),
     ) as unknown as typeof fetch
@@ -219,7 +218,7 @@ describe('ensureActivated', () => {
     expect(readStoredToken(dir)).toBeNull()
   })
 
-  it('token local invalido dispara nova tentativa', async () => {
+  it('an invalid local token triggers a fresh attempt', async () => {
     storeToken(dir, mint(INSTALL, OUTRA_MAQUINA))
     const rede = vi.fn(
       async () => new Response(JSON.stringify({ status: 'pending', code: 'B2A4F6C8' }), { status: 202 }),

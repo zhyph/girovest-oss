@@ -4,29 +4,28 @@ import fs from 'fs'
 import os from 'os'
 
 /**
- * Impressao digital da maquina, usada para amarrar a ativacao a um computador.
+ * Machine fingerprint, used to bind an activation to one computer.
  *
- * O valor bruto NUNCA sai daqui: o que trafega e o sha256 dele. O servidor nao
- * precisa saber qual e a maquina, so precisa reconhecer que e a mesma de antes,
- * e um hash resolve isso sem transportar identificador de hardware.
+ * The raw value never leaves this file: what travels is its sha256. The server
+ * doesn't need to know which machine this is, only to recognise it as the same
+ * one as before, and a hash does that without shipping a hardware identifier.
  *
- * FALHA PARA O LADO SEGURO. Se nenhuma fonte responder, `resolveMachineHash`
- * devolve null e o chamador deixa o app abrir. Bloquear por falha de leitura
- * transformaria uma peculiaridade de sistema operacional (SELinux, container,
- * imagem clonada sem machine-id) em loja parada num sabado. O risco aceito e
- * que alguem apague o identificador de proposito para escapar da trava; contra
- * esse alguem a trava nunca ia funcionar mesmo, porque a verificacao roda no
- * cliente.
+ * FAILS OPEN. When no source answers, resolveMachineHash returns null and the
+ * caller lets the app through. Blocking on a read failure would turn an OS
+ * quirk (SELinux, a container, an image cloned without a machine-id) into a
+ * shop that can't open on a Saturday. The accepted risk is someone deleting the
+ * identifier on purpose to escape the lock — and against that someone the lock
+ * was never going to hold anyway, since the check runs client-side.
  */
 
-/** Fontes em ordem de preferencia: estaveis primeiro, derivadas depois. */
+/** Sources in order of preference: stable ones first, derived ones last. */
 function readLinuxMachineId(): string | null {
   for (const file of ['/etc/machine-id', '/var/lib/dbus/machine-id']) {
     try {
       const value = fs.readFileSync(file, 'utf-8').trim()
       if (value !== '') return value
     } catch {
-      // Arquivo ausente e normal em varias distribuicoes; tenta a proxima.
+      // A missing file is normal on several distributions; try the next one.
     }
   }
   return null
@@ -34,8 +33,8 @@ function readLinuxMachineId(): string | null {
 
 function readWindowsMachineGuid(): string | null {
   try {
-    // Nao existe API de registro no Node; `reg query` e a forma sem dependencia
-    // nativa. execFileSync (nao exec) para nao passar por shell.
+    // Node has no registry API; `reg query` is the way to read it without a
+    // native dependency. execFileSync rather than exec so no shell is involved.
     const out = execFileSync(
       'reg',
       ['query', 'HKLM\\SOFTWARE\\Microsoft\\Cryptography', '/v', 'MachineGuid'],
@@ -49,27 +48,27 @@ function readWindowsMachineGuid(): string | null {
 }
 
 /**
- * Ultimo recurso: MAC da primeira interface fisica.
+ * Last resort: the MAC of the first physical interface.
  *
- * Menos estavel que o machine-id (troca de placa de rede muda), mas melhor que
- * desistir: sem ele, apagar /etc/machine-id bastaria para escapar da trava.
- * Interfaces virtuais ficam de fora porque docker0/veth mudam a cada reboot e
- * existem identicas em maquinas diferentes.
+ * Less stable than a machine-id (swapping the network card changes it), but
+ * better than giving up: without it, deleting /etc/machine-id would be enough
+ * to escape the lock. Virtual interfaces are excluded because docker0/veth
+ * change on every reboot and identical ones exist across different machines.
  */
 function readPrimaryMac(): string | null {
-  const virtuais = /^(docker|veth|br-|virbr|vmnet|vboxnet|tun|tap|wg|tailscale|zt|lo)/i
-  const candidatos: string[] = []
+  const virtual = /^(docker|veth|br-|virbr|vmnet|vboxnet|tun|tap|wg|tailscale|zt|lo)/i
+  const candidates: string[] = []
   for (const [name, infos] of Object.entries(os.networkInterfaces())) {
-    if (virtuais.test(name)) continue
+    if (virtual.test(name)) continue
     for (const info of infos ?? []) {
       if (info.internal) continue
-      if (info.mac && info.mac !== '00:00:00:00:00:00') candidatos.push(info.mac)
+      if (info.mac && info.mac !== '00:00:00:00:00:00') candidates.push(info.mac)
     }
   }
-  // Ordena para nao depender da ordem de enumeracao do sistema, que varia entre
-  // boots quando ha mais de uma interface.
-  candidatos.sort()
-  return candidatos[0] ?? null
+  // Sorted so the result doesn't depend on the system's enumeration order,
+  // which varies between boots when there is more than one interface.
+  candidates.sort()
+  return candidates[0] ?? null
 }
 
 export interface MachineSource {
@@ -77,7 +76,7 @@ export interface MachineSource {
   readonly raw: string
 }
 
-/** Primeira fonte disponivel, ja identificada (util para log e suporte). */
+/** First available source, labelled (useful for logs and support). */
 export function detectMachineSource(platform: NodeJS.Platform = process.platform): MachineSource | null {
   if (platform === 'win32') {
     const guid = readWindowsMachineGuid()
@@ -90,16 +89,17 @@ export function detectMachineSource(platform: NodeJS.Platform = process.platform
   return mac === null ? null : { source: 'mac', raw: mac }
 }
 
-/** sha256 hex do identificador bruto, ou null quando nenhuma fonte respondeu. */
+/** sha256 hex of the raw identifier, or null when no source answered. */
 export function resolveMachineHash(source: MachineSource | null = detectMachineSource()): string | null {
   if (source === null) return null
   return hashMachineValue(source.source, source.raw)
 }
 
 /**
- * O prefixo com a fonte entra no hash de proposito: se a mesma maquina passar a
- * responder por outra fonte (machine-id apagado, caindo para MAC), o hash muda e
- * a ativacao e refeita. O contrario -- colidir os dois -- esconderia a troca.
+ * The source name is part of the hash on purpose: if the same machine starts
+ * answering from a different source (machine-id deleted, falling back to MAC),
+ * the hash changes and activation is redone. Colliding the two would hide the
+ * switch instead.
  */
 export function hashMachineValue(source: MachineSource['source'], raw: string): string {
   return createHash('sha256').update(`${source}:${raw.trim().toLowerCase()}`).digest('hex')
