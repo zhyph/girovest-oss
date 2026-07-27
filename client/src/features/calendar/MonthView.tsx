@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Calendar, dateFnsLocalizer } from 'react-big-calendar'
 import { format, parse, startOfWeek, getDay } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -13,6 +14,10 @@ import { CalendarDayItemsList } from './CalendarDayItemsList.tsx'
 import type { Allocation } from '../allocations/allocationSchemas.ts'
 import type { Product } from '../products/productSchemas.ts'
 
+// Note: unlike the calendar's chrome (localized through i18n below), the date
+// formatting itself is pinned to date-fns' pt-BR here and via culture="pt-BR"
+// on <Calendar>. Adding a second locale bundle would mean rebuilding this
+// localizer per locale rather than at module scope.
 const localizer = dateFnsLocalizer({
   format,
   parse,
@@ -20,13 +25,6 @@ const localizer = dateFnsLocalizer({
   getDay,
   locales: { 'pt-BR': ptBR },
 })
-
-const messages = {
-  today: 'Hoje',
-  previous: 'Anterior',
-  next: 'Próximo',
-  month: 'Mês',
-}
 
 export function MonthView({
   allocations,
@@ -48,7 +46,23 @@ export function MonthView({
   onNavigate: (date: Date) => void
 }) {
   const { locale } = useLocale()
+  const { t } = useTranslation('calendarScreen')
   const [showMoreDay, setShowMoreDay] = useState<{ date: Date; allocations: Allocation[] } | null>(null)
+
+  // Overrides react-big-calendar's built-in English strings. `showMore` gets
+  // the number of events the cell could not fit, not the day total. `month` is
+  // unrendered while views={['month']} (rbc hides the view switcher for a
+  // single view) but is one line and goes live the moment a second view is added.
+  const messages = useMemo(
+    () => ({
+      today: t('rbc.today'),
+      previous: t('rbc.previous'),
+      next: t('rbc.next'),
+      month: t('rbc.month'),
+      showMore: (count: number) => t('rbc.showMore', { count }),
+    }),
+    [t],
+  )
 
   const events = allocations.map((allocation) => ({
     title: productNames.get(allocation.productId) ?? allocation.productId,

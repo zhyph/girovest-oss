@@ -44,7 +44,7 @@ Se errar, aparece "Usuário ou senha inválidos." Confira e tente de novo.
 
 ### Dicas
 
-- Por segurança, depois de cerca de 12 horas o aplicativo pede a senha de novo e volta para a tela de entrada. É normal: nada se perde, basta entrar de novo.
+- Enquanto você está trabalhando, a sessão se renova sozinha: pode passar o dia inteiro no Girovest que ele não pede a senha no meio do serviço. Já uma sessão deixada parada vence sozinha depois de algumas horas: às vezes leva 12 horas, às vezes bem menos, porque a renovação não acontece a cada clique. Na prática, conte que umas 6 horas sem ninguém mexer já bastam para o aplicativo voltar para a tela de entrada. É normal: nada se perde, basta entrar de novo.
 - Para sair da conta a qualquer momento, clique em **"Sair"**, no rodapé do menu lateral.
 
 ---
@@ -153,8 +153,8 @@ Há dois jeitos de colocar fotos em um produto:
 
 1. Na tela de Produtos, clique em **"Adicionar fotos remotamente"**.
 2. Abre a janela **"Fotos remotas"** com um código QR e a instrução "Escaneie o código com o celular para escolher ou cadastrar um produto e enviar fotos."
-3. Com o celular **na mesma rede Wi-Fi do computador**, aponte a câmera para o código. Abre uma página com o título "Selecione um produto" e uma busca ("Buscar por nome, categoria ou cor..."). Cadastre a peça primeiro no computador; no celular você escolhe uma peça já cadastrada.
-4. Toque na peça. Na tela seguinte:
+3. Com o celular **na mesma rede Wi-Fi do computador**, aponte a câmera para o código. Abre uma página com o título "Selecione um produto", uma busca ("Buscar por nome, categoria ou cor...") e o botão **"+ Cadastrar nova peça"**.
+4. Toque na peça que quer fotografar. Se ela ainda não estiver cadastrada, você pode cadastrá-la ali mesmo pelo celular (veja "Cadastrar a peça pelo próprio celular", logo abaixo). Na tela seguinte:
    - **"Tirar Foto"** (botão com a câmera): abre a câmera e tira uma foto por vez; toque de novo para cada foto.
    - **"Escolher da Galeria"**: pega várias fotos de uma vez das que já estão no celular.
    - Cada foto aparece como miniatura; toque no ✕ para descartar alguma.
@@ -163,6 +163,20 @@ Há dois jeitos de colocar fotos em um produto:
 As fotos **aparecem sozinhas no computador**, na lista de produtos, sem precisar recarregar nada.
 
 O mesmo código vale por **12 horas**: escaneie uma vez de manhã e use o dia todo, peça após peça. Quando vencer, aparece "Código expirado." na janela; clique em **"Gerar novo código"**. Ao terminar, é só fechar: "Feche esta janela quando terminar de enviar fotos."
+
+### Cadastrar a peça pelo próprio celular
+
+Se a peça chegou agora na loja e ainda não está no sistema, não precisa ir até o computador para cadastrá-la. Na mesma página que você abriu com o código QR das fotos:
+
+1. Na tela "Selecione um produto", toque em **"+ Cadastrar nova peça"**.
+2. Abre a tela **"Cadastrar nova peça"**, com os campos **"Nome"**, **"Categoria"**, **"Tamanho"**, **"Cor"**, **"Preço do aluguel"** e **"Caução"**.
+3. Nome, Categoria, Tamanho e Cor são obrigatórios. Se faltar algum, aparece "Preencha nome, categoria, tamanho e cor."
+4. Em **"Preço do aluguel"** e **"Caução"**, digite só os números, igualzinho ao computador: o valor entra a partir dos centavos (digitando 15000, o campo mostra R$ 150,00).
+5. Toque em **"Cadastrar e tirar fotos"**. A peça é cadastrada e o celular já abre direto a tela de fotos dela: é só seguir com **"Tirar Foto"** ou **"Escolher da Galeria"** e depois **"Enviar"**.
+
+Se aparecer "Erro ao cadastrar. Tente novamente.", verifique o Wi-Fi e toque de novo. Para desistir do cadastro e voltar à lista de peças, toque em **"← Voltar"**.
+
+A peça cadastrada pelo celular **aparece sozinha na lista do computador**, sem precisar recarregar. A Descrição e o Status não são pedidos no celular; se quiser completar esses campos, é só abrir a peça depois no computador.
 
 ### Excluir
 
@@ -202,7 +216,11 @@ Cada contrato aparece como um cartão "#número — cliente" com a data do event
 - **Alugado**: a peça saiu da loja. Botão: **"Devolver"**.
 - **Devolvido** / **Cancelado**: encerrado, sem botões.
 
-**Na retirada** clique em **"Check-out"**. Na janela **"Check-out"**, anote o **"Estado do produto na saída"** e a **"Caução recebida"**, e confirme em **"Confirmar check-out"**. O aplicativo não deixa fazer check-out antes da data marcada ("Não é possível fazer check-out antes da data de saída.").
+**Na retirada** clique em **"Check-out"**. Na janela **"Check-out"**, anote o **"Estado do produto na saída"** e a **"Caução recebida"**, e confirme em **"Confirmar check-out"**.
+
+Se o cliente vier buscar a peça **antes da data marcada**, o aplicativo não impede: ele abre a janela **"Retirada antes da data"** com o aviso "A saída deste item está marcada para {data}. Registrar a retirada mesmo assim? O produto passa a ficar indisponível a partir de agora." Clique em **"Retirar mesmo assim"** para entregar a peça hoje, ou em **"Cancelar"** para deixar tudo como estava.
+
+Há um caso em que a retirada adiantada **não** é liberada: quando a mesma peça já está prometida a outro contrato justamente nos dias que você quer adiantar. Aí aparece "Este produto está reservado para outro cliente antes da data de saída marcada. Só é possível retirar agora se essa outra reserva for alterada." Esse aviso não tem como ser confirmado por cima: para entregar a peça hoje, é preciso primeiro mudar ou cancelar a reserva do outro contrato.
 
 **Na devolução** clique em **"Devolver"**. Na janela **"Devolução"**, anote o **"Estado do produto na devolução"** e a **"Caução devolvida"**, e confirme em **"Confirmar devolução"**.
 
@@ -250,7 +268,7 @@ Abra **"Calendário"** no menu. Ele tem duas visões e três filtros.
 Um calendário do mês com o nome da peça em cada dia. Use **"Hoje"**, **"Anterior"** e **"Próximo"** para navegar entre os meses.
 
 - Clique em um compromisso, em um dia ou no número do dia para trocar para a visão de agenda (do mês daquele dia).
-- Em dias muito cheios aparece um aviso "+N" (pode aparecer em inglês, como "+3 more"); clicando nele abre uma janela com a lista completa daquele dia.
+- Em dias muito cheios, quando não cabe tudo no quadradinho do dia, aparece um aviso **"+N mais"** (por exemplo, "+3 mais"); clique nele para abrir uma janela com a lista completa daquele dia.
 
 ### Visão de agenda
 
@@ -286,7 +304,7 @@ Clique em **"Salvar"** para gravar o telefone e as cláusulas. Aparece a confirm
 
 - **O trabalho do dia a dia é no computador**: cadastros, contratos, calendário, impressão. Tanto no aplicativo instalado quanto na versão pelo navegador.
 - **O celular entra em dois momentos**, sempre lendo um código QR na tela do computador:
-  1. **Fotos de produtos** (seção 6): qualquer celular da loja, código vale 12 horas.
+  1. **Fotos de produtos** (seção 6): qualquer celular da loja, código vale 12 horas. Pelo celular dá para escolher uma peça já cadastrada ou cadastrar uma peça nova na hora, com **"+ Cadastrar nova peça"**.
   2. **Assinatura do cliente** (seção 7): o celular do cliente ou da loja, código vale 15 minutos e uma única vez.
 
 **Requisitos de rede:**
@@ -327,28 +345,28 @@ O código de assinatura serve uma única vez. No computador, clique em **"Gerar 
 Confira se no celular apareceu a confirmação "... fotos adicionadas ao produto." Se apareceu "Erro ao enviar. Tente novamente.", o envio não terminou: verifique o Wi-Fi e toque em **"Enviar"** de novo. Fechar e abrir a janela "Fotos remotas" também força uma atualização da lista.
 
 **Quero cadastrar a peça direto no celular na hora das fotos.**
-A página do celular serve para escolher uma peça já cadastrada e enviar as fotos. Cadastre a peça primeiro no computador (é rápido com o "Salvar e adicionar outro") e depois só fotografe pelo celular.
+Dá para fazer isso. Na página do celular, na tela "Selecione um produto", toque em **"+ Cadastrar nova peça"**, preencha **"Nome"**, **"Categoria"**, **"Tamanho"** e **"Cor"** (obrigatórios), mais **"Preço do aluguel"** e **"Caução"** se já souber os valores, e toque em **"Cadastrar e tirar fotos"**. O celular já abre a tela de fotos da peça recém-cadastrada, e ela aparece sozinha na lista do computador. Veja a seção 6.
 
 **O botão "Excluir" não aparece para um cliente ou produto.**
 Ele só existe para quem nunca participou de um aluguel. Registros com histórico não podem ser excluídos ("Não é possível excluir um cliente com histórico de alocações." / "...um produto com histórico de alocações."). Para tirar uma peça de circulação, mude o **"Status"** dela para **Aposentado**.
 
+**O cliente veio buscar a peça antes da data marcada.**
+Pode entregar. Ao confirmar o check-out, o aplicativo abre a janela **"Retirada antes da data"**, lembrando para que dia a saída estava marcada. Clique em **"Retirar mesmo assim"** e a peça sai hoje; **"Cancelar"** deixa tudo como estava.
+
 **Não consigo fazer o check-out de uma peça.**
-Se aparecer "Não é possível fazer check-out antes da data de saída.", é porque a data de retirada daquela peça ainda não chegou. Confira a data no contrato.
+Se aparecer "Este produto está reservado para outro cliente antes da data de saída marcada. Só é possível retirar agora se essa outra reserva for alterada.", é porque a mesma peça está prometida a outro contrato justamente nos dias que você quer adiantar. Esse é o único caso em que a retirada adiantada não é liberada, e não há como confirmar por cima dele: procure o outro contrato e mude ou cancele a reserva dele antes.
 
 **O produto que quero não aparece na lista do contrato, ou aparece "Este produto não está disponível para essas datas."**
 Na lista só entram peças com status Disponível; peças em Manutenção ou Aposentadas ficam de fora. Se a peça existe mas as datas conflitam com outro contrato, escolha outras datas ou outra peça.
 
 **O aplicativo voltou sozinho para a tela de entrada.**
-Por segurança, a sessão dura cerca de 12 horas. Nada se perde: entre de novo com usuário e senha.
+Enquanto você usa o Girovest, a sessão se renova sozinha, então trabalhar sem parar não desconecta ninguém. Mas uma sessão deixada de lado expira por segurança: depois de umas 6 horas paradas ela já pode ter vencido, e com 12 horas vence sempre. Nada se perde: entre de novo com usuário e senha.
 
-**Cliquei em "Cancelar" no formulário e perdi o que digitei.**
-O que você preenche só é gravado ao clicar em **"Salvar"**; "Cancelar" descarta as mudanças. A única exceção é a **"Aparência"** nas Configurações, que vale na hora.
+**Cliquei em "Cancelar" no formulário. Perco o que digitei?**
+Só se você confirmar. Se houver algo preenchido e ainda não salvo, o aplicativo pergunta antes: aparece **"Descartar alterações?"** com o aviso "As alterações que você fez não foram salvas e serão perdidas." Clique em **"Continuar editando"** para voltar ao formulário do jeito que estava, ou em **"Descartar"** para jogar fora mesmo. Isso vale para os formulários de cliente, de produto, de contrato novo e para as janelas de **"Check-out"** e **"Devolução"** (e também quando você fecha clicando fora ou apertando Esc; nos três formulários, o **X** do canto também passa pela mesma pergunta). A tela de **Configurações** não tem essa pergunta: lá, clique em **"Salvar"** antes de sair. A **"Aparência"** é o caso à parte de sempre, porque vale na hora e não precisa salvar.
 
 **A impressão está saindo estranha / quero conferir antes de imprimir.**
 A página de impressão mostra exatamente o que sai no papel, em folha A4, sempre com fundo claro (mesmo no modo escuro do aplicativo). Use **"Voltar"** para retornar sem imprimir. Se faltarem os "Termos e Condições", confira as **"Cláusulas do Contrato"** em Configurações.
-
-**No calendário apareceu um aviso em inglês, tipo "+3 more".**
-É só o aviso de dia cheio. Clique nele para ver a lista completa daquele dia.
 
 **Apareceu "Algo deu errado. Tente novamente." ou "Não foi possível carregar esta parte do aplicativo."**
 Clique em **"Tentar novamente"** ou **"Recarregar"**. Se aparecer "Não foi possível carregar seu perfil.", use **"Tentar novamente"**; em último caso, **"Sair"** e entre de novo.

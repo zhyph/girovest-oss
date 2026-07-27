@@ -145,8 +145,10 @@ describe('ProductsPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
 
     // Now type unsaved edits into the still-open drawer and cancel instead of saving.
+    // Cancelling with unsaved input now asks for confirmation first.
     await userEvent.type(screen.getByLabelText('Categoria'), 'unsaved')
     await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Descartar' }))
 
     // The remembered defaults must still be the last *saved* values, not the unsaved edit.
     await userEvent.click(screen.getByRole('button', { name: 'Novo' }))

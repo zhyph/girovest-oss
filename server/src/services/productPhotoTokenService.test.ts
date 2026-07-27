@@ -8,6 +8,7 @@ import {
   issueProductPhotoSession,
   checkTokenValidity,
   submitPhotos,
+  createProductFromPhotoToken,
 } from './productPhotoTokenService.js'
 import { productPhotoEvents } from '../events/productPhotoEvents.js'
 
@@ -125,6 +126,76 @@ describe('submitPhotos', () => {
       expect(received).toEqual([{ productId: product.id, locationId: staff.locationId, photos: result.photos }])
     } finally {
       productPhotoEvents.off('photo', listener)
+    }
+  })
+})
+
+const NEW_PRODUCT = {
+  name: 'Vestido Novo',
+  category: 'festa',
+  size: 'G',
+  color: 'vermelho',
+  rentalPrice: 250,
+  depositAmount: 125,
+}
+
+describe('createProductFromPhotoToken', () => {
+  it('creates the product at the token\'s location and returns a photo-ready DTO', async () => {
+    const staff = await prisma.staff.findFirstOrThrow()
+    const { token } = await issueProductPhotoSession(staff.id, staff.locationId)
+
+    const product = await createProductFromPhotoToken(token, NEW_PRODUCT)
+
+    expect(product.locationId).toBe(staff.locationId)
+    expect(product.name).toBe('Vestido Novo')
+    expect(product.photos).toEqual([])
+    expect(product.status).toBe('active')
+    expect(product.availability).toBe('available')
+    expect(product.hasAllocationHistory).toBe(false)
+    const row = await prisma.product.findUniqueOrThrow({ where: { id: product.id } })
+    expect(row.locationId).toBe(staff.locationId)
+  })
+
+  it('takes the location from the token, never from the caller-supplied input', async () => {
+    const staff = await prisma.staff.findFirstOrThrow()
+    const { token } = await issueProductPhotoSession(staff.id, staff.locationId)
+    const otherLocation = await prisma.location.create({ data: { name: 'Other', address: 'X' } })
+
+    const product = await createProductFromPhotoToken(token, {
+      ...NEW_PRODUCT,
+      locationId: otherLocation.id,
+    } as never)
+
+    expect(product.locationId).toBe(staff.locationId)
+    expect(product.locationId).not.toBe(otherLocation.id)
+  })
+
+  it('rejects an unknown token', async () => {
+    await expect(createProductFromPhotoToken('unknown-token', NEW_PRODUCT)).rejects.toThrow(AppError)
+    expect(await prisma.product.count({ where: { name: NEW_PRODUCT.name } })).toBe(0)
+  })
+
+  it('rejects an expired token', async () => {
+    const staff = await prisma.staff.findFirstOrThrow()
+    const { token } = await issueProductPhotoSession(staff.id, staff.locationId)
+    await prisma.productPhotoToken.update({ where: { token }, data: { expiresAt: new Date(Date.now() - 1000) } })
+
+    await expect(createProductFromPhotoToken(token, NEW_PRODUCT)).rejects.toThrow(AppError)
+    expect(await prisma.product.count({ where: { name: NEW_PRODUCT.name } })).toBe(0)
+  })
+
+  it('emits exactly one product-created event carrying the location and the full product', async () => {
+    const staff = await prisma.staff.findFirstOrThrow()
+    const { token } = await issueProductPhotoSession(staff.id, staff.locationId)
+
+    const received: unknown[] = []
+    const listener = (event: unknown) => received.push(event)
+    productPhotoEvents.on('product-created', listener)
+    try {
+      const product = await createProductFromPhotoToken(token, NEW_PRODUCT)
+      expect(received).toEqual([{ locationId: staff.locationId, product }])
+    } finally {
+      productPhotoEvents.off('product-created', listener)
     }
   })
 })

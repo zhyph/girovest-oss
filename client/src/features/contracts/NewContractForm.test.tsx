@@ -84,6 +84,70 @@ describe('NewContractForm', () => {
     expect(screen.getByLabelText(/nome/i)).toHaveValue('Joana Incompleta')
   })
 
+  it('closes immediately when Cancelar is clicked on an untouched form', async () => {
+    mockHooks()
+    const onClose = vi.fn()
+    renderWithToast(<NewContractForm onClose={onClose} />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+    expect(screen.queryByText('Descartar alterações?')).not.toBeInTheDocument()
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('prompts before discarding a partially filled contract', async () => {
+    mockHooks()
+    const onClose = vi.fn()
+    renderWithToast(<NewContractForm onClose={onClose} />)
+
+    await userEvent.selectOptions(screen.getByLabelText(/cliente/i), 'c1')
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+    expect(screen.getByText('Descartar alterações?')).toBeInTheDocument()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('closes after confirming Descartar', async () => {
+    mockHooks()
+    const onClose = vi.fn()
+    renderWithToast(<NewContractForm onClose={onClose} />)
+
+    await userEvent.selectOptions(screen.getByLabelText(/cliente/i), 'c1')
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Descartar' }))
+
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('prompts instead of closing when the backdrop is clicked with a partially filled contract', async () => {
+    mockHooks()
+    const onClose = vi.fn()
+    renderWithToast(<NewContractForm onClose={onClose} />)
+
+    await userEvent.selectOptions(screen.getByLabelText(/cliente/i), 'c1')
+    await userEvent.click(document.querySelector('[data-slot="sheet-overlay"]')!)
+
+    expect(screen.getByText('Descartar alterações?')).toBeInTheDocument()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('does not prompt on the contract form when the nested client drawer is closed', async () => {
+    mockHooks()
+    const onClose = vi.fn()
+    renderWithToast(<NewContractForm onClose={onClose} />)
+
+    await userEvent.selectOptions(screen.getByLabelText(/cliente/i), 'c2')
+    await userEvent.click(screen.getByRole('button', { name: /completar cadastro/i }))
+    expect(screen.getByRole('dialog', { name: 'Editar cliente' })).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+    expect(screen.queryByText('Descartar alterações?')).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Editar cliente' })).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Novo Contrato' })).toBeInTheDocument()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
   it('lets staff add a second line item', async () => {
     mockHooks()
     renderWithToast(<NewContractForm onClose={vi.fn()} />)

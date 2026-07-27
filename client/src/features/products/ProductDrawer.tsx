@@ -6,11 +6,12 @@ import { X } from 'lucide-react'
 import { Button } from '../../components/ui/button.tsx'
 import { Input } from '../../components/ui/input.tsx'
 import { CurrencyInput } from '../../components/ui/currency-input.tsx'
-import { Modal } from '../../components/ui/modal.tsx'
+import { ConfirmDialog } from '../../components/ui/confirm-dialog.tsx'
 import { Select } from '../../components/ui/select.tsx'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from '../../components/ui/sheet.tsx'
 import { showErrorToast } from '../../lib/toast.ts'
 import { useAuth } from '../../lib/useAuth.ts'
+import { useUnsavedChangesGuard } from '../../lib/useUnsavedChangesGuard.ts'
 import { AuthenticatedPhoto } from '../../components/ui/authenticated-photo.tsx'
 import { productSchema, type Product, type ProductFormValues, type ProductStatus } from './productSchemas.ts'
 import { useCreateProduct, useUpdateProduct, useDeleteProduct } from './useProducts.ts'
@@ -47,7 +48,7 @@ export function ProductDrawer({
     handleSubmit,
     control,
     reset,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
     defaultValues: product ?? {
@@ -61,6 +62,17 @@ export function ProductDrawer({
       description: duplicateDefaults?.description,
     },
   })
+
+  // status, photos and newPhotoUrl live outside react-hook-form, so isDirty
+  // alone under-reports: without this the user could still lose an added photo.
+  const initialPhotos = product?.photos ?? []
+  const hasUnsavedChanges =
+    isDirty ||
+    status !== (product?.status ?? 'active') ||
+    photos.length !== initialPhotos.length ||
+    photos.some((url, index) => url !== initialPhotos[index]) ||
+    newPhotoUrl.trim() !== ''
+  const discardGuard = useUnsavedChangesGuard({ isDirty: hasUnsavedChanges, onConfirmDiscard: onClose })
 
   function addPhoto() {
     const url = newPhotoUrl.trim()
@@ -122,7 +134,7 @@ export function ProductDrawer({
   const drawerTitle = product ? t('editTitle') : t('newTitle')
 
   return (
-    <Sheet open onOpenChange={(next) => !next && onClose()}>
+    <Sheet open onOpenChange={(next) => !next && discardGuard.requestClose()}>
       <SheetContent className="w-80" aria-describedby={undefined}>
         <SheetHeader>
           <SheetTitle>{drawerTitle}</SheetTitle>
@@ -240,7 +252,7 @@ export function ProductDrawer({
             </Button>
           )}
           <div className="flex flex-1 flex-shrink-0 justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={onClose}>
+            <Button type="button" variant="secondary" onClick={discardGuard.requestClose}>
               {t('common:actions.cancel', { ns: 'common' })}
             </Button>
             <Button type="submit" disabled={createProduct.isPending || updateProduct.isPending}>
@@ -250,22 +262,28 @@ export function ProductDrawer({
         </div>
       </form>
       {product && (
-        <Modal
+        <ConfirmDialog
           open={confirmingDelete}
-          onClose={() => setConfirmingDelete(false)}
           title={t('common:confirmDelete.title', { ns: 'common', name: product.name })}
-        >
-          <p className="mb-4 text-sm text-foreground">{t('common:confirmDelete.message', { ns: 'common' })}</p>
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={() => setConfirmingDelete(false)}>
-              {t('common:actions.cancel', { ns: 'common' })}
-            </Button>
-            <Button type="button" variant="danger" onClick={handleDelete} disabled={deleteProduct.isPending}>
-              {t('common:actions.delete', { ns: 'common' })}
-            </Button>
-          </div>
-        </Modal>
+          message={t('common:confirmDelete.message', { ns: 'common' })}
+          confirmLabel={t('common:actions.delete', { ns: 'common' })}
+          cancelLabel={t('common:actions.cancel', { ns: 'common' })}
+          confirmVariant="danger"
+          confirmDisabled={deleteProduct.isPending}
+          onConfirm={handleDelete}
+          onCancel={() => setConfirmingDelete(false)}
+        />
       )}
+      <ConfirmDialog
+        open={discardGuard.isConfirmingDiscard}
+        title={t('common:confirmDiscard.title', { ns: 'common' })}
+        message={t('common:confirmDiscard.message', { ns: 'common' })}
+        confirmLabel={t('common:confirmDiscard.confirm', { ns: 'common' })}
+        cancelLabel={t('common:confirmDiscard.cancel', { ns: 'common' })}
+        confirmVariant="danger"
+        onConfirm={discardGuard.confirmDiscard}
+        onCancel={discardGuard.cancelDiscard}
+      />
       </SheetContent>
     </Sheet>
   )

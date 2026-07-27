@@ -5,10 +5,12 @@ import os from 'os'
 import path from 'path'
 import { app } from '../app.js'
 import { prisma } from '../db/client.js'
-import { signStaffToken } from '../auth/jwt.js'
+import jwt from 'jsonwebtoken'
+import { SESSION_TTL_SECONDS, signStaffToken } from '../auth/jwt.js'
 
 let locationId: string
 let staffToken: string
+let agedStaffToken: string
 let productId: string
 let photosDir: string
 let originalPhotosDir: string | undefined
@@ -20,6 +22,13 @@ beforeEach(async () => {
     data: { name: 'S', login: `staff-${Date.now()}-${Math.random()}`, passwordHash: 'x', role: 'staff', locationId },
   })
   staffToken = signStaffToken({ staffId: staff.id, role: 'staff' })
+  // Same token, but 7h into its 12h life: jsonwebtoken derives exp from a
+  // caller-supplied iat, so this is a real past-half-life token, no fake timers.
+  agedStaffToken = jwt.sign(
+    { staffId: staff.id, role: 'staff', iat: Math.floor(Date.now() / 1000) - 7 * 60 * 60 },
+    process.env.JWT_SECRET as string,
+    { expiresIn: SESSION_TTL_SECONDS },
+  )
   const product = await prisma.product.create({
     data: { locationId, name: 'P', category: 'festa', size: 'M', color: 'azul', rentalPrice: 100, depositAmount: 50 },
   })
@@ -67,6 +76,28 @@ describe('POST /api/products/events/ticket', () => {
   it('requires authentication', async () => {
     const res = await request(app).post('/api/products/events/ticket')
     expect(res.status).toBe(401)
+  })
+
+  // The client re-mints this ticket every ~4 minutes for as long as the app is
+  // merely open, with no user involvement. If it renewed the session, an
+  // unattended terminal would keep itself logged in forever, which is exactly
+  // what "an idle session still expires" forbids.
+  it('does not renew the session, even with a token past its half-life', async () => {
+    const res = await request(app)
+      .post('/api/products/events/ticket')
+      .set('Authorization', `Bearer ${agedStaffToken}`)
+
+    expect(res.status).toBe(201)
+    expect(res.headers['x-renewed-token']).toBeUndefined()
+  })
+
+  it('is the only excluded path — a real request renews with the same token', async () => {
+    const res = await request(app)
+      .get('/api/products')
+      .set('Authorization', `Bearer ${agedStaffToken}`)
+
+    expect(res.status).toBe(200)
+    expect(typeof res.headers['x-renewed-token']).toBe('string')
   })
 })
 

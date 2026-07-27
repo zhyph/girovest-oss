@@ -29,10 +29,17 @@ export interface CreateContractInput {
   installments: CreateContractInstallmentInput[]
 }
 
-function toWindow(allocation: { status: string; checkoutDate: Date; dueDate: Date; actualReturnDate: Date | null }): AllocationWindow {
+function toWindow(allocation: {
+  status: string
+  checkoutDate: Date
+  actualCheckoutDate: Date | null
+  dueDate: Date
+  actualReturnDate: Date | null
+}): AllocationWindow {
   return {
     status: allocation.status as AllocationStatus,
     checkoutDate: allocation.checkoutDate,
+    actualCheckoutDate: allocation.actualCheckoutDate,
     dueDate: allocation.dueDate,
     actualReturnDate: allocation.actualReturnDate,
   }
@@ -60,6 +67,7 @@ export async function createContract(input: CreateContractInput) {
       .map((other) => ({
         status: 'reserved' as AllocationStatus,
         checkoutDate: other.checkoutDate,
+        actualCheckoutDate: null,
         dueDate: other.dueDate,
         actualReturnDate: null,
       }))

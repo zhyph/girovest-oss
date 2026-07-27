@@ -7,10 +7,11 @@ import { Button } from '../../components/ui/button.tsx'
 import { Input } from '../../components/ui/input.tsx'
 import { PhoneInput } from '../../components/ui/phone-input.tsx'
 import { MaskedTextInput } from '../../components/ui/masked-text-input.tsx'
-import { Modal } from '../../components/ui/modal.tsx'
+import { ConfirmDialog } from '../../components/ui/confirm-dialog.tsx'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose, SheetBody } from '../../components/ui/sheet.tsx'
 import { showErrorToast } from '../../lib/toast.ts'
 import { useLocale } from '../../lib/LocaleContext.tsx'
+import { useUnsavedChangesGuard } from '../../lib/useUnsavedChangesGuard.ts'
 import { getClientFieldTemplate } from '../../lib/clientFieldTemplates.ts'
 import { getFieldMask } from '../../lib/clientFieldMasks.ts'
 import { clientSchema, type Client, type ClientFormValues } from './clientSchemas.ts'
@@ -41,7 +42,7 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
     register,
     handleSubmit,
     control,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<ClientFormValues>({
     resolver: zodResolver(clientSchema),
     defaultValues: client ?? {
@@ -56,6 +57,7 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
 
   const identityDocuments = useFieldArray({ control, name: 'identityDocuments' })
   const addressLines = useFieldArray({ control, name: 'addressLines' })
+  const discardGuard = useUnsavedChangesGuard({ isDirty, onConfirmDiscard: onClose })
 
   function showError(error: unknown) {
     const code = (error as { code?: string }).code ?? 'UNKNOWN'
@@ -97,7 +99,7 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
   const drawerTitle = client ? t('editTitle') : t('newTitle')
 
   return (
-    <Sheet open onOpenChange={(next) => !next && onClose()}>
+    <Sheet open onOpenChange={(next) => !next && discardGuard.requestClose()}>
       <SheetContent className="w-96" aria-describedby={undefined}>
         <SheetHeader>
           <SheetTitle>{drawerTitle}</SheetTitle>
@@ -248,7 +250,7 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
             </Button>
           )}
           <div className="flex flex-1 justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={onClose}>
+            <Button type="button" variant="secondary" onClick={discardGuard.requestClose}>
               {t('common:actions.cancel', { ns: 'common' })}
             </Button>
             <Button type="submit" disabled={createClient.isPending || updateClient.isPending}>
@@ -258,22 +260,28 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
         </div>
       </form>
       {client && (
-        <Modal
+        <ConfirmDialog
           open={confirmingDelete}
-          onClose={() => setConfirmingDelete(false)}
           title={t('common:confirmDelete.title', { ns: 'common', name: client.name })}
-        >
-          <p className="mb-4 text-sm text-foreground">{t('common:confirmDelete.message', { ns: 'common' })}</p>
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={() => setConfirmingDelete(false)}>
-              {t('common:actions.cancel', { ns: 'common' })}
-            </Button>
-            <Button type="button" variant="danger" onClick={handleDelete} disabled={deleteClient.isPending}>
-              {t('common:actions.delete', { ns: 'common' })}
-            </Button>
-          </div>
-        </Modal>
+          message={t('common:confirmDelete.message', { ns: 'common' })}
+          confirmLabel={t('common:actions.delete', { ns: 'common' })}
+          cancelLabel={t('common:actions.cancel', { ns: 'common' })}
+          confirmVariant="danger"
+          confirmDisabled={deleteClient.isPending}
+          onConfirm={handleDelete}
+          onCancel={() => setConfirmingDelete(false)}
+        />
       )}
+      <ConfirmDialog
+        open={discardGuard.isConfirmingDiscard}
+        title={t('common:confirmDiscard.title', { ns: 'common' })}
+        message={t('common:confirmDiscard.message', { ns: 'common' })}
+        confirmLabel={t('common:confirmDiscard.confirm', { ns: 'common' })}
+        cancelLabel={t('common:confirmDiscard.cancel', { ns: 'common' })}
+        confirmVariant="danger"
+        onConfirm={discardGuard.confirmDiscard}
+        onCancel={discardGuard.cancelDiscard}
+      />
         </SheetBody>
       </SheetContent>
     </Sheet>
