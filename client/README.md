@@ -54,10 +54,19 @@ npm run test:e2e       # Playwright, against a real running server (see e2e/happ
 npm run electron:dev    # launches the real Electron app; it spawns server/ itself
 ```
 
+Dev mode runs the server workspace's tsc output (`dist/server.js` and
+`dist/migrate-cli.js`), so run `npm run build --workspace=server` first — a
+`dist/` built before the migration runner existed will fail startup with
+"Cannot find module dist/migrate-cli.js".
+
 `main.ts` runs the server on Electron's own bundled Node (no system Node
 required), auto-migrates the SQLite database into the OS's per-user data
 directory, generates and persists its own JWT secret, and binds `127.0.0.1`
-only. First launch shows a one-time "Configurar loja" screen to create the
+only. Migrations are applied by `server/src/db/migrationRunner.ts` (a
+Prisma-compatible SQLite runner; packaged apps do not ship the Prisma CLI),
+so the packaged server directory is just the two esbuild bundles, the native
+addons, and the migration `.sql` files — see the allowlist in
+`electron-builder.yml`. First launch shows a one-time "Configurar loja" screen to create the
 shop's first login — no seed script needed.
 
 ### Building an installer

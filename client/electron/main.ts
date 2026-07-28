@@ -50,33 +50,26 @@ export function resolveProductPhotosDir(userDataPath: string): string {
   return path.join(userDataPath, 'product-photos')
 }
 
-// The packaged server directory lives inside the app's read-only mounted
-// resources (e.g. an AppImage's squashfs mount, or an ASAR-adjacent
-// directory on Windows/NSIS installs users don't have write access to).
-// That's fine for running the bundled server itself, but Prisma's
-// schema-engine (used by `migrate deploy`) self-heals by copying its binary
-// from its own global cache into node_modules/@prisma/engines/ whenever it
-// doesn't find what it expects there — and that copy's *target* must be
-// writable. Confirmed directly against a real packaged AppImage: this fails
-// with EROFS against the read-only mount. Copy the whole server directory
-// into a writable location under userData once per app version (re-copying
-// only when the version marker doesn't match, so a normal launch doesn't
-// pay for a full copy every time), and run everything from there instead.
-export function ensureWritableServerRuntime(
-  sourceDir: string,
-  userDataPath: string,
-  version: string,
-): string {
-  const runtimeDir = path.join(userDataPath, 'server-runtime')
-  const versionMarkerPath = path.join(runtimeDir, '.version')
-  const isCurrent =
-    fs.existsSync(versionMarkerPath) && fs.readFileSync(versionMarkerPath, 'utf-8') === version
-  if (!isCurrent) {
-    fs.rmSync(runtimeDir, { recursive: true, force: true })
-    fs.cpSync(sourceDir, runtimeDir, { recursive: true })
-    fs.writeFileSync(versionMarkerPath, version, 'utf-8')
-  }
-  return runtimeDir
+// Same split as resolveServerEntry, for the migration step: dev runs the tsc
+// output, packaged builds run the esbuild bundle sitting next to
+// server-bundle.mjs. Replaces the Prisma CLI (`prisma migrate deploy`) — see
+// server/src/db/migrationRunner.ts for why and for the compatibility
+// guarantees. This is also what lets the app run straight out of the
+// read-only resources directory: the old CLI's schema-engine self-healed by
+// copying a binary into node_modules (EROFS on an AppImage mount), which
+// forced a full writable copy of resources into userData. The runner writes
+// only to the database file, which already lives in userData.
+export function resolveMigrateEntry(isPackaged: boolean): string {
+  return isPackaged ? 'migrate.mjs' : 'dist/migrate-cli.js'
+}
+
+// Versions up to 0.5.0 copied all of resources (server bundle plus ~450MB of
+// node_modules) into userData/server-runtime at first launch to work around
+// the EROFS problem above. That copy is dead weight now that nothing needs a
+// writable server directory — reclaim the disk on installs upgrading from
+// those versions.
+export function cleanupLegacyServerRuntime(userDataPath: string): void {
+  fs.rmSync(path.join(userDataPath, 'server-runtime'), { recursive: true, force: true })
 }
 
 // electron-updater's quitAndInstall spawns the NEW app instance before the
@@ -127,10 +120,13 @@ let serverProcess: ChildProcess | null = null
 // handler below doesn't show a duplicate/incorrect crash dialog in those cases.
 let isShuttingDown = false
 
-function runMigrations(serverCwd: string, env: NodeJS.ProcessEnv): Promise<void> {
+function runMigrations(
+  serverCwd: string,
+  env: NodeJS.ProcessEnv,
+  isPackaged: boolean,
+): Promise<void> {
   return new Promise((resolve, reject) => {
-    const prismaCli = path.join(serverCwd, 'node_modules', 'prisma', 'build', 'index.js')
-    const migrate = spawn(process.execPath, [prismaCli, 'migrate', 'deploy'], {
+    const migrate = spawn(process.execPath, [resolveMigrateEntry(isPackaged)], {
       cwd: serverCwd,
       env: { ...env, ELECTRON_RUN_AS_NODE: '1' },
       stdio: 'pipe',
@@ -148,7 +144,7 @@ function runMigrations(serverCwd: string, env: NodeJS.ProcessEnv): Promise<void>
     migrate.stderr?.on('data', capture)
     migrate.on('exit', (code) => {
       if (code === 0) resolve()
-      else reject(new Error(`prisma migrate deploy exited with code ${code}\n${output.trim()}`))
+      else reject(new Error(`database migration exited with code ${code}\n${output.trim()}`))
     })
     migrate.on('error', reject)
   })
@@ -167,21 +163,15 @@ async function logError(message: string, error: unknown): Promise<void> {
 // Returns null on success, or the failure detail to show/log otherwise.
 async function startServer(): Promise<string | null> {
   const userDataPath = app.getPath('userData')
-  // Packaged: copy the whole resources directory (not just resources/server)
-  // into the writable runtime location, preserving the server/node_modules
-  // sibling relationship Node's module resolution depends on — the shared,
-  // hoisted npm-workspace dependencies (effect, dotenv, zod, cors, ...) live
-  // in resources/node_modules, a *sibling* of resources/server, not nested
-  // under it, and resolution walks up from server/node_modules to find them.
-  // Copying only resources/server (an earlier version of this fix) broke
-  // that walk-up entirely — confirmed directly by reproducing the resulting
-  // "Cannot find module 'effect'" error before catching and fixing it here.
-  const serverCwd = app.isPackaged
-    ? path.join(
-        ensureWritableServerRuntime(process.resourcesPath, userDataPath, app.getVersion()),
-        'server',
-      )
-    : resolveServerRuntimeCwd(app.isPackaged, app.getAppPath(), process.resourcesPath)
+  const serverCwd = resolveServerRuntimeCwd(app.isPackaged, app.getAppPath(), process.resourcesPath)
+  // Best-effort: a locked file (e.g. Windows AV holding a handle) must not
+  // block startup — the stale copy is only wasted disk, and the next launch
+  // retries.
+  try {
+    cleanupLegacyServerRuntime(userDataPath)
+  } catch (error) {
+    await logError('Failed to remove legacy server-runtime copy:', error)
+  }
 
   const env: NodeJS.ProcessEnv = {
     ...process.env,
@@ -201,7 +191,7 @@ async function startServer(): Promise<string | null> {
       app.getVersion(),
       new Date().toISOString().slice(0, 10),
     )
-    await runMigrations(serverCwd, env)
+    await runMigrations(serverCwd, env, app.isPackaged)
     // Only after success: a failed upgrade must re-back-up on the next
     // launch attempt, so the marker can't move until migrations land.
     writeBackupMarker(userDataPath, app.getVersion())

@@ -1,0 +1,5 @@
+# Migration scripts are checksummed (sha256 of the exact bytes) into every
+# installed database's _prisma_migrations table. Pin them to LF so a checkout
+# on a machine with core.autocrlf=true (e.g. Windows CI runners) cannot flip
+# their bytes and change the checksums the packaged app computes at startup.
+*.sql text eol=lf

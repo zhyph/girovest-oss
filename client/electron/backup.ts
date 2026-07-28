@@ -5,9 +5,11 @@ export const MAX_BACKUPS = 5
 
 const MARKER_FILENAME = 'db-backup-version'
 
-// Deliberately its own marker file: server-runtime/.version (see
-// ensureWritableServerRuntime in main.ts) is rewritten BEFORE migrations run,
-// so keying the backup off it would never trigger one.
+// Deliberately its own marker file: versions up to 0.5.0 kept a
+// server-runtime/.version marker (for a since-removed writable copy of the
+// server) that was rewritten BEFORE migrations ran, so keying the backup off
+// it would never have triggered one. The invariant stands on its own: this
+// marker only advances AFTER migrations succeed (see startServer).
 export function readBackupMarker(userDataPath: string): string | null {
   const markerPath = path.join(userDataPath, MARKER_FILENAME)
   return fs.existsSync(markerPath) ? fs.readFileSync(markerPath, 'utf-8') : null

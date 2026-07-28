@@ -2,69 +2,62 @@ appId: com.girovest.app
 productName: Girovest
 directories:
   output: release
+# The three build targets are self-contained: electron-vite bundles the main
+# process (including electron-updater/electron-log — see the externalization
+# comment in electron.vite.config.ts), the preload, and the renderer into
+# out/. Without the explicit exclusion, electron-builder still auto-packs the
+# production node_modules tree into app.asar (~85MB / 18k files of React,
+# Radix, etc. that Vite already compiled into out/renderer) — dead weight in
+# every download and delta update.
 files:
   - out/**/*
   - package.json
+  - '!node_modules'
+# The server side of the app ships as two esbuild bundles plus an explicit
+# ALLOWLIST of the only packages they can't inline (native addons and their
+# loaders) -- verified by grepping the built bundles for surviving bare
+# require()/import specifiers. Everything else (express, zod, the generated
+# Prisma client, ...) is already inside the bundles.
+#
+# History: this used to copy the whole root and server node_modules trees
+# (~450MB, tens of thousands of files, even after a first round of
+# exclusions), which made the Windows installer take ~15 minutes -- NSIS
+# extracts and Defender scans every file individually. It also forced a
+# second full copy into userData at first launch (see cleanupLegacyServerRuntime
+# in electron/main.ts). The bulk of it existed only so `prisma migrate
+# deploy` (the CLI + its engines, ~250MB) could run at startup; that job is
+# now done by server/src/db/migrationRunner.ts, which needs nothing beyond
+# better-sqlite3 and the migration .sql files below. Keep this an allowlist:
+# a denylist over node_modules silently regrows with every new devDependency.
 extraResources:
   - from: ../server/dist-bundle/server-bundle.mjs
     to: server/server-bundle.mjs
+  - from: ../server/dist-bundle/migrate.mjs
+    to: server/migrate.mjs
   - from: ../server/node_modules
     to: server/node_modules
-  - from: ../node_modules
-    to: node_modules
-    # npm workspaces links each workspace package into the shared root
-    # node_modules by its package name -- girovest-client is a symlink back
-    # to ../client itself. Copying it here recurses straight into this same
-    # packaging run's own in-progress output (client/release/...), which
-    # only failed on Windows (a real CI failure, not theoretical): infinite
-    # path nesting until MAX_PATH is hit. Neither workspace-self-link is
-    # needed at runtime (server/node_modules already ships separately;
-    # client's own source has no business inside the packaged server's
-    # node_modules), so both are excluded outright.
-    #
-    # The packages below are excluded because this whole entry only exists so
-    # the packaged server-bundle.mjs can resolve its externals (bcrypt,
-    # better-sqlite3, pg-native) and the handful of hoisted workspace deps it
-    # doesn't inline (effect, dotenv, zod, cors, ...) -- see the comment on
-    # ensureWritableServerRuntime in main.ts. None of these are that: they're
-    # build/dev/test-only tooling (confirmed via grep: nothing under
-    # server/src or client/src imports them), and together they're ~376MB of
-    # the ~826MB this entry used to copy -- the largest single contributor to
-    # a slow Windows install, since NSIS extracts and Defender scans every
-    # file individually.
-    #   - electron: the dev-time Electron binary itself. The packaged app
-    #     already *is* Electron; it never loads a second copy from resources.
-    #   - electron-winstaller: builds Squirrel (.exe) installers. This project
-    #     only ever uses the nsis Windows target (see win.target below).
-    #   - playwright / playwright-core: e2e test runner, dev-only.
-    #   - lightningcss-linux-x64-gnu: a Linux-only native binary pulled in by
-    #     Tailwind's build step -- irrelevant after the CSS is already
-    #     compiled into client/out, and wrong-platform on a Windows/macOS
-    #     build regardless.
+    # bcrypt loads its compiled addon through node-gyp-build; better-sqlite3
+    # through bindings (which needs file-uri-to-path). The compiled .node
+    # files land in build/ via electron-rebuild (see the prepackage hook in
+    # package.json); prebuilds/ carries bcrypt's fallback binaries. C/C++
+    # sources and sqlite's amalgamation only matter at rebuild time, never at
+    # runtime -- excluded.
     filter:
-      - '**/*'
-      - '!girovest-client'
-      - '!girovest-client/**'
-      - '!girovest-server'
-      - '!girovest-server/**'
-      - '!electron'
-      - '!electron/**'
-      - '!electron-winstaller'
-      - '!electron-winstaller/**'
-      - '!playwright'
-      - '!playwright/**'
-      - '!playwright-core'
-      - '!playwright-core/**'
-      - '!lightningcss-linux-x64-gnu'
-      - '!lightningcss-linux-x64-gnu/**'
-  - from: ../server/prisma
-    to: server/prisma
+      - 'bcrypt/**'
+      - 'better-sqlite3/**'
+      - 'bindings/**'
+      - 'file-uri-to-path/**'
+      - 'node-gyp-build/**'
+      - '!bcrypt/{src,test,examples}/**'
+      - '!better-sqlite3/{src,deps}/**'
+      - '!better-sqlite3/build/Release/obj/**'
+      - '!**/build/Release/obj.target/**'
+  # Only the raw migration scripts: the runner walks this directory itself.
+  # The schema files and postgresql/ tree are CLI/dev-time inputs.
+  - from: ../server/prisma/sqlite/migrations
+    to: server/prisma/sqlite/migrations
     filter:
-      - '**/*'
-      - '!**/*.db'
-      - '!**/*.db-journal'
-  - from: ../server/prisma.config.ts
-    to: server/prisma.config.ts
+      - '**/migration.sql'
 win:
   target: nsis
 linux:

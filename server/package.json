@@ -1,6 +1,6 @@
 {
   "name": "girovest-server",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "description": "Girovest API server — Express + Prisma, SQLite or Postgres.",
   "author": "Girovest",
@@ -14,7 +14,7 @@
     "dev": "cross-env HOST=127.0.0.1 tsx watch src/server.ts",
     "db:tools": "tsx scripts/db-tools.ts",
     "build": "tsc -p tsconfig.json",
-    "build:electron-bundle": "esbuild dist/server.js --bundle --platform=node --format=esm --outfile=dist-bundle/server-bundle.mjs --external:bcrypt --external:better-sqlite3 --external:pg-native --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\"",
+    "build:electron-bundle": "esbuild dist/server.js --bundle --platform=node --format=esm --outfile=dist-bundle/server-bundle.mjs --external:bcrypt --external:better-sqlite3 --external:pg-native --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\" && esbuild dist/migrate-cli.js --bundle --platform=node --format=esm --outfile=dist-bundle/migrate.mjs --external:better-sqlite3 --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\"",
     "start": "node dist/server.js",
     "test:setup": "dotenv -e .env.test -- npm run db:schema && dotenv -e .env.test -- prisma db push",
     "pretest": "npm run test:setup",
