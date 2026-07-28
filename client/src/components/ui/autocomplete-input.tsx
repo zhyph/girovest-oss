@@ -1,5 +1,6 @@
 import { useId, useMemo, useRef, useState, type InputHTMLAttributes } from 'react'
 import { cn } from '../../lib/cn.ts'
+import { foldForSearch } from '../../lib/autocompleteMatch.ts'
 import { Popover, PopoverAnchor, PopoverContent } from './popover.tsx'
 
 type AutocompleteInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'list'> & {
@@ -7,15 +8,6 @@ type AutocompleteInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'value
   onChange: (value: string) => void
   /** Values already in use elsewhere in the shop; never a closed set. */
   suggestions: string[]
-}
-
-/** "festa" must match "Festa" and "cerimonia" must match "Cerimônia". */
-function foldForSearch(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .toLowerCase()
-    .trim()
 }
 
 /**
@@ -52,10 +44,13 @@ export function AutocompleteInput({
       return true
     })
     const query = foldForSearch(value)
-    // An exact match is not worth suggesting — the field already says it.
-    if (query && unique.some((suggestion) => foldForSearch(suggestion) === query)) return []
     const filtered = query ? unique.filter((suggestion) => foldForSearch(suggestion).includes(query)) : unique
-    return filtered.sort((a, b) => a.localeCompare(b)).slice(0, 8)
+    // A suggestion identical to what's already typed is not worth showing —
+    // the field already says it — but that shouldn't hide other, longer
+    // suggestions that also match (e.g. typing "Festa" exactly still leaves
+    // "Festa Junina" worth offering).
+    const withoutExactMatch = query ? filtered.filter((suggestion) => foldForSearch(suggestion) !== query) : filtered
+    return withoutExactMatch.sort((a, b) => a.localeCompare(b)).slice(0, 8)
   }, [suggestions, value])
 
   const showList = isOpen && matches.length > 0
@@ -117,7 +112,7 @@ export function AutocompleteInput({
             'h-10 w-full rounded-md border border-input bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground transition-colors',
             'hover:border-input-hover',
             'focus:outline-none focus:border-ring focus:ring-2 focus:ring-ring/30',
-            'aria-invalid:border-destructive aria-invalid:focus:border-destructive aria-invalid:focus:ring-destructive/30',
+            'aria-invalid:border-destructive aria-invalid:bg-destructive-subtle aria-invalid:focus:border-destructive aria-invalid:focus:ring-destructive/30',
             'disabled:cursor-not-allowed disabled:opacity-50',
             className,
           )}

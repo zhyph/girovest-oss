@@ -33,6 +33,11 @@
     "add": "Adicionar linha de endereço",
     "remove": "Remover linha de endereço"
   },
+  "confirmRemoveDefaultField": {
+    "title": "Remover \"{{label}}\"?",
+    "message": "Este é um campo padrão do modelo da loja. Você pode adicioná-lo novamente depois, mas o valor digitado aqui será perdido.",
+    "confirm": "Remover"
+  },
   "empty": "Nenhum cliente cadastrado ainda.",
   "noResults": "Nenhum cliente encontrado para essa busca."
 }

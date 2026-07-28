@@ -196,6 +196,29 @@ describe('NewContractForm', () => {
     expect(createImpl.mock.calls[0][0].locationId).toBeUndefined()
     expect(onClose).toHaveBeenCalledOnce()
   })
+
+  it('asks for confirmation instead of saving immediately when the client is missing required fields', async () => {
+    const createImpl = vi.fn().mockResolvedValue(undefined)
+    mockHooks()
+    vi.spyOn(useContractsModule, 'useCreateContract').mockReturnValue({ mutateAsync: createImpl, isPending: false } as never)
+    renderWithToast(<NewContractForm onClose={vi.fn()} />)
+
+    await userEvent.selectOptions(screen.getByLabelText(/cliente/i), 'c2')
+    await userEvent.type(screen.getByLabelText(/data do evento/i), '03102026')
+    await userEvent.selectOptions(screen.getByLabelText(/produto/i), 'p1')
+    await userEvent.type(screen.getByLabelText(/retirada/i), '02102026')
+    await userEvent.type(screen.getByLabelText(/devolução/i), '05102026')
+    await userEvent.selectOptions(screen.getByLabelText(/forma de pagamento/i), 'PIX')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+
+    expect(createImpl).not.toHaveBeenCalled()
+    expect(screen.getByText(/salvar contrato mesmo assim/i)).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: /salvar mesmo assim/i }))
+
+    expect(createImpl).toHaveBeenCalledOnce()
+    expect(createImpl.mock.calls[0][0].clientId).toBe('c2')
+  })
 })
 
 describe('pricing', () => {

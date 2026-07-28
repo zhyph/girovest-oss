@@ -9,6 +9,7 @@ import { DateInput } from '../../components/ui/date-input.tsx'
 import { Select } from '../../components/ui/select.tsx'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose, SheetBody } from '../../components/ui/sheet.tsx'
 import { ConfirmDialog } from '../../components/ui/confirm-dialog.tsx'
+import { RequiredMark } from '../../components/ui/required-mark.tsx'
 import { showErrorToast } from '../../lib/toast.ts'
 import { useLocale } from '../../lib/LocaleContext.tsx'
 import { formatCurrency, getLocaleConfig } from '../../lib/locale.ts'
@@ -54,7 +55,7 @@ function ItemRow({
     <div className="flex flex-col gap-2 rounded-md border border-border p-2">
       <div className="flex items-end gap-2">
         <label className="flex flex-1 flex-col gap-1 text-sm">
-          {t('fields.product')}
+          <span>{t('fields.product')}<RequiredMark /></span>
           <Select
             {...register(`items.${index}.productId`, {
               onChange: (event) => {
@@ -68,6 +69,7 @@ function ItemRow({
               },
             })}
             aria-label={t('fields.product')}
+            aria-required="true"
           >
             <option value="">—</option>
             {activeProducts.map((product) => (
@@ -83,7 +85,7 @@ function ItemRow({
       </div>
       <div className="flex gap-2">
         <label className="flex flex-1 flex-col gap-1 text-sm">
-          {t('fields.checkoutDate')}
+          <span>{t('fields.checkoutDate')}<RequiredMark /></span>
           <Controller
             name={`items.${index}.checkoutDate`}
             control={control}
@@ -92,6 +94,7 @@ function ItemRow({
                 value={field.value}
                 onChange={field.onChange}
                 aria-label={t('fields.checkoutDate')}
+                aria-required="true"
                 aria-invalid={checkoutDateError ? true : undefined}
               />
             )}
@@ -99,7 +102,7 @@ function ItemRow({
           {checkoutDateError && <span className="text-xs text-destructive">{checkoutDateError}</span>}
         </label>
         <label className="flex flex-1 flex-col gap-1 text-sm">
-          {t('fields.dueDate')}
+          <span>{t('fields.dueDate')}<RequiredMark /></span>
           <Controller
             name={`items.${index}.dueDate`}
             control={control}
@@ -108,6 +111,7 @@ function ItemRow({
                 value={field.value}
                 onChange={field.onChange}
                 aria-label={t('fields.dueDate')}
+                aria-required="true"
                 aria-invalid={dueDateError ? true : undefined}
               />
             )}
@@ -146,6 +150,7 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
   const { data: products } = useProducts()
   const createContract = useCreateContract()
   const [completingClient, setCompletingClient] = useState<Client | null>(null)
+  const [pendingSubmitValues, setPendingSubmitValues] = useState<NewContractFormValues | null>(null)
 
   const {
     register,
@@ -172,7 +177,7 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
   const selectedClient = clients?.find((client) => client.id === selectedClientId) ?? null
   const missingFields = selectedClient ? getMissingRequiredFields(selectedClient, locale) : []
 
-  async function onSubmit(values: NewContractFormValues) {
+  async function submitContract(values: NewContractFormValues) {
     try {
       await createContract.mutateAsync(values)
       onClose()
@@ -180,6 +185,25 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
       const code = (error as { code?: string }).code ?? 'UNKNOWN'
       showErrorToast(t(`errors.${code}`, { defaultValue: t('common:errors.UNKNOWN', { ns: 'common' }) }))
     }
+  }
+
+  // The client-readiness banner above the form is easy to miss once the
+  // rest of the form is filled in — one last checkpoint before an
+  // incomplete client's contract is actually saved, rather than a silent
+  // pass-through.
+  async function onSubmit(values: NewContractFormValues) {
+    if (missingFields.length > 0) {
+      setPendingSubmitValues(values)
+      return
+    }
+    await submitContract(values)
+  }
+
+  async function confirmSubmitAnyway() {
+    if (!pendingSubmitValues) return
+    const values = pendingSubmitValues
+    setPendingSubmitValues(null)
+    await submitContract(values)
   }
 
   const activeProducts = products?.filter((product) => product.status === 'active') ?? []
@@ -201,8 +225,8 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
         <SheetBody>
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3">
           <label className="flex flex-col gap-1 text-sm">
-            {t('fields.client')}
-            <Select {...register('clientId')} aria-label={t('fields.client')}>
+            <span>{t('fields.client')}<RequiredMark /></span>
+            <Select {...register('clientId')} aria-label={t('fields.client')} aria-required="true">
               <option value="">—</option>
               {clients?.map((client) => (
                 <option key={client.id} value={client.id}>{client.name}</option>
@@ -219,7 +243,7 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
             </div>
           )}
           <label className="flex flex-col gap-1 text-sm">
-            {t('fields.eventDate')}
+            <span>{t('fields.eventDate')}<RequiredMark /></span>
             <Controller
               name="eventDate"
               control={control}
@@ -228,6 +252,7 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
                   value={field.value}
                   onChange={field.onChange}
                   aria-label={t('fields.eventDate')}
+                  aria-required="true"
                   aria-invalid={errors.eventDate ? true : undefined}
                 />
               )}
@@ -277,8 +302,8 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
             </div>
           </div>
           <label className="flex flex-col gap-1 text-sm">
-            {t('fields.paymentMethod')}
-            <Select {...register('paymentMethod')} aria-label={t('fields.paymentMethod')}>
+            <span>{t('fields.paymentMethod')}<RequiredMark /></span>
+            <Select {...register('paymentMethod')} aria-label={t('fields.paymentMethod')} aria-required="true">
               <option value="">—</option>
               {paymentMethods.map((method) => (
                 <option key={method} value={method}>{method}</option>
@@ -361,6 +386,17 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
           confirmVariant="danger"
           onConfirm={discardGuard.confirmDiscard}
           onCancel={discardGuard.cancelDiscard}
+        />
+        <ConfirmDialog
+          open={pendingSubmitValues !== null}
+          title={t('clientReadiness.confirmSaveTitle')}
+          message={t('clientReadiness.confirmSaveMessage', { fields: missingFields.join(', ') })}
+          confirmLabel={t('clientReadiness.confirmSaveConfirm')}
+          cancelLabel={t('common:actions.cancel', { ns: 'common' })}
+          confirmVariant="danger"
+          confirmDisabled={createContract.isPending}
+          onConfirm={confirmSubmitAnyway}
+          onCancel={() => setPendingSubmitValues(null)}
         />
         </SheetBody>
       </SheetContent>

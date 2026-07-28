@@ -111,6 +111,8 @@ describe('ProductsPage', () => {
     await userEvent.type(screen.getByLabelText('Categoria'), 'festa')
     await userEvent.type(screen.getByLabelText('Tamanho'), 'M')
     await userEvent.type(screen.getByLabelText('Cor'), 'verde')
+    await userEvent.clear(screen.getByLabelText('Preço do aluguel'))
+    await userEvent.type(screen.getByLabelText('Preço do aluguel'), '15000')
     await userEvent.click(screen.getByLabelText('Salvar e adicionar outro'))
     await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
 
@@ -141,6 +143,8 @@ describe('ProductsPage', () => {
     await userEvent.type(screen.getByLabelText('Categoria'), 'festa')
     await userEvent.type(screen.getByLabelText('Tamanho'), 'M')
     await userEvent.type(screen.getByLabelText('Cor'), 'verde')
+    await userEvent.clear(screen.getByLabelText('Preço do aluguel'))
+    await userEvent.type(screen.getByLabelText('Preço do aluguel'), '15000')
     await userEvent.click(screen.getByLabelText('Salvar e adicionar outro'))
     await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
 

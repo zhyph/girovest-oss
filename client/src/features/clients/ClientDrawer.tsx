@@ -7,23 +7,31 @@ import { Button } from '../../components/ui/button.tsx'
 import { Input } from '../../components/ui/input.tsx'
 import { PhoneInput } from '../../components/ui/phone-input.tsx'
 import { MaskedTextInput } from '../../components/ui/masked-text-input.tsx'
+import { AutocompleteInput } from '../../components/ui/autocomplete-input.tsx'
 import { ConfirmDialog } from '../../components/ui/confirm-dialog.tsx'
+import { RequiredMark } from '../../components/ui/required-mark.tsx'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose, SheetBody } from '../../components/ui/sheet.tsx'
 import { showErrorToast } from '../../lib/toast.ts'
 import { useLocale } from '../../lib/LocaleContext.tsx'
 import { useUnsavedChangesGuard } from '../../lib/useUnsavedChangesGuard.ts'
 import { getClientFieldTemplate } from '../../lib/clientFieldTemplates.ts'
 import { getFieldMask } from '../../lib/clientFieldMasks.ts'
+import { normalizeToSuggestion } from '../../lib/autocompleteMatch.ts'
 import { clientSchema, type Client, type ClientFormValues } from './clientSchemas.ts'
-import { useCreateClient, useUpdateClient, useDeleteClient } from './useClients.ts'
+import { useClients, useCreateClient, useUpdateClient, useDeleteClient } from './useClients.ts'
 
 export function ClientDrawer({ client, onClose }: { client: Client | null; onClose: () => void }) {
   const { t } = useTranslation('clients')
   const { locale } = useLocale()
+  const { data: allClients } = useClients()
   const createClient = useCreateClient()
   const updateClient = useUpdateClient()
   const deleteClient = useDeleteClient()
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [confirmingRemoveField, setConfirmingRemoveField] = useState<{
+    kind: 'identityDocuments' | 'addressLines'
+    index: number
+  } | null>(null)
 
   const template = getClientFieldTemplate(locale)
   const defaultIdentityDocuments = client
@@ -59,6 +67,56 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
   const addressLines = useFieldArray({ control, name: 'addressLines' })
   const discardGuard = useUnsavedChangesGuard({ isDirty, onConfirmDiscard: onClose })
 
+  // Address lines repeat across the shop's clientele (same cities,
+  // neighborhoods, states), so offering what's already on file speeds up
+  // entry the same way ProductDrawer's category/size/color suggestions do.
+  function addressSuggestionsFor(label: string): string[] {
+    return (allClients ?? [])
+      .flatMap((otherClient) => otherClient.addressLines ?? [])
+      .filter((line) => line.label === label)
+      .map((line) => line.value)
+      .filter((value): value is string => Boolean(value))
+  }
+
+  // The CPF/RG/address rows seeded from the location's field template look
+  // locked (read-only, muted label) to signal they're expected fields; a
+  // stray click on the same-size remove icon shouldn't be able to drop one
+  // without at least one chance to back out. Freely-added extra rows carry
+  // no such expectation and remove immediately.
+  function requestRemoveIdentityDocument(index: number) {
+    const isDefaultField = template.identityDocuments[index]?.label === identityDocuments.fields[index].label
+    if (isDefaultField) {
+      setConfirmingRemoveField({ kind: 'identityDocuments', index })
+    } else {
+      identityDocuments.remove(index)
+    }
+  }
+
+  function requestRemoveAddressLine(index: number) {
+    const isDefaultField = template.addressLines[index]?.label === addressLines.fields[index].label
+    if (isDefaultField) {
+      setConfirmingRemoveField({ kind: 'addressLines', index })
+    } else {
+      addressLines.remove(index)
+    }
+  }
+
+  function confirmRemoveField() {
+    if (!confirmingRemoveField) return
+    if (confirmingRemoveField.kind === 'identityDocuments') {
+      identityDocuments.remove(confirmingRemoveField.index)
+    } else {
+      addressLines.remove(confirmingRemoveField.index)
+    }
+    setConfirmingRemoveField(null)
+  }
+
+  const removingFieldLabel =
+    confirmingRemoveField &&
+    (confirmingRemoveField.kind === 'identityDocuments'
+      ? identityDocuments.fields[confirmingRemoveField.index]?.label
+      : addressLines.fields[confirmingRemoveField.index]?.label)
+
   function showError(error: unknown) {
     const code = (error as { code?: string }).code ?? 'UNKNOWN'
     showErrorToast(t(`errors.${code}`, { defaultValue: t('common:errors.UNKNOWN', { ns: 'common' }) }))
@@ -67,10 +125,19 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
   async function onSubmit(values: ClientFormValues) {
     const normalized: ClientFormValues = {
       ...values,
-      identityDocuments: values.identityDocuments.filter((doc) => doc.value.trim() !== ''),
+      identityDocuments: values.identityDocuments
+        .filter((doc) => doc.value.trim() !== '')
+        .map((doc) => ({ ...doc, value: doc.value.trim() })),
       addressLines: values.addressLines
         .filter((line) => line.value.trim() !== '')
-        .map((line, index) => ({ ...line, sortOrder: index })),
+        // Snap to whatever casing/accents are already on file for the same
+        // value (e.g. "piedade" -> "Piedade"), so the same city doesn't end
+        // up stored two different ways depending on who typed it.
+        .map((line, index) => ({
+          ...line,
+          value: normalizeToSuggestion(line.value, addressSuggestionsFor(line.label)),
+          sortOrder: index,
+        })),
     }
     try {
       if (client) {
@@ -110,20 +177,33 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
         <SheetBody>
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3">
         <label className="flex flex-col gap-1 text-sm">
-          {t('fields.name')}
-          <Input {...register('name')} aria-invalid={errors.name ? true : undefined} aria-describedby={errors.name ? 'client-name-error' : undefined} />
+          <span>{t('fields.name')}<RequiredMark /></span>
+          <Input
+            {...register('name')}
+            aria-required="true"
+            aria-invalid={errors.name ? true : undefined}
+            aria-describedby={errors.name ? 'client-name-error' : undefined}
+          />
           {errors.name && <span id="client-name-error" className="text-xs text-destructive">{t('validation.nameRequired')}</span>}
         </label>
         <label className="flex flex-col gap-1 text-sm">
-          {t('fields.phone')}
+          <span>{t('fields.phone')}<RequiredMark /></span>
           <Controller
             name="phone"
             control={control}
             render={({ field }) => (
-              <PhoneInput value={field.value} onChange={field.onChange} id="phone" aria-label={t('fields.phone')} />
+              <PhoneInput
+                value={field.value}
+                onChange={field.onChange}
+                id="phone"
+                aria-label={t('fields.phone')}
+                aria-required="true"
+                aria-invalid={errors.phone ? true : undefined}
+                aria-describedby={errors.phone ? 'client-phone-error' : undefined}
+              />
             )}
           />
-          {errors.phone && <span className="text-xs text-destructive">{t('validation.phoneRequired')}</span>}
+          {errors.phone && <span id="client-phone-error" className="text-xs text-destructive">{t('validation.phoneRequired')}</span>}
         </label>
         <label className="flex flex-col gap-1 text-sm">
           {t('fields.email')}
@@ -173,7 +253,7 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
                 type="button"
                 variant="ghost"
                 size="icon"
-                onClick={() => identityDocuments.remove(index)}
+                onClick={() => requestRemoveIdentityDocument(index)}
                 aria-label={t('identityDocuments.remove')}
               >
                 <X size={16} />
@@ -207,21 +287,31 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
                 <Controller
                   name={`addressLines.${index}.value`}
                   control={control}
-                  render={({ field: valueField }) => (
-                    <MaskedTextInput
-                      value={valueField.value}
-                      onChange={valueField.onChange}
-                      mask={getFieldMask(addressLines.fields[index].maskKey)}
-                      aria-label={t('addressLines.valueFieldAria')}
-                    />
-                  )}
+                  render={({ field: valueField }) =>
+                    getFieldMask(field.maskKey) ? (
+                      <MaskedTextInput
+                        value={valueField.value}
+                        onChange={valueField.onChange}
+                        mask={getFieldMask(field.maskKey)}
+                        aria-label={t('addressLines.valueFieldAria')}
+                      />
+                    ) : (
+                      <AutocompleteInput
+                        value={valueField.value}
+                        onChange={valueField.onChange}
+                        onBlur={valueField.onBlur}
+                        suggestions={addressSuggestionsFor(field.label)}
+                        aria-label={t('addressLines.valueFieldAria')}
+                      />
+                    )
+                  }
                 />
               </div>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                onClick={() => addressLines.remove(index)}
+                onClick={() => requestRemoveAddressLine(index)}
                 aria-label={t('addressLines.remove')}
               >
                 <X size={16} />
@@ -281,6 +371,16 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
         confirmVariant="danger"
         onConfirm={discardGuard.confirmDiscard}
         onCancel={discardGuard.cancelDiscard}
+      />
+      <ConfirmDialog
+        open={confirmingRemoveField !== null}
+        title={t('confirmRemoveDefaultField.title', { label: removingFieldLabel })}
+        message={t('confirmRemoveDefaultField.message')}
+        confirmLabel={t('confirmRemoveDefaultField.confirm')}
+        cancelLabel={t('common:actions.cancel', { ns: 'common' })}
+        confirmVariant="danger"
+        onConfirm={confirmRemoveField}
+        onCancel={() => setConfirmingRemoveField(null)}
       />
         </SheetBody>
       </SheetContent>

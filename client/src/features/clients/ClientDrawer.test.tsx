@@ -20,7 +20,9 @@ function mockClientHooks(
   deleteImpl: () => Promise<unknown> = vi.fn(),
   createImpl: (...args: never[]) => Promise<unknown> = vi.fn(),
   updateImpl: (...args: never[]) => Promise<unknown> = vi.fn(),
+  otherClients: Client[] = [],
 ) {
+  vi.spyOn(useClientsModule, 'useClients').mockReturnValue({ data: otherClients } as never)
   vi.spyOn(useClientsModule, 'useCreateClient').mockReturnValue({ mutateAsync: createImpl } as never)
   vi.spyOn(useClientsModule, 'useUpdateClient').mockReturnValue({ mutateAsync: updateImpl } as never)
   vi.spyOn(useClientsModule, 'useDeleteClient').mockReturnValue({ mutateAsync: deleteImpl } as never)
@@ -235,13 +237,26 @@ describe('ClientDrawer identity documents', () => {
     expect(labelInputs).toHaveLength(3)
   })
 
-  it('lets staff remove an identity document row', async () => {
+  it('confirms before removing a default identity document row', async () => {
     mockClientHooks()
     renderWithToast(<ClientDrawer client={null} onClose={vi.fn()} />)
     const removeButtons = screen.getAllByRole('button', { name: /remover documento/i })
     await userEvent.click(removeButtons[0])
+    expect(screen.getByDisplayValue('CPF')).toBeInTheDocument()
+    const dialog = screen.getByRole('dialog', { name: /remover "cpf"/i })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Remover' }))
     expect(screen.queryByDisplayValue('CPF')).not.toBeInTheDocument()
     expect(screen.getByDisplayValue('RG')).toBeInTheDocument()
+  })
+
+  it('cancels removal of a default identity document row without removing it', async () => {
+    mockClientHooks()
+    renderWithToast(<ClientDrawer client={null} onClose={vi.fn()} />)
+    const removeButtons = screen.getAllByRole('button', { name: /remover documento/i })
+    await userEvent.click(removeButtons[0])
+    const dialog = screen.getByRole('dialog', { name: /remover "cpf"/i })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }))
+    expect(screen.getByDisplayValue('CPF')).toBeInTheDocument()
   })
 
   it('applies the CPF mask as staff types into a CPF row value', async () => {
@@ -319,11 +334,14 @@ describe('ClientDrawer address lines', () => {
     expect(labelInputs).toHaveLength(5)
   })
 
-  it('lets staff remove an address line row', async () => {
+  it('confirms before removing a default address line row', async () => {
     mockClientHooks()
     renderWithToast(<ClientDrawer client={null} onClose={vi.fn()} />)
     const removeButtons = screen.getAllByRole('button', { name: /remover linha de endereço/i })
     await userEvent.click(removeButtons[0])
+    expect(screen.getByDisplayValue('Endereço')).toBeInTheDocument()
+    const dialog = screen.getByRole('dialog', { name: /remover "endereço"/i })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Remover' }))
     expect(screen.queryByDisplayValue('Endereço')).not.toBeInTheDocument()
     expect(screen.getByDisplayValue('Bairro')).toBeInTheDocument()
   })
@@ -358,5 +376,43 @@ describe('ClientDrawer address lines', () => {
 
     expect(createImpl).toHaveBeenCalledOnce()
     expect(createImpl.mock.calls[0][0].addressLines).toEqual([])
+  })
+
+  it('normalizes a typed address line to the casing already on file for the same value', async () => {
+    const createImpl = vi.fn().mockResolvedValue(undefined)
+    const otherClient: Client = {
+      id: 'c-other', name: 'Outra Cliente', phone: '11988887777', email: '', notes: '',
+      identityDocuments: [],
+      addressLines: [{ id: 'l1', label: 'Cidade', value: 'Piedade', sortOrder: 0, maskKey: null }],
+      hasAllocationHistory: false, createdAt: '2026-01-01',
+    }
+    mockClientHooks(vi.fn(), createImpl, vi.fn(), [otherClient])
+    renderWithToast(<ClientDrawer client={null} onClose={vi.fn()} />)
+
+    await userEvent.type(screen.getByLabelText('Nome'), 'Nova Cliente')
+    await userEvent.type(screen.getByLabelText('Telefone'), '11999999999')
+    await userEvent.type(screen.getByLabelText('E-mail'), 'nova@example.com')
+    await userEvent.type(screen.getAllByLabelText(/valor da linha de endereço/i)[2], 'piedade')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+
+    expect(createImpl).toHaveBeenCalledOnce()
+    const savedCidade = createImpl.mock.calls[0][0].addressLines.find((line: { label: string }) => line.label === 'Cidade')
+    expect(savedCidade.value).toBe('Piedade')
+  })
+
+  it('trims whitespace from a saved address line value even when nothing on file matches', async () => {
+    const createImpl = vi.fn().mockResolvedValue(undefined)
+    mockClientHooks(vi.fn(), createImpl)
+    renderWithToast(<ClientDrawer client={null} onClose={vi.fn()} />)
+
+    await userEvent.type(screen.getByLabelText('Nome'), 'Nova Cliente')
+    await userEvent.type(screen.getByLabelText('Telefone'), '11999999999')
+    await userEvent.type(screen.getByLabelText('E-mail'), 'nova@example.com')
+    await userEvent.type(screen.getAllByLabelText(/valor da linha de endereço/i)[2], '  Nova Cidade  ')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+
+    expect(createImpl).toHaveBeenCalledOnce()
+    const savedCidade = createImpl.mock.calls[0][0].addressLines.find((line: { label: string }) => line.label === 'Cidade')
+    expect(savedCidade.value).toBe('Nova Cidade')
   })
 })

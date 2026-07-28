@@ -9,7 +9,9 @@ import { CurrencyInput } from '../../components/ui/currency-input.tsx'
 import { ConfirmDialog } from '../../components/ui/confirm-dialog.tsx'
 import { Select } from '../../components/ui/select.tsx'
 import { AutocompleteInput } from '../../components/ui/autocomplete-input.tsx'
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from '../../components/ui/sheet.tsx'
+import { RequiredMark } from '../../components/ui/required-mark.tsx'
+import { normalizeToSuggestion } from '../../lib/autocompleteMatch.ts'
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose, SheetBody } from '../../components/ui/sheet.tsx'
 import { showErrorToast } from '../../lib/toast.ts'
 import { useAuth } from '../../lib/useAuth.ts'
 import { useUnsavedChangesGuard } from '../../lib/useUnsavedChangesGuard.ts'
@@ -93,24 +95,33 @@ export function ProductDrawer({
   }
 
   async function onSubmit(values: ProductFormValues) {
+    // Snap category/size/color to whatever casing/accents are already on
+    // file for the same value, so "gala" and "Gala" don't quietly become
+    // two different catalogue entries depending on who typed it.
+    const normalized: ProductFormValues = {
+      ...values,
+      category: normalizeToSuggestion(values.category, suggestionsFor('category')),
+      size: normalizeToSuggestion(values.size, suggestionsFor('size')),
+      color: normalizeToSuggestion(values.color, suggestionsFor('color')),
+    }
     try {
       if (product) {
-        await updateProduct.mutateAsync({ id: product.id, values: { ...values, status, photos } })
+        await updateProduct.mutateAsync({ id: product.id, values: { ...normalized, status, photos } })
         onClose()
       } else {
-        await createProduct.mutateAsync({ ...values, photos })
-        onCreated?.(values)
+        await createProduct.mutateAsync({ ...normalized, photos })
+        onCreated?.(normalized)
         if (addAnotherAfterSave) {
           setPhotos([])
           reset({
             locationId: staff?.locationId ?? '',
             name: '',
-            category: values.category,
-            size: values.size,
-            color: values.color,
-            rentalPrice: values.rentalPrice,
-            depositAmount: values.depositAmount,
-            description: values.description,
+            category: normalized.category,
+            size: normalized.size,
+            color: normalized.color,
+            rentalPrice: normalized.rentalPrice,
+            depositAmount: normalized.depositAmount,
+            description: normalized.description,
           })
         } else {
           onClose()
@@ -149,16 +160,21 @@ export function ProductDrawer({
             <X size={18} />
           </SheetClose>
         </SheetHeader>
-      <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col p-4">
-        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
+        <SheetBody>
+      <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3">
         <input type="hidden" {...register('locationId')} />
         <label className="flex flex-col gap-1 text-sm">
-          {t('fields.name')}
-          <Input {...register('name')} aria-invalid={errors.name ? true : undefined} aria-describedby={errors.name ? 'product-name-error' : undefined} />
+          <span>{t('fields.name')}<RequiredMark /></span>
+          <Input
+            {...register('name')}
+            aria-required="true"
+            aria-invalid={errors.name ? true : undefined}
+            aria-describedby={errors.name ? 'product-name-error' : undefined}
+          />
           {errors.name && <span id="product-name-error" className="text-xs text-destructive">{t('validation.nameRequired')}</span>}
         </label>
         <label className="flex flex-col gap-1 text-sm">
-          {t('fields.category')}
+          <span>{t('fields.category')}<RequiredMark /></span>
           <Controller
             name="category"
             control={control}
@@ -169,6 +185,7 @@ export function ProductDrawer({
                 onBlur={field.onBlur}
                 suggestions={suggestionsFor('category')}
                 aria-label={t('fields.category')}
+                aria-required="true"
                 aria-invalid={errors.category ? true : undefined}
                 aria-describedby={errors.category ? 'product-category-error' : undefined}
               />
@@ -177,7 +194,7 @@ export function ProductDrawer({
           {errors.category && <span id="product-category-error" className="text-xs text-destructive">{t('validation.categoryRequired')}</span>}
         </label>
         <label className="flex flex-col gap-1 text-sm">
-          {t('fields.size')}
+          <span>{t('fields.size')}<RequiredMark /></span>
           <Controller
             name="size"
             control={control}
@@ -188,6 +205,7 @@ export function ProductDrawer({
                 onBlur={field.onBlur}
                 suggestions={suggestionsFor('size')}
                 aria-label={t('fields.size')}
+                aria-required="true"
                 aria-invalid={errors.size ? true : undefined}
                 aria-describedby={errors.size ? 'product-size-error' : undefined}
               />
@@ -196,7 +214,7 @@ export function ProductDrawer({
           {errors.size && <span id="product-size-error" className="text-xs text-destructive">{t('validation.sizeRequired')}</span>}
         </label>
         <label className="flex flex-col gap-1 text-sm">
-          {t('fields.color')}
+          <span>{t('fields.color')}<RequiredMark /></span>
           <Controller
             name="color"
             control={control}
@@ -207,6 +225,7 @@ export function ProductDrawer({
                 onBlur={field.onBlur}
                 suggestions={suggestionsFor('color')}
                 aria-label={t('fields.color')}
+                aria-required="true"
                 aria-invalid={errors.color ? true : undefined}
                 aria-describedby={errors.color ? 'product-color-error' : undefined}
               />
@@ -215,15 +234,23 @@ export function ProductDrawer({
           {errors.color && <span id="product-color-error" className="text-xs text-destructive">{t('validation.colorRequired')}</span>}
         </label>
         <label className="flex flex-col gap-1 text-sm">
-          {t('fields.rentalPrice')}
+          <span>{t('fields.rentalPrice')}<RequiredMark /></span>
           <Controller
             name="rentalPrice"
             control={control}
             render={({ field }) => (
-              <CurrencyInput value={field.value} onChange={field.onChange} id="rentalPrice" aria-label={t('fields.rentalPrice')} />
+              <CurrencyInput
+                value={field.value}
+                onChange={field.onChange}
+                id="rentalPrice"
+                aria-label={t('fields.rentalPrice')}
+                aria-required="true"
+                aria-invalid={errors.rentalPrice ? true : undefined}
+                aria-describedby={errors.rentalPrice ? 'product-rental-price-error' : undefined}
+              />
             )}
           />
-          {errors.rentalPrice && <span className="text-xs text-destructive">{t('validation.rentalPriceInvalid')}</span>}
+          {errors.rentalPrice && <span id="product-rental-price-error" className="text-xs text-destructive">{t('validation.rentalPriceInvalid')}</span>}
         </label>
         <label className="flex flex-col gap-1 text-sm">
           {t('fields.depositAmount')}
@@ -231,10 +258,17 @@ export function ProductDrawer({
             name="depositAmount"
             control={control}
             render={({ field }) => (
-              <CurrencyInput value={field.value} onChange={field.onChange} id="depositAmount" aria-label={t('fields.depositAmount')} />
+              <CurrencyInput
+                value={field.value}
+                onChange={field.onChange}
+                id="depositAmount"
+                aria-label={t('fields.depositAmount')}
+                aria-invalid={errors.depositAmount ? true : undefined}
+                aria-describedby={errors.depositAmount ? 'product-deposit-amount-error' : undefined}
+              />
             )}
           />
-          {errors.depositAmount && <span className="text-xs text-destructive">{t('validation.depositAmountInvalid')}</span>}
+          {errors.depositAmount && <span id="product-deposit-amount-error" className="text-xs text-destructive">{t('validation.depositAmountInvalid')}</span>}
         </label>
         <label className="flex flex-col gap-1 text-sm">
           {t('fields.description')}
@@ -288,8 +322,7 @@ export function ProductDrawer({
             {t('common:actions.saveAndAddAnother', { ns: 'common' })}
           </label>
         )}
-        </div>
-        <div className="mt-2 flex flex-shrink-0 justify-between gap-2">
+        <div className="mt-2 flex justify-between gap-2">
           {product && !product.hasAllocationHistory && (
             <Button
               type="button"
@@ -300,7 +333,7 @@ export function ProductDrawer({
               {t('common:actions.delete', { ns: 'common' })}
             </Button>
           )}
-          <div className="flex flex-1 flex-shrink-0 justify-end gap-2">
+          <div className="flex flex-1 justify-end gap-2">
             <Button type="button" variant="secondary" onClick={discardGuard.requestClose}>
               {t('common:actions.cancel', { ns: 'common' })}
             </Button>
@@ -333,6 +366,7 @@ export function ProductDrawer({
         onConfirm={discardGuard.confirmDiscard}
         onCancel={discardGuard.cancelDiscard}
       />
+        </SheetBody>
       </SheetContent>
     </Sheet>
   )

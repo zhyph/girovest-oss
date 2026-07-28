@@ -33,6 +33,14 @@ describe('productCreateSchema', () => {
     expect(productCreateSchema.safeParse({ ...VALID, [field]: -1 }).success).toBe(false)
   })
 
+  it('rejects a zero rentalPrice', () => {
+    expect(productCreateSchema.safeParse({ ...VALID, rentalPrice: 0 }).success).toBe(false)
+  })
+
+  it('accepts a zero depositAmount', () => {
+    expect(productCreateSchema.safeParse({ ...VALID, depositAmount: 0 }).success).toBe(true)
+  })
+
   it.each(['rentalPrice', 'depositAmount'])('rejects a %s sent as a string', (field) => {
     expect(productCreateSchema.safeParse({ ...VALID, [field]: '250' }).success).toBe(false)
   })

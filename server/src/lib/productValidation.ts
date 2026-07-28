@@ -27,6 +27,6 @@ export const productCreateSchema = z.object({
   category: z.string().min(1).max(100),
   size: z.string().min(1).max(100),
   color: z.string().min(1).max(100),
-  rentalPrice: z.number().nonnegative().max(MAX_PRICE),
+  rentalPrice: z.number().positive().max(MAX_PRICE),
   depositAmount: z.number().nonnegative().max(MAX_PRICE),
 })

@@ -99,6 +99,15 @@ describe('AutocompleteInput', () => {
     expect(screen.queryByRole('option')).not.toBeInTheDocument()
   })
 
+  it('still offers a longer suggestion that also matches an exact-match query', async () => {
+    render(<Harness suggestions={['Festa', 'Festa Junina']} />)
+
+    await userEvent.type(screen.getByLabelText('Categoria'), 'Festa')
+
+    expect(screen.queryByRole('option', { name: 'Festa' })).not.toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Festa Junina' })).toBeInTheDocument()
+  })
+
   it('shows each repeated value only once', async () => {
     render(<Harness suggestions={['Festa', 'festa', 'FESTA', 'Noiva']} />)
 

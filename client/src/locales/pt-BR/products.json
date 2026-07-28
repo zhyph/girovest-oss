@@ -35,7 +35,7 @@
     "categoryRequired": "Categoria é obrigatória",
     "sizeRequired": "Tamanho é obrigatório",
     "colorRequired": "Cor é obrigatória",
-    "rentalPriceInvalid": "Preço do aluguel deve ser zero ou maior",
+    "rentalPriceInvalid": "Preço do aluguel deve ser maior que zero",
     "depositAmountInvalid": "Caução deve ser zero ou maior"
   },
   "empty": "Nenhum produto cadastrado ainda.",

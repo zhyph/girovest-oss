@@ -35,7 +35,7 @@ const updateSchema = z.object({
   category: z.string().min(1).optional(),
   size: z.string().min(1).optional(),
   color: z.string().min(1).optional(),
-  rentalPrice: z.number().nonnegative().optional(),
+  rentalPrice: z.number().positive().optional(),
   depositAmount: z.number().nonnegative().optional(),
   photos: z.array(z.string()).optional(),
   status: z.enum(['active', 'maintenance', 'retired']).optional(),

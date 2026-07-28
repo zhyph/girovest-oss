@@ -33,7 +33,10 @@
   },
   "clientReadiness": {
     "missing": "Faltam campos obrigatórios: {{fields}}",
-    "complete": "Completar cadastro"
+    "complete": "Completar cadastro",
+    "confirmSaveTitle": "Salvar contrato mesmo assim?",
+    "confirmSaveMessage": "Este cliente ainda não tem: {{fields}}. Você pode completar o cadastro depois, mas esses dados podem faltar no contrato impresso.",
+    "confirmSaveConfirm": "Salvar mesmo assim"
   },
   "cancelContract": {
     "action": "Cancelar contrato",

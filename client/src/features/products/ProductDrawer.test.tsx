@@ -204,6 +204,8 @@ describe('ProductDrawer', () => {
     await userEvent.type(screen.getByLabelText('Categoria'), 'festa')
     await userEvent.type(screen.getByLabelText('Tamanho'), 'M')
     await userEvent.type(screen.getByLabelText('Cor'), 'verde')
+    await userEvent.clear(screen.getByLabelText('Preço do aluguel'))
+    await userEvent.type(screen.getByLabelText('Preço do aluguel'), '15000')
     await userEvent.click(screen.getByLabelText('Salvar e adicionar outro'))
     await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
     await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
@@ -258,6 +260,8 @@ describe('ProductDrawer', () => {
     await userEvent.type(screen.getByLabelText('Categoria'), 'casual')
     await userEvent.type(screen.getByLabelText('Tamanho'), 'M')
     await userEvent.type(screen.getByLabelText('Cor'), 'verde')
+    await userEvent.clear(screen.getByLabelText('Preço do aluguel'))
+    await userEvent.type(screen.getByLabelText('Preço do aluguel'), '15000')
     await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
 
     expect(await screen.findByText('Algo deu errado. Tente novamente.')).toBeInTheDocument()
@@ -358,6 +362,8 @@ describe('ProductDrawer', () => {
     await userEvent.type(screen.getByLabelText('Categoria'), 'festa')
     await userEvent.type(screen.getByLabelText('Tamanho'), 'M')
     await userEvent.type(screen.getByLabelText('Cor'), 'verde')
+    await userEvent.clear(screen.getByLabelText('Preço do aluguel'))
+    await userEvent.type(screen.getByLabelText('Preço do aluguel'), '15000')
     await userEvent.click(screen.getByLabelText('Salvar e adicionar outro'))
     await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
 
@@ -377,10 +383,45 @@ describe('ProductDrawer', () => {
     await userEvent.type(screen.getByLabelText('Categoria'), 'festa')
     await userEvent.type(screen.getByLabelText('Tamanho'), 'M')
     await userEvent.type(screen.getByLabelText('Cor'), 'verde')
+    await userEvent.clear(screen.getByLabelText('Preço do aluguel'))
+    await userEvent.type(screen.getByLabelText('Preço do aluguel'), '15000')
     await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
 
     expect(createImpl).toHaveBeenCalled()
     expect(onClose).toHaveBeenCalled()
+  })
+
+  it('rejects a rental price of zero instead of saving a free product', async () => {
+    const createImpl = vi.fn().mockResolvedValue(undefined)
+    mockProductHooks(vi.fn(), createImpl)
+    renderWithToast(<ProductDrawer product={null} onClose={vi.fn()} />)
+
+    await userEvent.type(screen.getByLabelText('Nome'), 'Vestido Verde')
+    await userEvent.type(screen.getByLabelText('Categoria'), 'festa')
+    await userEvent.type(screen.getByLabelText('Tamanho'), 'M')
+    await userEvent.type(screen.getByLabelText('Cor'), 'verde')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+
+    expect(await screen.findByText('Preço do aluguel deve ser maior que zero')).toBeInTheDocument()
+    expect(createImpl).not.toHaveBeenCalled()
+  })
+
+  it('normalizes typed category/size/color to the casing already on file for the same value', async () => {
+    const createImpl = vi.fn().mockResolvedValue(undefined)
+    // The fixture `product` already has category 'casual', size 'P', color 'azul'.
+    mockProductHooks(vi.fn(), createImpl)
+    renderWithToast(<ProductDrawer product={null} onClose={vi.fn()} />)
+
+    await userEvent.type(screen.getByLabelText('Nome'), 'Vestido Verde')
+    await userEvent.type(screen.getByLabelText('Categoria'), 'Casual')
+    await userEvent.type(screen.getByLabelText('Tamanho'), 'P')
+    await userEvent.type(screen.getByLabelText('Cor'), 'Azul')
+    await userEvent.clear(screen.getByLabelText('Preço do aluguel'))
+    await userEvent.type(screen.getByLabelText('Preço do aluguel'), '15000')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+
+    expect(createImpl).toHaveBeenCalledOnce()
+    expect(createImpl.mock.calls[0][0]).toMatchObject({ category: 'casual', color: 'azul' })
   })
 
   it('does not show "Salvar e adicionar outro" in edit mode', () => {
@@ -404,10 +445,11 @@ describe('ProductDrawer', () => {
     expect(thumbnail).toHaveClass('h-16', 'w-16')
   })
 
-  it('keeps the footer action buttons in a flex-shrink-0 region, form scrolls internally', () => {
+  it('keeps the footer buttons inside the same scrollable region as the rest of the form, like ClientDrawer', () => {
     mockProductHooks(vi.fn())
     renderWithToast(<ProductDrawer product={product} onClose={vi.fn()} />)
-    const footer = screen.getByRole('button', { name: 'Salvar' }).closest('div')
-    expect(footer?.className).toContain('flex-shrink-0')
+    const saveButton = screen.getByRole('button', { name: 'Salvar' })
+    const sheetBody = document.querySelector('[data-slot="sheet-body"]')
+    expect(sheetBody).toContainElement(saveButton)
   })
 })
