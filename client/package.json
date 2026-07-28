@@ -1,7 +1,7 @@
 {
   "name": "girovest-client",
   "private": true,
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Girovest desktop and web client — clients, products, allocations, and calendar for a dress rental shop.",
   "author": "Girovest",
   "type": "module",
