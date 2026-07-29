@@ -160,6 +160,23 @@ async function logError(message: string, error: unknown): Promise<void> {
   log.error(message, error)
 }
 
+// Sliding-window crash-loop detector: mutates `timestamps` in place (drops
+// entries older than the window) and returns whether the threshold has been
+// reached within it. Pure aside from that mutation, so it's testable without
+// any Electron dependency -- same style as waitForPortFree above.
+export function recordCrashAndCheckLoop(
+  timestamps: number[],
+  now: number,
+  windowMs = 30_000,
+  threshold = 3,
+): boolean {
+  timestamps.push(now)
+  while (timestamps.length > 0 && now - timestamps[0]! > windowMs) {
+    timestamps.shift()
+  }
+  return timestamps.length >= threshold
+}
+
 // Mirrors the renderer's DevTools console into main.log. Without this, a
 // renderer-side error (e.g. a page component throwing during render) is only
 // ever visible in DevTools -- invisible on a packaged Windows build where a
@@ -175,8 +192,34 @@ function attachConsoleLogging(win: BrowserWindow): void {
       else log.info(line)
     })()
   })
+  // A crashed renderer takes React (and ChunkErrorBoundary with it) down
+  // along with the process -- there is no JS left running to catch anything
+  // or show a fallback, which is exactly the "solid screen" symptom that
+  // adding the boundary at the app root did not fix. Recover by reloading
+  // webContents instead of leaving a dead window. 'clean-exit' is excluded:
+  // that's an intentional close (e.g. during app shutdown), not a crash, and
+  // reloading a webContents whose window is going away would just interfere
+  // with normal quit. If reloading keeps failing (a crash loop -- e.g. a bad
+  // GPU driver crashing the renderer immediately on every launch), stop
+  // reloading and quit with an explanation instead of silently hammering the
+  // user with an invisible crash/reload cycle forever.
+  const crashTimestamps: number[] = []
   win.webContents.on('render-process-gone', (_event, details) => {
     void logError('Renderer process gone:', details.reason)
+    if (details.reason === 'clean-exit') return
+
+    if (recordCrashAndCheckLoop(crashTimestamps, Date.now())) {
+      dialog.showErrorBox(
+        'Girovest Crashed Repeatedly',
+        'The application keeps crashing and will now close. Please reopen Girovest; contact support if this keeps happening.',
+      )
+      isShuttingDown = true
+      serverProcess?.kill()
+      app.quit()
+      return
+    }
+
+    win.webContents.reload()
   })
   win.webContents.on('unresponsive', () => {
     void logError('Renderer became unresponsive', undefined)
@@ -374,6 +417,15 @@ if (app) {
   // after whenReady()) is a no-op and userData silently lands in the wrong
   // directory (girovest-client instead of girovest).
   app.setName('girovest')
+
+  // Must also run before whenReady(): Electron only accepts this call while
+  // the app isn't ready yet. A crashed renderer process (see the
+  // 'render-process-gone' handler in attachConsoleLogging) with no further
+  // detail is, in practice, most often a GPU/graphics-driver problem on the
+  // shop's own machine -- the app has no content that benefits from GPU
+  // rendering, so trading a little rendering performance to remove that
+  // whole crash class is a clear win.
+  app.disableHardwareAcceleration()
 
   // Keep native chrome (menus, dialogs, and the window backgroundColor
   // above for windows created later) in step with the in-app theme choice.

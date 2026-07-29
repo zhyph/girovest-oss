@@ -13,6 +13,7 @@ import {
   resolveMigrateEntry,
   cleanupLegacyServerRuntime,
   waitForPortFree,
+  recordCrashAndCheckLoop,
 } from './main.ts'
 
 describe('resolveServerCwd', () => {
@@ -160,5 +161,28 @@ describe('cleanupLegacyServerRuntime', () => {
 
   it('is a no-op when there is nothing to clean up', () => {
     expect(() => cleanupLegacyServerRuntime(userDataPath)).not.toThrow()
+  })
+})
+
+describe('recordCrashAndCheckLoop', () => {
+  it('does not trip below the threshold', () => {
+    const timestamps: number[] = []
+    expect(recordCrashAndCheckLoop(timestamps, 0, 30_000, 3)).toBe(false)
+    expect(recordCrashAndCheckLoop(timestamps, 1_000, 30_000, 3)).toBe(false)
+  })
+
+  it('trips once the threshold is reached within the window', () => {
+    const timestamps: number[] = []
+    recordCrashAndCheckLoop(timestamps, 0, 30_000, 3)
+    recordCrashAndCheckLoop(timestamps, 1_000, 30_000, 3)
+    expect(recordCrashAndCheckLoop(timestamps, 2_000, 30_000, 3)).toBe(true)
+  })
+
+  it('drops timestamps older than the window, so spread-out crashes never trip it', () => {
+    const timestamps: number[] = []
+    recordCrashAndCheckLoop(timestamps, 0, 30_000, 3)
+    recordCrashAndCheckLoop(timestamps, 40_000, 30_000, 3)
+    expect(recordCrashAndCheckLoop(timestamps, 80_000, 30_000, 3)).toBe(false)
+    expect(timestamps).toEqual([80_000])
   })
 })
