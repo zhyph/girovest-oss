@@ -24,7 +24,8 @@
   },
   "errors": {
     "UNKNOWN": "Algo deu errado. Tente novamente.",
-    "chunkLoadFailed": "Não foi possível carregar esta parte do aplicativo."
+    "chunkLoadFailed": "Não foi possível carregar esta parte do aplicativo.",
+    "unexpected": "Ocorreu um erro inesperado no aplicativo."
   },
   "profileLoadError": "Não foi possível carregar seu perfil.",
   "confirmDelete": {

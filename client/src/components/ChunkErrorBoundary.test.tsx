@@ -8,6 +8,10 @@ function Bomb(): never {
   throw new Error('chunk load failed')
 }
 
+function GenericBomb(): never {
+  throw new TypeError("Cannot read properties of undefined (reading 'foo')")
+}
+
 describe('ChunkErrorBoundary', () => {
   afterEach(() => {
     vi.restoreAllMocks()
@@ -42,5 +46,21 @@ describe('ChunkErrorBoundary', () => {
     expect(reloadButton).toBeInTheDocument()
     await userEvent.click(reloadButton)
     expect(reload).toHaveBeenCalledOnce()
+    expect(screen.getByText('Não foi possível carregar esta parte do aplicativo.')).toBeInTheDocument()
+  })
+
+  it('shows a generic message, not the chunk-load one, for an unrelated crash', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    render(
+      <ChunkErrorBoundary>
+        <GenericBomb />
+      </ChunkErrorBoundary>,
+    )
+
+    expect(screen.getByText('Ocorreu um erro inesperado no aplicativo.')).toBeInTheDocument()
+    expect(
+      screen.queryByText('Não foi possível carregar esta parte do aplicativo.'),
+    ).not.toBeInTheDocument()
   })
 })
