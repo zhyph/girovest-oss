@@ -22,6 +22,14 @@ export class ChunkErrorBoundary extends Component<ChunkErrorBoundaryProps, Chunk
     return { hasError: true }
   }
 
+  // Explicit, not relying on React's own default console.error of caught
+  // errors: this guarantees the message and stack are the ones forwarded to
+  // main.log (see attachConsoleLogging in electron/main.ts), regardless of
+  // React version/build differences in what it logs by default.
+  componentDidCatch(error: Error): void {
+    console.error('ChunkErrorBoundary caught:', error.message, error.stack)
+  }
+
   render() {
     if (this.state.hasError) {
       return (

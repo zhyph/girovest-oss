@@ -160,6 +160,29 @@ async function logError(message: string, error: unknown): Promise<void> {
   log.error(message, error)
 }
 
+// Mirrors the renderer's DevTools console into main.log. Without this, a
+// renderer-side error (e.g. a page component throwing during render) is only
+// ever visible in DevTools -- invisible on a packaged Windows build where a
+// shop can't reach DevTools, and invisible in main.log, since electron-log is
+// otherwise only ever called from this file's own main-process code.
+function attachConsoleLogging(win: BrowserWindow): void {
+  win.webContents.on('console-message', (details) => {
+    void (async () => {
+      const log = (await import('electron-log')).default
+      const line = `[renderer] ${details.message} (${details.sourceId}:${details.lineNumber})`
+      if (details.level === 'error') log.error(line)
+      else if (details.level === 'warning') log.warn(line)
+      else log.info(line)
+    })()
+  })
+  win.webContents.on('render-process-gone', (_event, details) => {
+    void logError('Renderer process gone:', details.reason)
+  })
+  win.webContents.on('unresponsive', () => {
+    void logError('Renderer became unresponsive', undefined)
+  })
+}
+
 // Returns null on success, or the failure detail to show/log otherwise.
 async function startServer(): Promise<string | null> {
   const userDataPath = app.getPath('userData')
@@ -300,6 +323,7 @@ function createWindow(state: ActivationState): BrowserWindow {
     },
   })
 
+  attachConsoleLogging(win)
   loadAppOrActivation(win, state)
   return win
 }
