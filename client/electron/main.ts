@@ -168,6 +168,11 @@ async function logError(message: string, error: unknown): Promise<void> {
   log.error(message, error)
 }
 
+async function logInfo(message: string): Promise<void> {
+  const log = (await import('electron-log')).default
+  log.info(message)
+}
+
 // Sliding-window crash-loop detector: mutates `timestamps` in place (drops
 // entries older than the window) and returns whether the threshold has been
 // reached within it. Pure aside from that mutation, so it's testable without
@@ -442,9 +447,15 @@ if (app) {
   // file and relaunches, and disableHardwareAcceleration only takes effect
   // for a NEW process, so this check has to run this early, before
   // whenReady(), to catch that relaunch.
-  if (fs.existsSync(resolveGpuDisableFlagPath(app.getPath('userData')))) {
+  const gpuDisabled = fs.existsSync(resolveGpuDisableFlagPath(app.getPath('userData')))
+  if (gpuDisabled) {
     app.disableHardwareAcceleration()
   }
+  // Diagnostic only, not a behavior change: confirms in main.log whether this
+  // launch actually disabled hardware acceleration and what Chromium's GPU
+  // feature status is, so a repeat crash after the flag is set answers
+  // whether GPU/driver was ever the cause instead of leaving it a guess.
+  void logInfo(`GPU acceleration disabled by flag: ${gpuDisabled}`)
 
   // Keep native chrome (menus, dialogs, and the window backgroundColor
   // above for windows created later) in step with the in-app theme choice.
@@ -472,7 +483,18 @@ if (app) {
     return cachedInstallId
   })
 
+  // Correlates a renderer crash with a same-time crash of another Chromium
+  // process (most importantly 'GPU'): render-process-gone alone can't tell us
+  // whether the GPU process died first and took the renderer down with it,
+  // or the renderer died on its own for an unrelated reason (e.g. a
+  // third-party DLL injected into it by security/overlay software).
+  app.on('child-process-gone', (_event, details) => {
+    void logError('Child process gone:', details)
+  })
+
   app.whenReady().then(async () => {
+    void logInfo(`GPU feature status: ${JSON.stringify(app.getGPUFeatureStatus())}`)
+
     const startupError = await startServer()
     if (startupError !== null) {
       dialog.showErrorBox(
