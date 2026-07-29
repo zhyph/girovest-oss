@@ -71,6 +71,12 @@ Em **Configurações**, no grupo **"Aparência"**, há três botões: **"Sistema
 
 A escolha vale na hora e fica gravada nesse computador; não é preciso clicar em "Salvar". O modo escuro cobre o aplicativo inteiro, incluindo o calendário; no aplicativo instalado, até os menus e janelas do sistema acompanham.
 
+### Tours guiados
+
+Na primeira vez que você abrir o **Painel**, **Clientes**, **Produtos** ou **Contratos**, aparece uma explicação passo a passo mostrando os principais botões daquela tela. Use **"Próximo"** para avançar, **"Anterior"** para voltar, e o **X** para fechar a qualquer momento.
+
+Se quiser rever essas explicações depois — para lembrar como algo funciona, ou para mostrar a alguém que está aprendendo a usar o aplicativo — vá em **Configurações**, na seção **"Tours guiados"**, e clique em **"Rever"** ao lado da tela desejada.
+
 ### Se algo der errado
 
 De vez em quando pode aparecer "Algo deu errado. Tente novamente." ou "Não foi possível carregar esta parte do aplicativo." Use os botões **"Tentar novamente"** ou **"Recarregar"**; quase sempre resolve.
@@ -293,6 +299,7 @@ Em **"Configurações"** você encontra:
 - **"Aparência"**: os botões **"Sistema"**, **"Claro"** e **"Escuro"** (veja a seção 3). Vale na hora, sem precisar salvar.
 - **"Telefone"**: o telefone da loja, com a formatação automática (DD) NNNNN-NNNN. Ele sai no cabeçalho do contrato impresso.
 - **"Cláusulas do Contrato"**: uma caixa de texto para cada cláusula. **"Adicionar cláusula"** cria uma nova; o **X** remove. Essas cláusulas saem em todos os contratos impressos, na seção "Termos e Condições".
+- **"Tours guiados"**: um botão **"Rever"** para cada tela (Painel, Clientes, Produtos, Contratos) — veja a seção 3.
 
 Clique em **"Salvar"** para gravar o telefone e as cláusulas. Aparece a confirmação "Configurações salvas."
 
