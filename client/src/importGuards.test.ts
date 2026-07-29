@@ -23,6 +23,11 @@ const GUARDED_STATIC_IMPORTS: Record<string, readonly string[]> = {
   'react-big-calendar': ['features/calendar/MonthView.tsx'],
   // motion drives the CountUp spring only.
   motion: ['components/CountUp.tsx'],
+  // driver.js (and its stylesheet) power the guided-walkthrough tours and
+  // are only ever needed from the four already-lazy route chunks that use
+  // them, via this one hook. buildDriverSteps.ts only imports driver.js's
+  // `DriveStep` type (erased at compile time, zero runtime cost).
+  'driver.js': ['features/onboarding/useSectionTour.ts', 'features/onboarding/buildDriverSteps.ts'],
 }
 
 const SRC_ROOT = path.dirname(fileURLToPath(import.meta.url))

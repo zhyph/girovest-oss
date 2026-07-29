@@ -1,0 +1,84 @@
+{
+  "common": {
+    "next": "Próximo",
+    "previous": "Anterior",
+    "done": "Concluir",
+    "progress": "{{current}} de {{total}}"
+  },
+  "dashboard": {
+    "steps": {
+      "title": {
+        "title": "Seu painel",
+        "description": "Aqui você vê um resumo do dia: o que está saindo, o que está voltando e o que está atrasado."
+      },
+      "gettingStarted": {
+        "title": "Comece por aqui",
+        "description": "Cadastre um cliente e um produto para criar seu primeiro contrato."
+      },
+      "stats": {
+        "title": "Resumo do dia",
+        "description": "Saindo hoje, voltando hoje e atrasados — os números mais importantes, sempre visíveis."
+      },
+      "upcoming": {
+        "title": "Próximas alocações",
+        "description": "As próximas retiradas e devoluções agendadas aparecem aqui, na ordem em que vão acontecer."
+      }
+    }
+  },
+  "clients": {
+    "steps": {
+      "create": {
+        "title": "Novo cliente",
+        "description": "Clique aqui para cadastrar um cliente novo, com telefone, e-mail e documentos."
+      },
+      "search": {
+        "title": "Buscar cliente",
+        "description": "Digite nome, telefone ou e-mail para encontrar um cliente rapidamente."
+      },
+      "table": {
+        "title": "Lista de clientes",
+        "description": "Clique em qualquer cliente da lista para ver ou editar os dados dele."
+      }
+    }
+  },
+  "products": {
+    "steps": {
+      "create": {
+        "title": "Novo produto",
+        "description": "Clique aqui para cadastrar uma peça nova, com categoria, tamanho, cor e preço."
+      },
+      "photoSession": {
+        "title": "Sessão de fotos",
+        "description": "Gere um QR code para que alguém tire as fotos do produto pelo celular — elas aparecem aqui automaticamente."
+      },
+      "search": {
+        "title": "Buscar produto",
+        "description": "Digite nome, categoria ou cor para encontrar uma peça rapidamente."
+      },
+      "table": {
+        "title": "Lista de produtos",
+        "description": "Clique em qualquer produto para ver ou editar os dados dele, e acompanhe se está disponível, reservado ou alugado."
+      }
+    }
+  },
+  "contracts": {
+    "steps": {
+      "create": {
+        "title": "Novo contrato",
+        "description": "Clique aqui para criar um contrato: escolha o cliente, as peças e as datas de retirada e devolução."
+      },
+      "search": {
+        "title": "Buscar contrato",
+        "description": "Digite o nome do cliente para encontrar um contrato rapidamente."
+      },
+      "card": {
+        "title": "Contrato",
+        "description": "Cada contrato mostra o cliente, as peças alugadas e as ações disponíveis: registrar retirada, devolução ou assinatura."
+      },
+      "pagination": {
+        "title": "Mais contratos",
+        "description": "Use estes botões para navegar entre as páginas quando houver muitos contratos."
+      }
+    }
+  }
+}

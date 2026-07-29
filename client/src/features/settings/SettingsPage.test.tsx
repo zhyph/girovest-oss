@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router'
 import '../../i18n.ts'
 import { setThemePreference } from '../../lib/useTheme.ts'
 import { SettingsPage } from './SettingsPage.tsx'
 import * as useLocationSettingsModule from './useLocationSettings.ts'
+import * as tourReplayModule from '../onboarding/tourReplay.ts'
 import { Toaster } from '../../components/ui/sonner.tsx'
 import type { LocationSettings } from './settingsSchemas.ts'
 
@@ -20,7 +22,7 @@ const settings: LocationSettings = {
 }
 
 function renderWithToast(ui: React.ReactElement) {
-  return render(<>{ui}<Toaster /></>)
+  return render(<>{ui}<Toaster /></>, { wrapper: MemoryRouter })
 }
 
 function mockSettingsHooks(updateImpl: (...args: never[]) => Promise<unknown> = vi.fn()) {
@@ -104,6 +106,28 @@ describe('SettingsPage', () => {
       maintenanceBufferDays: 0,
       clauses: [{ text: 'Primeira cláusula' }, { text: 'Segunda cláusula' }],
     })
+  })
+})
+
+describe('tours guiados', () => {
+  it('lista um botão Rever para cada seção coberta', () => {
+    mockSettingsHooks()
+    renderWithToast(<SettingsPage />)
+
+    expect(screen.getByRole('button', { name: 'Rever tour de Painel' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Rever tour de Clientes' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Rever tour de Produtos' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Rever tour de Contratos' })).toBeInTheDocument()
+  })
+
+  it('solicita o replay da seção ao clicar em Rever', async () => {
+    const requestTourReplaySpy = vi.spyOn(tourReplayModule, 'requestTourReplay')
+    mockSettingsHooks()
+    renderWithToast(<SettingsPage />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Rever tour de Clientes' }))
+
+    expect(requestTourReplaySpy).toHaveBeenCalledWith('clients')
   })
 })
 

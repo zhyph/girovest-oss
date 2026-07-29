@@ -7,6 +7,7 @@ import { Input } from '../../components/ui/input.tsx'
 import { Badge } from '../../components/ui/badge.tsx'
 import { AuthenticatedPhoto } from '../../components/ui/authenticated-photo.tsx'
 import { cn } from '../../lib/cn.ts'
+import { useSectionTour } from '../onboarding/useSectionTour.ts'
 import { useProducts, PRODUCTS_KEY } from './useProducts.ts'
 import { ProductDrawer } from './ProductDrawer.tsx'
 import { AddPhotosSessionModal } from './AddPhotosSessionModal.tsx'
@@ -52,6 +53,7 @@ export function ProductsPage() {
   const { data: products, isLoading } = useProducts()
   // In-memory only, never persisted: cleared on page reload, updated only by a successful create.
   const [lastCreatedDefaults, setLastCreatedDefaults] = useState<Partial<ProductFormValues> | null>(null)
+  useSectionTour('products', !isLoading)
 
   const filteredProducts = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -71,10 +73,12 @@ export function ProductsPage() {
       <div className="mb-4 flex flex-shrink-0 items-center justify-between">
         <h1 className="text-xl font-semibold">{t('title')}</h1>
         <div className="flex gap-2">
-          <Button variant="secondary" onClick={() => setAddingPhotosRemotely(true)}>
+          <Button variant="secondary" onClick={() => setAddingPhotosRemotely(true)} data-tour="products.photoSession">
             {t('photoIntake.sessionAction')}
           </Button>
-          <Button onClick={() => setEditing(null)}>{t('common:actions.create')}</Button>
+          <Button onClick={() => setEditing(null)} data-tour="products.create">
+            {t('common:actions.create')}
+          </Button>
         </div>
       </div>
       {products && products.length > 0 && (
@@ -84,6 +88,7 @@ export function ProductsPage() {
           placeholder={t('searchPlaceholder')}
           className="mb-3 flex-shrink-0"
           aria-label={t('searchPlaceholder')}
+          data-tour="products.search"
         />
       )}
       <div className="min-h-0 flex-1 overflow-y-auto">
@@ -92,7 +97,7 @@ export function ProductsPage() {
           <p className="text-muted-foreground">{t('noResults')}</p>
         )}
         {filteredProducts && filteredProducts.length > 0 && (
-          <div className="rounded-md border border-border">
+          <div className="rounded-md border border-border" data-tour="products.table">
             <div className="sticky top-0 z-10 flex justify-between bg-muted px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               <span>{t('fields.name')}</span>
               <span className="flex gap-4">

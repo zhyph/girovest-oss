@@ -9,6 +9,7 @@ import { parseDateOnly, formatDate } from '../../lib/date.ts'
 import { useLocale } from '../../lib/LocaleContext.tsx'
 import { useClients } from '../clients/useClients.ts'
 import { useProducts } from '../products/useProducts.ts'
+import { useSectionTour } from '../onboarding/useSectionTour.ts'
 import { useDashboard } from './useDashboard.ts'
 
 function StatTile({ label, value, danger }: { label: string; value: number; danger?: boolean }) {
@@ -35,6 +36,7 @@ export function DashboardPage() {
   const { goingOutToday, dueBackToday, overdue, upcoming, isLoading, isError } = useDashboard()
   const { data: products } = useProducts()
   const { data: clients } = useClients()
+  useSectionTour('dashboard', !isLoading && !isError)
 
   const productNames = useMemo(
     () => new Map((products ?? []).map((product) => [product.id, product.name])),
@@ -49,9 +51,9 @@ export function DashboardPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <h1 className="mb-4 flex-shrink-0 text-xl font-semibold">{t('title')}</h1>
+      <h1 className="mb-4 flex-shrink-0 text-xl font-semibold" data-tour="dashboard.title">{t('title')}</h1>
       {isBrandNewShop && (
-        <Card className="mb-4 flex-shrink-0 border-primary/30 bg-secondary">
+        <Card className="mb-4 flex-shrink-0 border-primary/30 bg-secondary" data-tour="dashboard.gettingStarted">
           <CardBody className="flex items-center justify-between gap-3">
             <div>
               <div className="text-sm font-semibold text-secondary-foreground">{t('gettingStarted.title')}</div>
@@ -83,7 +85,7 @@ export function DashboardPage() {
         </Card>
       )}
       {!isLoading && !isError && (
-        <div className="mb-4 grid flex-shrink-0 grid-cols-3 gap-4">
+        <div className="mb-4 grid flex-shrink-0 grid-cols-3 gap-4" data-tour="dashboard.stats">
           <StatTile label={t('goingOutToday')} value={goingOutToday.length} />
           <StatTile label={t('dueBackToday')} value={dueBackToday.length} />
           <StatTile label={t('overdue')} value={overdue.length} danger />
@@ -91,7 +93,7 @@ export function DashboardPage() {
       )}
       {!isLoading && !isError && (
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <Card>
+          <Card data-tour="dashboard.upcoming">
             <CardBody>
               <div className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">{t('upcoming')}</div>
               {upcoming.length === 0 ? (

@@ -14,6 +14,7 @@ import { formatCurrency, getLocaleConfig } from '../../lib/locale.ts'
 import { useLocale } from '../../lib/LocaleContext.tsx'
 import { showErrorToast } from '../../lib/toast.ts'
 import { useUnsavedChangesGuard } from '../../lib/useUnsavedChangesGuard.ts'
+import { useSectionTour } from '../onboarding/useSectionTour.ts'
 import { useClients } from '../clients/useClients.ts'
 import { useProducts } from '../products/useProducts.ts'
 import {
@@ -410,6 +411,7 @@ export function ContractsPage() {
   const { data: products } = useProducts()
   const { data: clients } = useClients()
   const [showForm, setShowForm] = useState(false)
+  useSectionTour('contracts', !isLoading)
 
   const productNames = useMemo(
     () => new Map((products ?? []).map((product) => [product.id, product.name])),
@@ -436,7 +438,9 @@ export function ContractsPage() {
     <div className="flex h-full min-h-0 flex-col">
       <div className="mb-4 flex flex-shrink-0 items-center justify-between">
         <h1 className="text-xl font-semibold">{t('title')}</h1>
-        <Button onClick={() => setShowForm(true)}>{t('newContract')}</Button>
+        <Button onClick={() => setShowForm(true)} data-tour="contracts.create">
+          {t('newContract')}
+        </Button>
       </div>
       {(search || (data?.total ?? 0) > 0) && (
         <Input
@@ -445,6 +449,7 @@ export function ContractsPage() {
           placeholder={t('searchPlaceholder')}
           className="mb-3 flex-shrink-0"
           aria-label={t('searchPlaceholder')}
+          data-tour="contracts.search"
         />
       )}
       <div className="min-h-0 flex-1 overflow-y-auto">
@@ -452,8 +457,12 @@ export function ContractsPage() {
           <p className="text-muted-foreground">{search ? t('noResults') : t('empty')}</p>
         )}
         <div className="flex flex-col gap-3">
-          {contracts?.map((contract) => (
-            <div key={contract.id} className="rounded-md border border-border p-3">
+          {contracts?.map((contract, index) => (
+            <div
+              key={contract.id}
+              className="rounded-md border border-border p-3"
+              data-tour={index === 0 ? 'contracts.card' : undefined}
+            >
               <div className="mb-2 flex items-center justify-between">
                 <div className="flex flex-col">
                   <span className="font-medium">
@@ -501,7 +510,7 @@ export function ContractsPage() {
         </div>
       </div>
       {totalPages > 1 && (
-        <div className="flex flex-shrink-0 items-center justify-between text-sm">
+        <div className="flex flex-shrink-0 items-center justify-between text-sm" data-tour="contracts.pagination">
           <Button
             type="button"
             variant="secondary"

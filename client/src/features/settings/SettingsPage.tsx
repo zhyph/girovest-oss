@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useForm, useFieldArray, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router'
 import { X } from 'lucide-react'
 import { Button } from '../../components/ui/button.tsx'
 import { PhoneInput } from '../../components/ui/phone-input.tsx'
@@ -9,6 +10,9 @@ import { Input } from '../../components/ui/input.tsx'
 import { showErrorToast, showSuccessToast } from '../../lib/toast.ts'
 import { useTheme, type ThemePreference } from '../../lib/useTheme.ts'
 import { useInstallId } from '../../lib/useInstallId.ts'
+import { TOUR_SECTIONS } from '../onboarding/sections.ts'
+import { SECTION_ROUTES } from '../onboarding/tours.ts'
+import { requestTourReplay } from '../onboarding/tourReplay.ts'
 import { locationSettingsSchema, type LocationSettingsFormValues } from './settingsSchemas.ts'
 import { useLocationSettings, useUpdateLocationSettings } from './useLocationSettings.ts'
 
@@ -16,10 +20,16 @@ const THEME_OPTIONS: ThemePreference[] = ['system', 'light', 'dark']
 
 export function SettingsPage() {
   const { t } = useTranslation('settings')
+  const navigate = useNavigate()
   const { data: settings, isLoading } = useLocationSettings()
   const updateSettings = useUpdateLocationSettings()
   const { theme, setTheme } = useTheme()
   const installId = useInstallId()
+
+  function replayTour(section: (typeof TOUR_SECTIONS)[number]) {
+    requestTourReplay(section)
+    navigate(SECTION_ROUTES[section])
+  }
 
   // navigator.clipboard is absent in insecure contexts and in some test
   // environments, and the code stays selectable on screen either way: a failure
@@ -153,6 +163,28 @@ export function SettingsPage() {
             </div>
           </div>
         )}
+        {/* Outside the <form> too: replaying a tour is an action, not a field
+            that gets saved. */}
+        <div className="mt-6 flex flex-col gap-2 border-t border-border pt-4">
+          <span className="text-sm font-medium">{t('tours.title')}</span>
+          <p className="text-sm text-muted-foreground">{t('tours.help')}</p>
+          <div className="flex flex-col gap-2">
+            {TOUR_SECTIONS.map((section) => (
+              <div key={section} className="flex items-center justify-between gap-2">
+                <span className="text-sm">{t(`common:nav.${section}`, { ns: 'common' })}</span>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => replayTour(section)}
+                  aria-label={t('tours.replayAria', { section: t(`common:nav.${section}`, { ns: 'common' }) })}
+                >
+                  {t('tours.replay')}
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   )

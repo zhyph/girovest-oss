@@ -1,0 +1,72 @@
+/* driver.js ships an unstyled-for-Tailwind, hardcoded-white popover by
+   default. This re-skins it with Girovest's existing theme tokens so it
+   matches the rest of the app and follows dark mode automatically — no
+   overlay z-index/opacity overrides needed, driver.js's own overlay
+   (z-index 10000) and popover (z-index 1000000000) already sit above every
+   Dialog/Sheet/Popover in this app (all z-50 at most). */
+
+.driver-popover {
+  background-color: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
+  font-family: inherit;
+}
+
+.driver-popover-title {
+  color: var(--popover-foreground);
+  font-size: 1rem;
+}
+
+.driver-popover-description {
+  color: var(--muted-foreground);
+}
+
+.driver-popover-progress-text {
+  color: var(--muted-foreground);
+}
+
+.driver-popover-close-btn {
+  color: var(--muted-foreground);
+}
+
+.driver-popover-close-btn:hover,
+.driver-popover-close-btn:focus {
+  color: var(--popover-foreground);
+}
+
+.driver-popover-footer-btn {
+  background-color: var(--secondary);
+  color: var(--secondary-foreground);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius-md) - 2px);
+}
+
+.driver-popover-footer-btn:hover,
+.driver-popover-footer-btn:focus {
+  background-color: var(--muted);
+}
+
+.driver-popover-next-btn {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+  border-color: var(--primary);
+}
+
+/* Only the one visible (non-transparent) longhand per side is overridden
+   here, matching driver.css's own per-side selectors exactly — a blanket
+   `border-color` override would also clobber the transparent sides that
+   give the arrow its triangular shape. */
+.driver-popover-arrow-side-left {
+  border-left-color: var(--popover);
+}
+.driver-popover-arrow-side-right {
+  border-right-color: var(--popover);
+}
+.driver-popover-arrow-side-top {
+  border-top-color: var(--popover);
+}
+.driver-popover-arrow-side-bottom {
+  border-bottom-color: var(--popover);
+}

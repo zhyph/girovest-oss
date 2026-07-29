@@ -25,5 +25,11 @@
     "copy": "Copiar",
     "copied": "Identificador copiado."
   },
-  "maintenanceBufferHelp": "Dias em que a peça fica indisponível depois de voltar, para limpeza e reparos, antes de sair para o próximo cliente. Use 0 para liberar já no dia seguinte à devolução."
+  "maintenanceBufferHelp": "Dias em que a peça fica indisponível depois de voltar, para limpeza e reparos, antes de sair para o próximo cliente. Use 0 para liberar já no dia seguinte à devolução.",
+  "tours": {
+    "title": "Tours guiados",
+    "help": "Reveja as explicações passo a passo de cada tela sempre que precisar se lembrar de como algo funciona.",
+    "replay": "Rever",
+    "replayAria": "Rever tour de {{section}}"
+  }
 }
