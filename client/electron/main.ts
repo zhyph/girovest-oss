@@ -50,6 +50,14 @@ export function resolveProductPhotosDir(userDataPath: string): string {
   return path.join(userDataPath, 'product-photos')
 }
 
+// Presence-only marker: written once a machine has actually crash-looped
+// (see recordCrashAndCheckLoop), read at next launch to decide whether to
+// call app.disableHardwareAcceleration(). Deliberately per-machine and
+// evidence-based rather than a blanket default off for every install.
+export function resolveGpuDisableFlagPath(userDataPath: string): string {
+  return path.join(userDataPath, 'gpu-disabled')
+}
+
 // Same split as resolveServerEntry, for the migration step: dev runs the tsc
 // output, packaged builds run the esbuild bundle sitting next to
 // server-bundle.mjs. Replaces the Prisma CLI (`prisma migrate deploy`) — see
@@ -209,13 +217,22 @@ function attachConsoleLogging(win: BrowserWindow): void {
     if (details.reason === 'clean-exit') return
 
     if (recordCrashAndCheckLoop(crashTimestamps, Date.now())) {
+      // Best-effort: if this can't be written, the relaunch just retries
+      // with GPU acceleration still on and may crash-loop again -- no worse
+      // than today's behavior, just not self-healing this time.
+      try {
+        fs.writeFileSync(resolveGpuDisableFlagPath(app.getPath('userData')), '')
+      } catch (error) {
+        void logError('Failed to write GPU-disable flag:', error)
+      }
       dialog.showErrorBox(
         'Girovest Crashed Repeatedly',
-        'The application keeps crashing and will now close. Please reopen Girovest; contact support if this keeps happening.',
+        'The application kept crashing and will now restart in a compatibility mode.\n\nContact support if this keeps happening.',
       )
       isShuttingDown = true
       serverProcess?.kill()
-      app.quit()
+      app.relaunch()
+      app.exit(0)
       return
     }
 
@@ -418,14 +435,16 @@ if (app) {
   // directory (girovest-client instead of girovest).
   app.setName('girovest')
 
-  // Must also run before whenReady(): Electron only accepts this call while
-  // the app isn't ready yet. A crashed renderer process (see the
-  // 'render-process-gone' handler in attachConsoleLogging) with no further
-  // detail is, in practice, most often a GPU/graphics-driver problem on the
-  // shop's own machine -- the app has no content that benefits from GPU
-  // rendering, so trading a little rendering performance to remove that
-  // whole crash class is a clear win.
-  app.disableHardwareAcceleration()
+  // Left on by default: most machines render fine with GPU acceleration, and
+  // disabling it for everyone costs smoothness for a problem most installs
+  // never have. Only a machine that has actually crash-looped (see
+  // recordCrashAndCheckLoop below) gets this -- that run persists the flag
+  // file and relaunches, and disableHardwareAcceleration only takes effect
+  // for a NEW process, so this check has to run this early, before
+  // whenReady(), to catch that relaunch.
+  if (fs.existsSync(resolveGpuDisableFlagPath(app.getPath('userData')))) {
+    app.disableHardwareAcceleration()
+  }
 
   // Keep native chrome (menus, dialogs, and the window backgroundColor
   // above for windows created later) in step with the in-app theme choice.

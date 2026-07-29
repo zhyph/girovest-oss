@@ -10,6 +10,7 @@ import {
   resolveJwtSecret,
   resolveDatabaseUrl,
   resolveProductPhotosDir,
+  resolveGpuDisableFlagPath,
   resolveMigrateEntry,
   cleanupLegacyServerRuntime,
   waitForPortFree,
@@ -88,6 +89,13 @@ describe('resolveDatabaseUrl', () => {
   it('builds a file: URL pointing at dev.db inside the given directory', () => {
     const userDataPath = '/home/user/.config/girovest'
     expect(resolveDatabaseUrl(userDataPath)).toBe(`file:${path.join(userDataPath, 'dev.db')}`)
+  })
+})
+
+describe('resolveGpuDisableFlagPath', () => {
+  it('builds a path to a gpu-disabled marker inside the given directory', () => {
+    const userDataPath = '/home/user/.config/girovest'
+    expect(resolveGpuDisableFlagPath(userDataPath)).toBe(path.join(userDataPath, 'gpu-disabled'))
   })
 })
 
