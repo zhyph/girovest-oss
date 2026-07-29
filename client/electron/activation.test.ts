@@ -7,6 +7,7 @@ import {
   ensureActivated,
   readStoredToken,
   requestActivation,
+  resolveHostname,
   storeToken,
   tokenPath,
   verifyActivationToken,
@@ -123,9 +124,13 @@ describe('requestActivation', () => {
     return vi.fn(async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch
   }
 
+  // hostname is passed explicitly (null) throughout so these stay hermetic:
+  // without it, the default resolveHostname() would read the real machine
+  // running the suite, which the assertions below never need.
+
   it('returns the token on 200', async () => {
     const token = mint(INSTALL, MACHINE)
-    const result = await requestActivation(endpoint, INSTALL, MACHINE, fakeFetch(200, { token }))
+    const result = await requestActivation(endpoint, INSTALL, MACHINE, fakeFetch(200, { token }), null)
     expect(result).toEqual({ result: { state: 'activated' }, token })
   })
 
@@ -135,6 +140,7 @@ describe('requestActivation', () => {
       INSTALL,
       MACHINE,
       fakeFetch(202, { status: 'pending', code: 'B2A4F6C8' }),
+      null,
     )
     expect(result.result).toEqual({ state: 'pending', code: 'B2A4F6C8' })
   })
@@ -145,6 +151,7 @@ describe('requestActivation', () => {
       INSTALL,
       MACHINE,
       fakeFetch(403, { reason: 'machine_mismatch' }),
+      null,
     )
     expect(result.result).toEqual({ state: 'refused', reason: 'machine_mismatch' })
   })
@@ -152,7 +159,7 @@ describe('requestActivation', () => {
   it('503 becomes unreachable, not a refusal', async () => {
     // A server with no signing key is the owner's problem, not the shop's: the
     // app retries instead of showing "access denied".
-    const result = await requestActivation(endpoint, INSTALL, MACHINE, fakeFetch(503, {}))
+    const result = await requestActivation(endpoint, INSTALL, MACHINE, fakeFetch(503, {}), null)
     expect(result.result).toEqual({ state: 'unreachable' })
   })
 
@@ -160,16 +167,52 @@ describe('requestActivation', () => {
     const boom = vi.fn(async () => {
       throw new Error('offline')
     }) as unknown as typeof fetch
-    const result = await requestActivation(endpoint, INSTALL, MACHINE, boom)
+    const result = await requestActivation(endpoint, INSTALL, MACHINE, boom, null)
     expect(result.result).toEqual({ state: 'unreachable' })
   })
 
   it('does not double the slash when building the URL', async () => {
     const spy = fakeFetch(200, { token: mint(INSTALL, MACHINE) })
-    await requestActivation(endpoint, INSTALL, MACHINE, spy)
+    await requestActivation(endpoint, INSTALL, MACHINE, spy, null)
     expect((spy as unknown as { mock: { calls: unknown[][] } }).mock.calls[0]?.[0]).toBe(
       'https://proxy.exemplo/activate',
     )
+  })
+
+  it('sends the hostname alongside installId and machineHash', async () => {
+    const spy = fakeFetch(200, { token: mint(INSTALL, MACHINE) })
+    await requestActivation(endpoint, INSTALL, MACHINE, spy, 'CAIXA-02')
+    const call = (spy as unknown as { mock: { calls: unknown[][] } }).mock.calls[0]
+    const sent = JSON.parse((call?.[1] as RequestInit).body as string)
+    expect(sent).toEqual({ installId: INSTALL, machineHash: MACHINE, hostname: 'CAIXA-02' })
+  })
+
+  it('defaults to the real machine hostname when none is given', async () => {
+    const spy = fakeFetch(200, { token: mint(INSTALL, MACHINE) })
+    await requestActivation(endpoint, INSTALL, MACHINE, spy)
+    const call = (spy as unknown as { mock: { calls: unknown[][] } }).mock.calls[0]
+    const sent = JSON.parse((call?.[1] as RequestInit).body as string)
+    expect(sent.hostname).toBe(os.hostname())
+  })
+})
+
+describe('resolveHostname', () => {
+  it('returns the OS hostname', () => {
+    expect(resolveHostname()).toBe(os.hostname())
+  })
+
+  it('degrades to null rather than throwing when the OS call fails', () => {
+    const spy = vi.spyOn(os, 'hostname').mockImplementation(() => {
+      throw new Error('no hostname source')
+    })
+    expect(resolveHostname()).toBeNull()
+    spy.mockRestore()
+  })
+
+  it('treats a blank hostname as absent', () => {
+    const spy = vi.spyOn(os, 'hostname').mockReturnValue('   ')
+    expect(resolveHostname()).toBeNull()
+    spy.mockRestore()
   })
 })
 

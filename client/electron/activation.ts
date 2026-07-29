@@ -1,5 +1,6 @@
 import { createPublicKey, verify } from 'node:crypto'
 import fs from 'fs'
+import os from 'node:os'
 import path from 'path'
 
 /**
@@ -110,6 +111,24 @@ export interface ActivationEndpoint {
 type FetchLike = typeof globalThis.fetch
 
 /**
+ * The computer's own network hostname (e.g. "CAIXA-02"), sent alongside the
+ * activation request so the shop can tell machines apart in the admin panel
+ * when several share one product key. Unlike machineHash (see machineId.ts)
+ * this is plain text, not a hash: it is display-only, never part of what the
+ * signature binds, and there is nothing to keep private about a hostname.
+ * Best-effort like everything else here -- a shop whose hostname lookup fails
+ * for some OS-specific reason still gets to activate, just without a label.
+ */
+export function resolveHostname(): string | null {
+  try {
+    const value = os.hostname().trim()
+    return value === '' ? null : value
+  } catch {
+    return null
+  }
+}
+
+/**
  * Asks the server to activate. Only called when the local token doesn't serve.
  *
  * 202 means "pending", not an error: the owner is still going to approve it in
@@ -123,6 +142,7 @@ export async function requestActivation(
   installId: string,
   machineHash: string,
   fetchImpl: FetchLike = globalThis.fetch,
+  hostname: string | null = resolveHostname(),
 ): Promise<{ readonly result: ActivationState; readonly token?: string }> {
   let response: Response
   try {
@@ -132,7 +152,7 @@ export async function requestActivation(
         authorization: `Bearer ${endpoint.productKey}`,
         'content-type': 'application/json',
       },
-      body: JSON.stringify({ installId, machineHash }),
+      body: JSON.stringify({ installId, machineHash, hostname }),
     })
   } catch {
     return { result: { state: 'unreachable' } }
