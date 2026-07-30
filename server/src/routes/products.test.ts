@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import request from 'supertest'
 import fs from 'fs'
 import os from 'os'
@@ -7,6 +7,16 @@ import { app } from '../app.js'
 import { prisma } from '../db/client.js'
 import jwt from 'jsonwebtoken'
 import { SESSION_TTL_SECONDS, signStaffToken } from '../auth/jwt.js'
+
+// Real openRelayConnection() opens an actual outbound WebSocket to
+// credentials.url, which in relay-mode tests below is a fake host —
+// stubbed so the route test never makes a real network connection.
+vi.mock('../network/relayClient.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../network/relayClient.js')>()
+  return { ...actual, openRelayConnection: vi.fn(() => ({ close: vi.fn(), opened: Promise.resolve(true) })) }
+})
+
+const RELAY_ENV_KEYS = ['GIROVEST_UPDATE_URL', 'GIROVEST_UPDATE_KEY', 'GIROVEST_INSTALL_ID'] as const
 
 let locationId: string
 let staffToken: string
@@ -47,6 +57,7 @@ afterEach(async () => {
   await prisma.product.deleteMany()
   await prisma.staff.deleteMany()
   await prisma.location.deleteMany()
+  for (const key of RELAY_ENV_KEYS) delete process.env[key]
 })
 
 describe('POST /api/products/photo-session', () => {
@@ -60,6 +71,59 @@ describe('POST /api/products/photo-session', () => {
   it('requires authentication', async () => {
     const response = await request(app).post('/api/products/photo-session')
     expect(response.status).toBe(401)
+  })
+
+  it('returns LAN-mode candidates/port when connectivityMode is lan (default)', async () => {
+    const response = await request(app).post('/api/products/photo-session').set('Authorization', `Bearer ${staffToken}`)
+    expect(response.status).toBe(201)
+    expect(response.body.mode).toBe('lan')
+    expect(response.body.relayUrl).toBeUndefined()
+  })
+
+  it('returns a relayUrl instead of LAN candidates when connectivityMode is relay', async () => {
+    await prisma.location.update({ where: { id: locationId }, data: { connectivityMode: 'relay' } })
+    process.env.GIROVEST_UPDATE_URL = 'https://girovest-update-proxy.workers.dev'
+    process.env.GIROVEST_UPDATE_KEY = 'test-key'
+    process.env.GIROVEST_INSTALL_ID = 'test-install'
+
+    const response = await request(app).post('/api/products/photo-session').set('Authorization', `Bearer ${staffToken}`)
+
+    expect(response.status).toBe(201)
+    expect(response.body.mode).toBe('relay')
+    expect(response.body.relayUrl).toBe(`https://girovest-update-proxy.workers.dev/relay/${response.body.token}/photos`)
+    expect(response.body.relayUnavailable).toBeUndefined()
+    expect(response.body.candidates).toBeUndefined()
+    expect(response.body.port).toBeUndefined()
+  })
+
+  // Without this the desktop showed a perfectly normal QR code that could only
+  // ever produce a 504 on the phone ten seconds after scanning.
+  it('reports relayUnavailable (and closes the socket) when the relay never connects', async () => {
+    await prisma.location.update({ where: { id: locationId }, data: { connectivityMode: 'relay' } })
+    process.env.GIROVEST_UPDATE_URL = 'https://girovest-update-proxy.workers.dev'
+    process.env.GIROVEST_UPDATE_KEY = 'test-key'
+    process.env.GIROVEST_INSTALL_ID = 'test-install'
+    const { openRelayConnection } = await import('../network/relayClient.js')
+    const close = vi.fn()
+    ;(openRelayConnection as ReturnType<typeof vi.fn>).mockReturnValueOnce({ close, opened: Promise.resolve(false) })
+
+    const response = await request(app).post('/api/products/photo-session').set('Authorization', `Bearer ${staffToken}`)
+
+    expect(response.status).toBe(201)
+    expect(response.body.mode).toBe('relay')
+    expect(response.body.relayUnavailable).toBe(true)
+    expect(response.body.relayUrl).toBeUndefined()
+    expect(close).toHaveBeenCalledTimes(1)
+  })
+
+  it('falls back to LAN mode when connectivityMode is relay but credentials are not configured', async () => {
+    await prisma.location.update({ where: { id: locationId }, data: { connectivityMode: 'relay' } })
+
+    const response = await request(app).post('/api/products/photo-session').set('Authorization', `Bearer ${staffToken}`)
+
+    expect(response.status).toBe(201)
+    expect(response.body.mode).toBe('lan')
+    expect(response.body.relayUrl).toBeUndefined()
   })
 })
 

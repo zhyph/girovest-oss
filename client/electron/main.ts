@@ -269,6 +269,9 @@ async function startServer(): Promise<string | null> {
     PRODUCT_PHOTOS_DIR: resolveProductPhotosDir(userDataPath),
     HOST: '127.0.0.1',
     PORT: '3000',
+    GIROVEST_UPDATE_URL: GIROVEST_UPDATE_URL || '',
+    GIROVEST_UPDATE_KEY: GIROVEST_UPDATE_KEY || '',
+    GIROVEST_INSTALL_ID: resolveInstallId(userDataPath),
   }
 
   try {

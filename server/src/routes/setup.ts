@@ -16,6 +16,9 @@ const completeSetupSchema = z.object({
   ownerName: z.string().min(1),
   ownerLogin: z.string().min(1),
   ownerPassword: z.string().min(8),
+  // Optional so an older client's wizard payload still validates; the
+  // service then falls back to the schema default ('lan').
+  connectivityMode: z.enum(['lan', 'relay']).optional(),
 })
 
 setupRouter.post('/', async (req, res) => {

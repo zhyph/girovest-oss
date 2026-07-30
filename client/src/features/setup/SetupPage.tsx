@@ -24,7 +24,18 @@ export function SetupPage() {
     formState: { errors },
   } = useForm<SetupFormValues>({
     resolver: zodResolver(setupSchema),
-    defaultValues: { shopName: '', shopAddress: '', ownerName: '', ownerLogin: '', ownerPassword: '' },
+    // connectivityMode defaults to relay: a fresh install choosing this
+    // wizard's defaults must work at a shop with no shared Wi-Fi — the LAN
+    // mode's QR codes are exactly what breaks there, and an existing install
+    // is never shown this wizard (its stored setting stays untouched).
+    defaultValues: {
+      shopName: '',
+      shopAddress: '',
+      ownerName: '',
+      ownerLogin: '',
+      ownerPassword: '',
+      connectivityMode: 'relay',
+    },
   })
 
   async function onSubmit(values: SetupFormValues) {
@@ -133,6 +144,20 @@ export function SetupPage() {
                     {t('setup:validation.ownerPasswordTooShort')}
                   </span>
                 )}
+              </label>
+            </fieldset>
+            <fieldset className="flex flex-col gap-3 border-t border-border pt-4">
+              <legend className="mb-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                {t('setup:sections.connectivity')}
+              </legend>
+              <p className="text-xs text-muted-foreground">{t('setup:connectivityHint')}</p>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="radio" value="relay" {...register('connectivityMode')} />
+                {t('setup:connectivityOptions.relay')}
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="radio" value="lan" {...register('connectivityMode')} />
+                {t('setup:connectivityOptions.lan')}
               </label>
             </fieldset>
             {errorCode && (

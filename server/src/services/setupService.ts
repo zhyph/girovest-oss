@@ -10,6 +10,9 @@ export interface CompleteSetupInput {
   ownerName: string
   ownerLogin: string
   ownerPassword: string
+  // Optional for older clients whose wizard predates the choice; those keep
+  // the schema default ('lan'), same as every pre-upgrade install.
+  connectivityMode?: 'lan' | 'relay'
 }
 
 export async function needsSetup(): Promise<boolean> {
@@ -28,6 +31,7 @@ export async function completeSetup(
     data: {
       name: input.shopName,
       address: input.shopAddress,
+      connectivityMode: input.connectivityMode ?? 'lan',
       contractClauses: {
         create: DEFAULT_CONTRACT_CLAUSES.map((text, index) => ({ text, sortOrder: index })),
       },

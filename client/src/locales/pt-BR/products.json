@@ -50,9 +50,12 @@
     "regenerate": "Gerar novo código",
     "qrAlt": "Código QR para envio de fotos",
     "noLan": "Nenhuma rede local detectada. Não é possível enviar fotos remotamente neste momento.",
+    "noConnection": "Sem conexão com o serviço de envio de fotos. Verifique a internet da loja e tente novamente.",
     "pickNetwork": "Rede",
     "waiting": "Feche esta janela quando terminar de enviar fotos.",
     "expired": "Código expirado.",
-    "close": "Fechar"
+    "close": "Fechar",
+    "generating": "Gerando código...",
+    "issueFailed": "Não foi possível gerar o código. Tente novamente."
   }
 }

@@ -5,6 +5,7 @@ export const clauseSchema = z.object({ text: z.string().min(1) })
 export const locationSettingsSchema = z.object({
   phone: z.string(),
   maintenanceBufferDays: z.number().int().min(0).max(60),
+  connectivityMode: z.enum(['lan', 'relay']),
   clauses: z.array(clauseSchema),
 })
 
@@ -21,5 +22,6 @@ export interface LocationSettings {
   name: string
   phone: string | null
   maintenanceBufferDays: number
+  connectivityMode: 'lan' | 'relay'
   clauses: Clause[]
 }

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest'
 import request from 'supertest'
 import { app } from '../app.js'
 import { prisma } from '../db/client.js'
@@ -92,6 +92,56 @@ describe('POST /api/setup', () => {
 
   it('rejects an incomplete payload with VALIDATION_ERROR', async () => {
     const response = await request(app).post('/api/setup').send({ shopName: 'Loja' })
+    expect(response.status).toBe(400)
+    expect(response.body.code).toBe('VALIDATION_ERROR')
+  })
+})
+
+// The wizard's connectivity choice: a fresh install at a shop without shared
+// Wi-Fi must be able to start in relay mode from day one instead of first
+// generating dead LAN QR codes and hunting for the Settings radio.
+describe('POST /api/setup connectivityMode', () => {
+  const basePayload = {
+    shopName: 'Loja Nova',
+    shopAddress: 'Rua Nova, 100',
+    ownerName: 'Dona Ana',
+    ownerLogin: 'dona-ana',
+    ownerPassword: 'fake-password-1234',
+  }
+
+  beforeEach(async () => {
+    await prisma.staff.deleteMany()
+    await prisma.location.deleteMany()
+  })
+
+  afterAll(async () => {
+    await prisma.staff.deleteMany()
+    await prisma.location.deleteMany()
+  })
+
+  it('stores the chosen connectivityMode on the new location', async () => {
+    const response = await request(app)
+      .post('/api/setup')
+      .send({ ...basePayload, connectivityMode: 'relay' })
+
+    expect(response.status).toBe(201)
+    const location = await prisma.location.findUnique({ where: { id: response.body.locationId } })
+    expect(location?.connectivityMode).toBe('relay')
+  })
+
+  it('defaults to lan when the payload does not mention connectivity (an older client)', async () => {
+    const response = await request(app).post('/api/setup').send(basePayload)
+
+    expect(response.status).toBe(201)
+    const location = await prisma.location.findUnique({ where: { id: response.body.locationId } })
+    expect(location?.connectivityMode).toBe('lan')
+  })
+
+  it('rejects an unknown connectivityMode value', async () => {
+    const response = await request(app)
+      .post('/api/setup')
+      .send({ ...basePayload, connectivityMode: 'carrier-pigeon' })
+
     expect(response.status).toBe(400)
     expect(response.body.code).toBe('VALIDATION_ERROR')
   })

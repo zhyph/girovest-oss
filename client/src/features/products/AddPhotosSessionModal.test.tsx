@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import '../../i18n.ts'
@@ -10,6 +10,7 @@ import type { PhotoTokenResponse } from './productSchemas.ts'
 const tokenResponse: PhotoTokenResponse = {
   token: 'abc123',
   expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+  mode: 'lan',
   port: 3000,
   candidates: [{ interfaceName: 'wlan0', address: '192.168.1.42' }],
 }
@@ -63,6 +64,40 @@ describe('AddPhotosSessionModal', () => {
     renderWithProviders(<AddPhotosSessionModal open onClose={vi.fn()} />)
 
     await waitFor(() => expect(screen.getByLabelText('Rede')).toBeInTheDocument())
+  })
+
+  it('shows the no-connection message and a retry action when the relay never connected', async () => {
+    mockHooks({
+      issueImpl: vi.fn().mockResolvedValue({
+        token: 'abc123',
+        expiresAt: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString(),
+        mode: 'relay',
+        relayUnavailable: true,
+      }),
+    })
+
+    renderWithProviders(<AddPhotosSessionModal open onClose={vi.fn()} />)
+
+    await waitFor(() => expect(screen.getByText(/Sem conexão com o serviço de envio de fotos/)).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: 'Gerar novo código' })).toBeInTheDocument()
+    expect(screen.queryByRole('img', { name: /qr/i })).not.toBeInTheDocument()
+  })
+
+  it('renders the QR from relayUrl directly, with no network picker, when mode is relay', async () => {
+    mockHooks({
+      issueImpl: vi.fn().mockResolvedValue({
+        token: 'abc123',
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        mode: 'relay',
+        relayUrl: 'https://relay.example/relay/abc123/photos',
+      }),
+    })
+
+    renderWithProviders(<AddPhotosSessionModal open onClose={vi.fn()} />)
+
+    await waitFor(() => expect(screen.getByRole('img', { name: /qr/i })).toBeInTheDocument())
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Rede')).not.toBeInTheDocument()
   })
 
   it('shows a regenerate action', async () => {
@@ -120,6 +155,23 @@ describe('AddPhotosSessionModal', () => {
     await waitFor(() => expect(img.getAttribute('src')).not.toBe(firstSrc))
   })
 
+  it('shows a loading indicator while the token is being issued', async () => {
+    mockHooks({ issueImpl: () => new Promise<PhotoTokenResponse>(() => {}) })
+
+    renderWithProviders(<AddPhotosSessionModal open onClose={vi.fn()} />)
+
+    await waitFor(() => expect(screen.getByText('Gerando código...')).toBeInTheDocument())
+  })
+
+  it('offers a retry when issuing the token itself rejects', async () => {
+    mockHooks({ issueImpl: () => Promise.reject(new Error('network error')) })
+
+    renderWithProviders(<AddPhotosSessionModal open onClose={vi.fn()} />)
+
+    await waitFor(() => expect(screen.getByText('Não foi possível gerar o código. Tente novamente.')).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: 'Gerar novo código' })).toBeInTheDocument()
+  })
+
   it('calls onClose when the close button is clicked', async () => {
     const onClose = vi.fn()
     renderWithProviders(<AddPhotosSessionModal open onClose={onClose} />)
@@ -127,5 +179,50 @@ describe('AddPhotosSessionModal', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Fechar' }))
 
     expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  // Relay issuance can block server-side for up to 4s (the handshake wait),
+  // so a close-and-reopen realistically leaves the FIRST issuance resolving
+  // after the second. A stale response landing last must not overwrite the
+  // live session's state with a dead QR or a spurious "Sem conexão".
+  it('ignores a stale issuance response that resolves after the modal was reopened', async () => {
+    let resolveStale!: (response: PhotoTokenResponse) => void
+    const issueImpl = vi
+      .fn()
+      .mockImplementationOnce(() => new Promise<PhotoTokenResponse>((resolve) => (resolveStale = resolve)))
+      .mockResolvedValueOnce({
+        token: 'fresh',
+        expiresAt: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString(),
+        mode: 'relay',
+        relayUrl: 'https://relay.example/relay/fresh/photos',
+      })
+    mockHooks({ issueImpl })
+
+    const queryClient = new QueryClient()
+    const view = (open: boolean) => (
+      <QueryClientProvider client={queryClient}>
+        <AddPhotosSessionModal open={open} onClose={vi.fn()} />
+      </QueryClientProvider>
+    )
+    const { rerender } = render(view(true))
+    await waitFor(() => expect(issueImpl).toHaveBeenCalledTimes(1))
+
+    rerender(view(false))
+    rerender(view(true))
+    await waitFor(() => expect(issueImpl).toHaveBeenCalledTimes(2))
+    await screen.findByRole('img', { name: /qr/i })
+
+    await act(async () => {
+      resolveStale({
+        token: 'stale',
+        expiresAt: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString(),
+        mode: 'relay',
+        relayUnavailable: true,
+      })
+      await Promise.resolve()
+    })
+
+    expect(screen.queryByText(/Sem conexão com o serviço de envio de fotos/)).not.toBeInTheDocument()
+    expect(screen.getByRole('img', { name: /qr/i })).toBeInTheDocument()
   })
 })

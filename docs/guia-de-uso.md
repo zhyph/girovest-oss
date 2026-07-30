@@ -16,7 +16,7 @@ O Girovest existe em duas formas, com as mesmas telas e os mesmos recursos:
 Importante saber:
 
 - As duas versões **não compartilham dados entre si**. O que você cadastra no computador da loja fica no computador da loja; o que cadastra no site fica no site. Escolha uma como a "oficial" e use sempre ela.
-- Os recursos que usam o celular (enviar fotos de produtos e colher assinatura pelo código QR) funcionam **no aplicativo instalado no computador**, com o celular na mesma rede Wi-Fi da loja. Na versão pelo navegador esses recursos mostram o aviso "Nenhuma rede local detectada." (veja a seção 10).
+- Os recursos que usam o celular (enviar fotos de produtos e colher assinatura pelo código QR) funcionam **no aplicativo instalado no computador**. Como o celular alcança o computador depende da opção **"Conectividade"** (seção 9): em **"Internet"**, qualquer conexão do celular serve, inclusive dados móveis (4G/5G); em **"Rede local compartilhada"**, o celular precisa estar na mesma rede Wi-Fi da loja. Na versão pelo navegador esses recursos mostram o aviso "Nenhuma rede local detectada." (veja a seção 10).
 - O aplicativo do computador **se atualiza sozinho** (veja a seção 11). O site já abre sempre na versão mais nova.
 
 ---
@@ -29,7 +29,8 @@ Na primeira vez que o Girovest abre, ele mostra a tela **"Configurar loja"**, co
 
 1. Na seção **"Sobre a loja"**, preencha **"Nome da loja"** e **"Endereço"**. Esses dados aparecem no topo dos contratos impressos.
 2. Na seção **"Sua conta"**, preencha **"Seu nome"**, **"Usuário"** e **"Senha"**. A senha precisa ter pelo menos 8 caracteres (se for mais curta, aparece "Senha deve ter pelo menos 8 caracteres").
-3. Clique em **"Criar loja"**.
+3. Na seção **"Conectividade"**, escolha como o celular vai alcançar este computador nos recursos por código QR (fotos e assinatura): **"Internet"** (já vem marcada; o celular usa a própria conexão, inclusive dados móveis) ou **"Rede local compartilhada"** (o celular precisa estar no mesmo Wi-Fi da loja). Dá para mudar depois em Configurações (seção 9).
+4. Clique em **"Criar loja"**.
 
 O aplicativo entra sozinho na sua conta, mostra a mensagem `Loja "..." criada. Bem-vinda!` e abre o **Painel**.
 
@@ -159,7 +160,7 @@ Há dois jeitos de colocar fotos em um produto:
 
 1. Na tela de Produtos, clique em **"Adicionar fotos remotamente"**.
 2. Abre a janela **"Fotos remotas"** com um código QR e a instrução "Escaneie o código com o celular para escolher ou cadastrar um produto e enviar fotos."
-3. Com o celular **na mesma rede Wi-Fi do computador**, aponte a câmera para o código. Abre uma página com o título "Selecione um produto", uma busca ("Buscar por nome, categoria ou cor...") e o botão **"+ Cadastrar nova peça"**.
+3. Aponte a câmera do celular para o código (em modo **"Internet"**, qualquer conexão do celular serve; em modo **"Rede local compartilhada"**, o celular precisa estar no mesmo Wi-Fi do computador — veja a seção 10). Abre uma página com o título "Selecione um produto", uma busca ("Buscar por nome, categoria ou cor...") e o botão **"+ Cadastrar nova peça"**.
 4. Toque na peça que quer fotografar. Se ela ainda não estiver cadastrada, você pode cadastrá-la ali mesmo pelo celular (veja "Cadastrar a peça pelo próprio celular", logo abaixo). Na tela seguinte:
    - **"Tirar Foto"** (botão com a câmera): abre a câmera e tira uma foto por vez; toque de novo para cada foto.
    - **"Escolher da Galeria"**: pega várias fotos de uma vez das que já estão no celular.
@@ -180,7 +181,7 @@ Se a peça chegou agora na loja e ainda não está no sistema, não precisa ir a
 4. Em **"Preço do aluguel"** e **"Caução"**, digite só os números, igualzinho ao computador: o valor entra a partir dos centavos (digitando 15000, o campo mostra R$ 150,00).
 5. Toque em **"Cadastrar e tirar fotos"**. A peça é cadastrada e o celular já abre direto a tela de fotos dela: é só seguir com **"Tirar Foto"** ou **"Escolher da Galeria"** e depois **"Enviar"**.
 
-Se aparecer "Erro ao cadastrar. Tente novamente.", verifique o Wi-Fi e toque de novo. Para desistir do cadastro e voltar à lista de peças, toque em **"← Voltar"**.
+Se aparecer "Erro ao cadastrar. Tente novamente.", verifique a conexão do celular e toque de novo. Para desistir do cadastro e voltar à lista de peças, toque em **"← Voltar"**.
 
 A peça cadastrada pelo celular **aparece sozinha na lista do computador**, sem precisar recarregar. A Descrição e o Status não são pedidos no celular; se quiser completar esses campos, é só abrir a peça depois no computador.
 
@@ -237,7 +238,7 @@ Há um caso em que a retirada adiantada **não** é liberada: quando a mesma pe�
 ### Assinatura do cliente pelo celular
 
 1. No cartão do contrato, clique em **"Assinar remotamente"**.
-2. Abre a janela **"Assinatura remota"**: "Peça ao cliente para escanear o código com o celular." O celular do cliente precisa estar na mesma rede Wi-Fi da loja.
+2. Abre a janela **"Assinatura remota"**: "Peça ao cliente para escanear o código com o celular." Em modo **"Internet"**, o celular do cliente usa a própria conexão (os dados móveis dele servem); em modo **"Rede local compartilhada"**, ele precisa estar na mesma rede Wi-Fi da loja.
 3. No celular abre a página **"Assinatura do Contrato"**: o cliente assina com o dedo na tela. Se errar, toca em **"Limpar"**; quando estiver boa, toca em **"Enviar"**. Aparece "Assinatura enviada! Pode devolver o aparelho à loja."
 4. No computador, a janela mostra "Aguardando assinatura..." e muda sozinha para "Assinado com sucesso!" em poucos segundos. Clique em **"Fechar"**.
 
@@ -300,8 +301,9 @@ Em **"Configurações"** você encontra:
 - **"Telefone"**: o telefone da loja, com a formatação automática (DD) NNNNN-NNNN. Ele sai no cabeçalho do contrato impresso.
 - **"Cláusulas do Contrato"**: uma caixa de texto para cada cláusula. **"Adicionar cláusula"** cria uma nova; o **X** remove. Essas cláusulas saem em todos os contratos impressos, na seção "Termos e Condições".
 - **"Tours guiados"**: um botão **"Rever"** para cada tela (Painel, Clientes, Produtos, Contratos) — veja a seção 3.
+- **"Conectividade"**: como o celular alcança este computador nos recursos por código QR (fotos e assinatura). **"Internet"**: o celular usa a própria conexão, inclusive dados móveis — é a opção certa quando a loja não tem um Wi-Fi compartilhado entre o computador e os celulares. **"Rede local compartilhada"**: o celular precisa estar no mesmo Wi-Fi do computador, e nada passa pela internet. A troca vale para os próximos códigos gerados; um código já aberto no celular continua funcionando até vencer.
 
-Clique em **"Salvar"** para gravar o telefone e as cláusulas. Aparece a confirmação "Configurações salvas."
+Clique em **"Salvar"** para gravar o telefone, as cláusulas e a conectividade. Aparece a confirmação "Configurações salvas."
 
 > O nome e o endereço da loja são definidos na configuração inicial (seção 2) e não são editados nesta tela.
 
@@ -314,12 +316,11 @@ Clique em **"Salvar"** para gravar o telefone e as cláusulas. Aparece a confirm
   1. **Fotos de produtos** (seção 6): qualquer celular da loja, código vale 12 horas. Pelo celular dá para escolher uma peça já cadastrada ou cadastrar uma peça nova na hora, com **"+ Cadastrar nova peça"**.
   2. **Assinatura do cliente** (seção 7): o celular do cliente ou da loja, código vale 15 minutos e uma única vez.
 
-**Requisitos de rede:**
+**Requisitos de rede** (conforme a opção **"Conectividade"** da seção 9):
 
-- O celular precisa estar **na mesma rede Wi-Fi** do computador da loja. Dados móveis (4G/5G) não funcionam para isso.
-- Nada disso passa pela internet: a conexão acontece só dentro da rede da loja.
-- Esses dois recursos por QR funcionam no **aplicativo instalado no computador**. Na versão pelo navegador, as janelas mostram "Nenhuma rede local detectada." e o recurso fica indisponível.
-- Se o computador estiver ligado em mais de uma rede, aparece o seletor **"Rede"** na janela do código; escolha a mesma rede em que o celular está.
+- Em **"Internet"** (o padrão para lojas novas): o celular usa a própria conexão — Wi-Fi ou dados móveis (4G/5G), qualquer uma serve. O código QR aponta para um endereço seguro na internet que repassa cada envio direto para o computador da loja; as fotos e a assinatura **não ficam guardadas** nesse endereço. O computador da loja precisa estar ligado e com internet.
+- Em **"Rede local compartilhada"**: o celular precisa estar **na mesma rede Wi-Fi** do computador da loja — dados móveis não funcionam — e nada passa pela internet: a conexão acontece só dentro da rede da loja. Se o computador estiver ligado em mais de uma rede, aparece o seletor **"Rede"** na janela do código; escolha a mesma rede em que o celular está.
+- Nos dois modos, esses recursos por QR funcionam no **aplicativo instalado no computador**. Na versão pelo navegador, as janelas mostram "Nenhuma rede local detectada." e o recurso fica indisponível.
 
 ---
 
@@ -340,7 +341,7 @@ A versão pelo navegador não precisa de nada disso: cada vez que você abre o s
 ## 12. Perguntas frequentes / Problemas comuns
 
 **O celular escaneia o QR mas a página não abre.**
-Quase sempre é a rede: o celular precisa estar na **mesma rede Wi-Fi** do computador, e não em dados móveis (4G/5G) nem no Wi-Fi de visitantes. Confira a rede do celular, e se o computador tiver mais de uma rede, troque no seletor **"Rede"** da janela e escaneie de novo. Lembre também que esses recursos funcionam no aplicativo instalado, não na versão pelo navegador.
+Depende da opção **"Conectividade"** (seção 9). Em **"Internet"**: confira se o celular tem alguma conexão (Wi-Fi ou dados móveis) e se o computador da loja está ligado e com internet. Em **"Rede local compartilhada"**: quase sempre é a rede — o celular precisa estar na **mesma rede Wi-Fi** do computador, e não em dados móveis (4G/5G) nem no Wi-Fi de visitantes; se o computador tiver mais de uma rede, troque no seletor **"Rede"** da janela e escaneie de novo. Lembre também que esses recursos funcionam no aplicativo instalado, não na versão pelo navegador.
 
 **Apareceu "Código expirado." O que faço?**
 Clique em **"Gerar novo código"** e escaneie o novo. O código de fotos dura 12 horas; o de assinatura, 15 minutos.
@@ -349,7 +350,7 @@ Clique em **"Gerar novo código"** e escaneie o novo. O código de fotos dura 12
 O código de assinatura serve uma única vez. No computador, clique em **"Gerar novo código"** e peça para escanear de novo.
 
 **Enviei fotos pelo celular e não apareceram no computador.**
-Confira se no celular apareceu a confirmação "... fotos adicionadas ao produto." Se apareceu "Erro ao enviar. Tente novamente.", o envio não terminou: verifique o Wi-Fi e toque em **"Enviar"** de novo. Fechar e abrir a janela "Fotos remotas" também força uma atualização da lista.
+Confira se no celular apareceu a confirmação "... fotos adicionadas ao produto." Se apareceu "Erro ao enviar. Tente novamente.", o envio não terminou: verifique a conexão do celular e toque em **"Enviar"** de novo. Pode tocar sem medo: o mesmo lote não entra duas vezes. Fechar e abrir a janela "Fotos remotas" também força uma atualização da lista.
 
 **Quero cadastrar a peça direto no celular na hora das fotos.**
 Dá para fazer isso. Na página do celular, na tela "Selecione um produto", toque em **"+ Cadastrar nova peça"**, preencha **"Nome"**, **"Categoria"**, **"Tamanho"** e **"Cor"** (obrigatórios), mais **"Preço do aluguel"** e **"Caução"** se já souber os valores, e toque em **"Cadastrar e tirar fotos"**. O celular já abre a tela de fotos da peça recém-cadastrada, e ela aparece sozinha na lista do computador. Veja a seção 6.

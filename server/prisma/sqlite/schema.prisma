@@ -23,6 +23,13 @@ model Location {
   /// behaviour: free again the day after the return.
   maintenanceBufferDays Int @default(0)
 
+  /// "lan" (today's LAN-direct QR flow, unchanged) or "relay" (routes signing
+  /// and photo sessions through the Cloudflare relay for shops with no shared
+  /// Wi-Fi). Defaults to "lan" so existing installs see zero behavior change
+  /// after upgrading — only a fresh install's setup wizard offers "relay" as
+  /// its own default. See docs/superpowers/specs/2026-07-29-no-shared-wifi-relay-design.md.
+  connectivityMode String @default("lan")
+
   staff                Staff[]
   products             Product[]
   contracts            Contract[]
@@ -145,6 +152,13 @@ model ProductPhotoToken {
 
   staff    Staff    @relation(fields: [staffId], references: [id], onDelete: Cascade)
   location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+}
+
+model RelayIdempotencyKey {
+  id           String   @id @default(uuid())
+  key          String   @unique
+  sessionToken String
+  createdAt    DateTime @default(now())
 }
 
 model Installment {

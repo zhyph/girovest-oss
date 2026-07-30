@@ -44,7 +44,7 @@ export function SettingsPage() {
 
   const { handleSubmit, control, register, reset } = useForm<LocationSettingsFormValues>({
     resolver: zodResolver(locationSettingsSchema),
-    defaultValues: { phone: '', maintenanceBufferDays: 0, clauses: [] },
+    defaultValues: { phone: '', maintenanceBufferDays: 0, connectivityMode: 'lan', clauses: [] },
   })
 
   useEffect(() => {
@@ -52,6 +52,7 @@ export function SettingsPage() {
       reset({
         phone: settings.phone ?? '',
         maintenanceBufferDays: settings.maintenanceBufferDays,
+        connectivityMode: settings.connectivityMode,
         clauses: settings.clauses.map((clause) => ({ text: clause.text })),
       })
     }
@@ -117,6 +118,19 @@ export function SettingsPage() {
               {t('maintenanceBufferHelp')}
             </span>
           </label>
+          <div className="flex flex-col gap-2" role="group" aria-labelledby="connectivity-label">
+            <span id="connectivity-label" className="text-sm font-medium">{t('connectivity.title')}</span>
+            <div className="flex flex-col gap-2">
+              <label className="flex items-center gap-2 text-sm">
+                <input type="radio" value="lan" {...register('connectivityMode')} />
+                {t('connectivity.options.lan')}
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="radio" value="relay" {...register('connectivityMode')} />
+                {t('connectivity.options.relay')}
+              </label>
+            </div>
+          </div>
           <div className="flex flex-col gap-2">
             <span className="text-sm font-medium">{t('clauses.title')}</span>
             {clauses.fields.map((field, index) => (

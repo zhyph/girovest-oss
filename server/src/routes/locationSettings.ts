@@ -27,6 +27,7 @@ const updateSchema = z.object({
   // Capped because this silently blocks days on every piece in the shop —
   // a mistyped 300 would take the whole catalogue off the market for a year.
   maintenanceBufferDays: z.number().int().min(0).max(60).optional(),
+  connectivityMode: z.enum(['lan', 'relay']).optional(),
 })
 
 locationSettingsRouter.patch('/', async (req, res) => {

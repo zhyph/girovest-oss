@@ -10,6 +10,7 @@ export interface UpdateLocationSettingsInput {
   phone?: string | null
   clauses?: ClauseInput[]
   maintenanceBufferDays?: number
+  connectivityMode?: 'lan' | 'relay'
 }
 
 export interface ClauseDTO {
@@ -23,6 +24,7 @@ export interface LocationSettingsDTO {
   name: string
   phone: string | null
   maintenanceBufferDays: number
+  connectivityMode: 'lan' | 'relay'
   clauses: ClauseDTO[]
 }
 
@@ -31,6 +33,7 @@ function toDTO(location: {
   name: string
   phone: string | null
   maintenanceBufferDays: number
+  connectivityMode: string
   contractClauses: ClauseDTO[]
 }): LocationSettingsDTO {
   return {
@@ -38,6 +41,7 @@ function toDTO(location: {
     name: location.name,
     phone: location.phone,
     maintenanceBufferDays: location.maintenanceBufferDays,
+    connectivityMode: location.connectivityMode === 'relay' ? 'relay' : 'lan',
     clauses: [...location.contractClauses].sort((a, b) => a.sortOrder - b.sortOrder),
   }
 }
@@ -60,7 +64,11 @@ export async function updateLocationSettings(
   await getLocationSettings(locationId)
 
   await prisma.$transaction(async (tx) => {
-    if (data.phone !== undefined || data.maintenanceBufferDays !== undefined) {
+    if (
+      data.phone !== undefined ||
+      data.maintenanceBufferDays !== undefined ||
+      data.connectivityMode !== undefined
+    ) {
       await tx.location.update({
         where: { id: locationId },
         data: {
@@ -68,6 +76,7 @@ export async function updateLocationSettings(
           ...(data.maintenanceBufferDays !== undefined
             ? { maintenanceBufferDays: data.maintenanceBufferDays }
             : {}),
+          ...(data.connectivityMode !== undefined ? { connectivityMode: data.connectivityMode } : {}),
         },
       })
     }

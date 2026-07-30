@@ -4,11 +4,31 @@ import { app } from './app.js'
 import { signingApp } from './signingApp.js'
 import { detectLanCandidates } from './network/lanNetwork.js'
 import { runContractBackfill } from './services/contractBackfill.js'
+import { relayCredentialsFromEnv, resumeRelayConnections } from './network/relayResume.js'
+import { closeAllRelayConnections } from './network/relayRegistry.js'
+import { pruneExpiredIdempotencyKeys } from './network/relayIdempotencyPrune.js'
 
 const port = Number(process.env.PORT ?? 3000)
 const host = process.env.HOST ?? '0.0.0.0'
 
 await runContractBackfill()
+
+// Relay mode's WebSocket-per-session doesn't survive a process restart on
+// its own (unlike LAN mode, which is stateless) — reopen one for every
+// photo session that hasn't expired yet so a shift-long session survives a
+// crash/update/restart. A no-op until Task 8 forwards the relay env vars
+// into this process and/or the install is actually configured for relay.
+await resumeRelayConnections(await relayCredentialsFromEnv())
+
+// Fire-and-forget on purpose: bounding this table is housekeeping, and a DB
+// hiccup here must never hold up (or fail) boot. Both outcomes are still
+// reported — a silently swallowed failure would let the table grow forever
+// with nothing anywhere to say why.
+pruneExpiredIdempotencyKeys()
+  .then((count) => {
+    if (count > 0) console.log(`Pruned ${count} expired relay idempotency key(s)`)
+  })
+  .catch((error) => console.warn('Failed to prune relay idempotency keys:', error))
 
 const servers: Server[] = []
 
@@ -78,6 +98,9 @@ function closeServer(target: Server): Promise<void> {
 const SHUTDOWN_TIMEOUT_MS = 5_000
 
 async function shutdown() {
+  // Relay sockets are outbound and not owned by any http.Server, so closing
+  // the servers below would leave them open on the way out.
+  closeAllRelayConnections()
   await Promise.race([
     Promise.all(servers.map(closeServer)),
     new Promise((resolve) => setTimeout(resolve, SHUTDOWN_TIMEOUT_MS)),

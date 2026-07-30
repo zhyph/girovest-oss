@@ -1,8 +1,17 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import request from 'supertest'
 import { app } from '../app.js'
 import { prisma } from '../db/client.js'
 import { signStaffToken } from '../auth/jwt.js'
+
+// Real openRelayConnection() opens an actual outbound WebSocket to
+// credentials.url, which in relay-mode tests below is a fake host —
+// stubbed so the route test never makes a real network connection.
+const relayConnectionStub = { close: vi.fn(), opened: Promise.resolve(true) }
+vi.mock('../network/relayClient.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../network/relayClient.js')>()
+  return { ...actual, openRelayConnection: vi.fn(() => relayConnectionStub) }
+})
 
 let locationId: string
 let staffId: string
@@ -21,6 +30,8 @@ beforeEach(async () => {
   clientId = client.id
 })
 
+const RELAY_ENV_KEYS = ['GIROVEST_UPDATE_URL', 'GIROVEST_UPDATE_KEY', 'GIROVEST_INSTALL_ID'] as const
+
 afterEach(async () => {
   await prisma.installment.deleteMany()
   await prisma.allocation.deleteMany()
@@ -29,6 +40,7 @@ afterEach(async () => {
   await prisma.client.deleteMany()
   await prisma.staff.deleteMany()
   await prisma.location.deleteMany()
+  for (const key of RELAY_ENV_KEYS) delete process.env[key]
 })
 
 describe('GET /api/contracts', () => {
@@ -213,5 +225,84 @@ describe('PATCH /api/contracts/:contractId/installments/:installmentId', () => {
       .send({ paid: true })
 
     expect(response.status).toBe(404)
+  })
+})
+
+describe('POST /api/contracts/:id/sign-token', () => {
+  async function createBareContract() {
+    return prisma.contract.create({
+      data: { number: 1, locationId, clientId, staffId, eventDate: new Date(), paymentMethod: 'PIX' },
+    })
+  }
+
+  it('returns LAN-mode candidates/port when connectivityMode is lan (default)', async () => {
+    const contract = await createBareContract()
+
+    const res = await request(app)
+      .post(`/api/contracts/${contract.id}/sign-token`)
+      .set('Authorization', `Bearer ${staffToken}`)
+
+    expect(res.status).toBe(201)
+    expect(res.body.mode).toBe('lan')
+    expect(res.body.token).toBeTruthy()
+    expect(res.body.candidates).toBeDefined()
+    expect(res.body.relayUrl).toBeUndefined()
+  })
+
+  it('returns a relayUrl instead of LAN candidates when connectivityMode is relay', async () => {
+    const contract = await createBareContract()
+    await prisma.location.update({ where: { id: locationId }, data: { connectivityMode: 'relay' } })
+    process.env.GIROVEST_UPDATE_URL = 'https://girovest-update-proxy.workers.dev'
+    process.env.GIROVEST_UPDATE_KEY = 'test-key'
+    process.env.GIROVEST_INSTALL_ID = 'test-install'
+
+    const res = await request(app)
+      .post(`/api/contracts/${contract.id}/sign-token`)
+      .set('Authorization', `Bearer ${staffToken}`)
+
+    expect(res.status).toBe(201)
+    expect(res.body.mode).toBe('relay')
+    expect(res.body.relayUrl).toBe(`https://girovest-update-proxy.workers.dev/relay/${res.body.token}/sign`)
+    expect(res.body.relayUnavailable).toBeUndefined()
+    expect(res.body.candidates).toBeUndefined()
+    expect(res.body.port).toBeUndefined()
+  })
+
+  // The route used to answer 201-with-a-QR before the handshake had even been
+  // attempted, so a wrong product key or no internet at all was invisible on
+  // the desktop — the only symptom was the phone getting a 504 ten seconds
+  // after scanning.
+  it('reports relayUnavailable (and closes the socket) when the relay never connects', async () => {
+    const contract = await createBareContract()
+    await prisma.location.update({ where: { id: locationId }, data: { connectivityMode: 'relay' } })
+    process.env.GIROVEST_UPDATE_URL = 'https://girovest-update-proxy.workers.dev'
+    process.env.GIROVEST_UPDATE_KEY = 'test-key'
+    process.env.GIROVEST_INSTALL_ID = 'test-install'
+    const { openRelayConnection } = await import('../network/relayClient.js')
+    const close = vi.fn()
+    ;(openRelayConnection as ReturnType<typeof vi.fn>).mockReturnValueOnce({ close, opened: Promise.resolve(false) })
+
+    const res = await request(app)
+      .post(`/api/contracts/${contract.id}/sign-token`)
+      .set('Authorization', `Bearer ${staffToken}`)
+
+    expect(res.status).toBe(201)
+    expect(res.body.mode).toBe('relay')
+    expect(res.body.relayUnavailable).toBe(true)
+    expect(res.body.relayUrl).toBeUndefined()
+    expect(close).toHaveBeenCalledTimes(1)
+  })
+
+  it('falls back to LAN mode when connectivityMode is relay but credentials are not configured', async () => {
+    const contract = await createBareContract()
+    await prisma.location.update({ where: { id: locationId }, data: { connectivityMode: 'relay' } })
+
+    const res = await request(app)
+      .post(`/api/contracts/${contract.id}/sign-token`)
+      .set('Authorization', `Bearer ${staffToken}`)
+
+    expect(res.status).toBe(201)
+    expect(res.body.mode).toBe('lan')
+    expect(res.body.relayUrl).toBeUndefined()
   })
 })

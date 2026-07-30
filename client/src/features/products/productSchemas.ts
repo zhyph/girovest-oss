@@ -33,8 +33,12 @@ export interface Product extends ProductFormValues {
 export interface PhotoTokenResponse {
   token: string
   expiresAt: string
-  port: number
-  candidates: { interfaceName: string; address: string }[]
+  mode: 'lan' | 'relay'
+  port?: number
+  candidates?: { interfaceName: string; address: string }[]
+  relayUrl?: string
+  /** See SigningTokenResponse.relayUnavailable — same relay-connect failure. */
+  relayUnavailable?: boolean
 }
 
 export interface SseTicketResponse {

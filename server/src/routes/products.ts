@@ -17,6 +17,9 @@ import {
 import { issueProductPhotoSession } from '../services/productPhotoTokenService.js'
 import { mintSseTicket } from '../services/sseTicketService.js'
 import { reachableSigningCandidates } from './contracts.js'
+import { openRelayConnection } from '../network/relayClient.js'
+import { relayCredentialsFromEnv } from '../network/relayResume.js'
+import { registerRelayConnection } from '../network/relayRegistry.js'
 
 export const productsRouter = Router()
 productsRouter.use(requireAuth)
@@ -74,9 +77,33 @@ productsRouter.post('/photo-session', async (req, res) => {
   if (!req.staff) throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Unauthorized')
   const staff = await prisma.staff.findUniqueOrThrow({ where: { id: req.staff.staffId } })
   const { token, expiresAt } = await issueProductPhotoSession(staff.id, staff.locationId)
+
+  const location = await prisma.location.findUniqueOrThrow({ where: { id: staff.locationId } })
+  if (location.connectivityMode === 'relay') {
+    const credentials = await relayCredentialsFromEnv()
+    if (credentials) {
+      const connection = openRelayConnection(token, credentials)
+      // Same as the signing route: don't hand out a QR that can only ever
+      // produce a 504 on the phone — say so on the desktop, where staff can
+      // act on it.
+      if (!(await connection.opened)) {
+        connection.close()
+        return res.status(201).json({ token, expiresAt, mode: 'relay', relayUnavailable: true })
+      }
+      // A new photo-session token is minted every time this modal is opened
+      // or "Gerar novo código" is pressed; registering makes each one's socket
+      // close at expiresAt (or at shutdown) instead of accumulating all day.
+      registerRelayConnection(token, connection, expiresAt)
+      return res
+        .status(201)
+        .json({ token, expiresAt, mode: 'relay', relayUrl: `${credentials.url}/relay/${token}/photos` })
+    }
+  }
+
   res.status(201).json({
     token,
     expiresAt,
+    mode: 'lan',
     port: Number(process.env.PORT ?? 3000),
     candidates: reachableSigningCandidates(),
   })

@@ -27,4 +27,18 @@ describe('completeSetup', () => {
     expect(clauses.map((clause) => clause.text)).toEqual(DEFAULT_CONTRACT_CLAUSES)
     expect(clauses.map((clause) => clause.sortOrder)).toEqual(DEFAULT_CONTRACT_CLAUSES.map((_, index) => index))
   })
+
+  it('stores the chosen connectivityMode on the new Location', async () => {
+    const result = await completeSetup({
+      shopName: 'Priscila Moda Festa',
+      shopAddress: 'Rua Dr. Sebastião Pereira, 47',
+      ownerName: 'Priscila',
+      ownerLogin: 'priscila',
+      ownerPassword: 'senha12345',
+      connectivityMode: 'relay',
+    })
+
+    const location = await prisma.location.findUnique({ where: { id: result.locationId } })
+    expect(location?.connectivityMode).toBe('relay')
+  })
 })

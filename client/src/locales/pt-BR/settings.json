@@ -12,6 +12,13 @@
     "phone": "Telefone",
     "maintenanceBufferDays": "Dias de higienização entre aluguéis"
   },
+  "connectivity": {
+    "title": "Conectividade",
+    "options": {
+      "lan": "Rede local compartilhada",
+      "relay": "Internet"
+    }
+  },
   "clauses": {
     "title": "Cláusulas do Contrato",
     "textFieldAria": "Texto da cláusula",

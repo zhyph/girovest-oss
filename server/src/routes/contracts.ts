@@ -13,6 +13,9 @@ import {
 } from '../services/contractService.js'
 import { issueSigningToken } from '../services/signingService.js'
 import { detectLanCandidates } from '../network/lanNetwork.js'
+import { openRelayConnection } from '../network/relayClient.js'
+import { relayCredentialsFromEnv } from '../network/relayResume.js'
+import { registerRelayConnection } from '../network/relayRegistry.js'
 import { isoDate } from '../lib/zodDate.js'
 
 export const contractsRouter = Router()
@@ -108,9 +111,35 @@ contractsRouter.post('/:id/sign-token', async (req, res) => {
   if (!req.staff) throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Unauthorized')
   const locationId = await resolveLocationId(req.staff.staffId)
   const { token, expiresAt } = await issueSigningToken(req.params.id, locationId)
+
+  const location = await prisma.location.findUniqueOrThrow({ where: { id: locationId } })
+  if (location.connectivityMode === 'relay') {
+    const credentials = await relayCredentialsFromEnv()
+    if (credentials) {
+      const connection = openRelayConnection(token, credentials)
+      // The QR is worthless until the shop side is actually connected: with a
+      // wrong product key, a revoked install or no internet, the only symptom
+      // used to be the phone getting a 504 ten seconds after scanning. Wait
+      // for the handshake and report the failure on the desktop instead.
+      if (!(await connection.opened)) {
+        connection.close()
+        return res.status(201).json({ token, expiresAt, mode: 'relay', relayUnavailable: true })
+      }
+      // Registered so it is closed at expiresAt or at shutdown — never left
+      // reconnecting for the life of the process. Deliberately not closed when
+      // the signature lands: the phone pages' relayed `sign/status` check runs
+      // over this socket, so an already-signed link needs it to still be there.
+      registerRelayConnection(token, connection, expiresAt)
+      return res
+        .status(201)
+        .json({ token, expiresAt, mode: 'relay', relayUrl: `${credentials.url}/relay/${token}/sign` })
+    }
+  }
+
   res.status(201).json({
     token,
     expiresAt,
+    mode: 'lan',
     port: Number(process.env.PORT ?? 3000),
     candidates: reachableSigningCandidates(),
   })

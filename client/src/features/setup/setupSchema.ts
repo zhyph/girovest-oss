@@ -6,6 +6,7 @@ export const setupSchema = z.object({
   ownerName: z.string().min(1),
   ownerLogin: z.string().min(1),
   ownerPassword: z.string().min(8),
+  connectivityMode: z.enum(['lan', 'relay']),
 })
 
 export type SetupFormValues = z.infer<typeof setupSchema>

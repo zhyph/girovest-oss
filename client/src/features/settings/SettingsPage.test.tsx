@@ -15,6 +15,7 @@ const settings: LocationSettings = {
   name: 'Priscila Moda Festa',
   maintenanceBufferDays: 0,
   phone: '11987654321',
+  connectivityMode: 'lan',
   clauses: [
     { id: 'c1', text: 'Primeira cláusula', sortOrder: 0 },
     { id: 'c2', text: 'Segunda cláusula', sortOrder: 1 },
@@ -104,8 +105,21 @@ describe('SettingsPage', () => {
     expect(updateImpl).toHaveBeenCalledWith({
       phone: '11987654321',
       maintenanceBufferDays: 0,
+      connectivityMode: 'lan',
       clauses: [{ text: 'Primeira cláusula' }, { text: 'Segunda cláusula' }],
     })
+  })
+
+  it('shows the connectivity mode group and submits the selected value', async () => {
+    const updateImpl = vi.fn().mockResolvedValue(settings)
+    mockSettingsHooks(updateImpl)
+    renderWithToast(<SettingsPage />)
+
+    const group = screen.getByRole('group', { name: 'Conectividade' })
+    await userEvent.click(within(group).getByRole('radio', { name: 'Internet' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+
+    expect(updateImpl).toHaveBeenCalledWith(expect.objectContaining({ connectivityMode: 'relay' }))
   })
 })
 

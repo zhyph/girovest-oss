@@ -118,6 +118,48 @@ describe('SetupPage', () => {
     expect(apiFetch).not.toHaveBeenCalled()
   })
 
+  // The connectivity choice exists in the wizard precisely for the shop with
+  // no shared Wi-Fi doing a fresh install: relay must be the default, or that
+  // shop's first QR code is dead on arrival until someone finds Settings.
+  it('submits connectivityMode relay by default', async () => {
+    vi.mocked(apiFetch)
+      .mockResolvedValueOnce({ locationId: 'l1', staffId: 's1' })
+      .mockRejectedValueOnce(new Error('skip auto-login'))
+
+    renderSetupPage()
+    await fillAndSubmit()
+
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith(
+        '/api/setup',
+        expect.objectContaining({
+          method: 'POST',
+          body: expect.stringContaining('"connectivityMode":"relay"'),
+        }),
+      ),
+    )
+  })
+
+  it('submits connectivityMode lan when the owner picks the shared local network option', async () => {
+    vi.mocked(apiFetch)
+      .mockResolvedValueOnce({ locationId: 'l1', staffId: 's1' })
+      .mockRejectedValueOnce(new Error('skip auto-login'))
+
+    renderSetupPage()
+    await userEvent.click(screen.getByLabelText('Rede local compartilhada'))
+    await fillAndSubmit()
+
+    await waitFor(() =>
+      expect(apiFetch).toHaveBeenCalledWith(
+        '/api/setup',
+        expect.objectContaining({
+          method: 'POST',
+          body: expect.stringContaining('"connectivityMode":"lan"'),
+        }),
+      ),
+    )
+  })
+
   it('shows a too-short password error without touching the other fields', async () => {
     renderSetupPage()
 

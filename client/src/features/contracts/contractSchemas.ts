@@ -127,6 +127,15 @@ export interface LanCandidate {
 export interface SigningTokenResponse {
   token: string
   expiresAt: string
-  port: number
-  candidates: LanCandidate[]
+  mode: 'lan' | 'relay'
+  port?: number
+  candidates?: LanCandidate[]
+  relayUrl?: string
+  /**
+   * Relay mode only: the shop side never managed to connect to the relay
+   * (wrong product key, revoked install, no internet), so there is no usable
+   * URL to put in a QR code. Rendered with the same empty state + retry action
+   * as LAN mode's "no candidates" case.
+   */
+  relayUnavailable?: boolean
 }

@@ -33,6 +33,14 @@ describe('getLocationSettings', () => {
   it('throws NOT_FOUND for a missing location', async () => {
     await expect(getLocationSettings('does-not-exist')).rejects.toThrow(AppError)
   })
+
+  it('defaults connectivityMode to lan for an existing location', async () => {
+    const location = await prisma.location.create({ data: { name: 'L', address: 'A' } })
+
+    const settings = await getLocationSettings(location.id)
+
+    expect(settings.connectivityMode).toBe('lan')
+  })
 })
 
 describe('updateLocationSettings', () => {
@@ -72,5 +80,13 @@ describe('updateLocationSettings', () => {
 
   it('throws NOT_FOUND for a missing location', async () => {
     await expect(updateLocationSettings('does-not-exist', { phone: '1' })).rejects.toThrow(AppError)
+  })
+
+  it('updates connectivityMode to relay', async () => {
+    const location = await prisma.location.create({ data: { name: 'L', address: 'A' } })
+
+    const updated = await updateLocationSettings(location.id, { connectivityMode: 'relay' })
+
+    expect(updated.connectivityMode).toBe('relay')
   })
 })

@@ -65,11 +65,14 @@
     "regenerate": "Gerar novo código",
     "qrAlt": "Código QR para assinatura",
     "noLan": "Nenhuma rede local detectada. Não é possível assinar remotamente neste momento.",
+    "noConnection": "Sem conexão com o serviço de assinatura remota. Verifique a internet da loja e tente novamente.",
     "pickNetwork": "Rede",
     "waiting": "Aguardando assinatura...",
     "signed": "Assinado com sucesso!",
     "expired": "Código expirado.",
-    "close": "Fechar"
+    "close": "Fechar",
+    "generating": "Gerando código...",
+    "issueFailed": "Não foi possível gerar o código. Tente novamente."
   },
   "validation": {
     "clientRequired": "Cliente é obrigatório",

@@ -4,7 +4,13 @@
   "createdSuccess": "Loja \"{{shopName}}\" criada. Bem-vinda!",
   "sections": {
     "shop": "Sobre a loja",
-    "account": "Sua conta"
+    "account": "Sua conta",
+    "connectivity": "Conectividade"
+  },
+  "connectivityHint": "Como o celular dos clientes alcança este computador (assinatura remota e fotos de produtos). Dá para mudar depois em Configurações.",
+  "connectivityOptions": {
+    "lan": "Rede local compartilhada",
+    "relay": "Internet"
   },
   "shopNameField": "Nome da loja",
   "shopAddressField": "Endereço",
