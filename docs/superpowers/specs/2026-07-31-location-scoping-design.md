@@ -20,7 +20,9 @@ This is currently harmless in practice: `setupService.needsSetup()` guarantees e
 2. Add a structural guardrail so a *new* route/model can't reintroduce this bug silently.
 3. The schema migration (`Client.locationId`) is safe against the one live production SQLite database with real data — no data loss, no downtime beyond a normal update, a tested and reviewed migration script, not just a Prisma-CLI-generated one taken on faith.
 
-Out of scope: any product decision about cross-location access (e.g. a chain owner who should see multiple stores). Nothing here prevents adding that later; it's a separate feature decision, not a hygiene fix.
+Out of scope: any product decision about cross-location access. The product direction is one login per location (no role-based, multi-account, or cross-location access model planned) — `Staff.role` already exists in the schema/JWT but currently gates nothing, and this design doesn't add any behavior that depends on it. If a cross-location or multi-account model is ever wanted later, that's a separate feature decision; nothing here forecloses it, but nothing here should be read as anticipating it either.
+
+How this fits a future hosted/web deployment (as opposed to one Electron install per store) is still an open question, deliberately not answered here — every fix in this design (scoping by `Location`, the `scopedDb` guardrail, the Postgres schema already tracking the SQLite one) is deployment-shape-agnostic on purpose, so it doesn't block that direction, but the specifics (how a login maps to a location on the web, single shared login page vs. one per store, etc.) belong to that design when it's actually being built.
 
 ## Design
 
