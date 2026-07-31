@@ -38,5 +38,37 @@
     "help": "Reveja as explicações passo a passo de cada tela sempre que precisar se lembrar de como algo funciona.",
     "replay": "Rever",
     "replayAria": "Rever tour de {{section}}"
+  },
+  "backup": {
+    "title": "Backup",
+    "help": "Faça uma cópia dos dados da loja (clientes, produtos, contratos e fotos) em um lugar seguro, como um pendrive ou uma pasta sincronizada na nuvem.",
+    "lastBackup": {
+      "never": "Nunca feito",
+      "daysAgo": "Há {{count}} dia",
+      "daysAgo_other": "Há {{count}} dias"
+    },
+    "destination": "Destino: {{path}}",
+    "noDestination": "Nenhum destino escolhido ainda.",
+    "runNow": "Fazer backup agora",
+    "runningNow": "Fazendo backup...",
+    "chooseFolder": "Escolher outra pasta",
+    "success": "Backup concluído em {{destination}}.",
+    "error": "Não foi possível concluir o backup.",
+    "restore": {
+      "title": "Restaurar backup",
+      "help": "Substitui TODOS os dados atuais pelos dados de um backup anterior. O aplicativo será reiniciado.",
+      "action": "Restaurar backup...",
+      "confirmTitle": "Restaurar backup de {{date}}?",
+      "confirmMessage": "Isso substitui TODOS os dados atuais pelos dados do backup de {{date}}. Essa ação não pode ser desfeita.",
+      "confirmAction": "Restaurar e reiniciar",
+      "cancel": "Cancelar",
+      "error": "Não foi possível restaurar o backup.",
+      "unknownDate": "data desconhecida"
+    },
+    "destinationConflict": {
+      "title": "Esta pasta já foi usada por outra instalação",
+      "message": "A pasta \"{{path}}\" já guarda um backup de outra instalação do Girovest — por exemplo, o pendrive de um backup restaurado em um computador novo. Se essa outra instalação ainda estiver em uso, ela perderá o controle desta pasta e seus backups mais antigos poderão ser apagados com o tempo. Usar esta pasta mesmo assim?",
+      "confirmAction": "Usar esta pasta mesmo assim"
+    }
   }
 }

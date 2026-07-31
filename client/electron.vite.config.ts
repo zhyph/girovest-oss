@@ -5,10 +5,12 @@ import { resolve } from 'path'
 
 export default defineConfig({
   main: {
-    // electron-updater/electron-log are excluded from externalization (i.e.
-    // bundled into out/main) because the packaged app ships only out/**/* +
-    // package.json — no client node_modules to resolve them from at runtime.
-    plugins: [externalizeDepsPlugin({ exclude: ['electron-updater', 'electron-log'] })],
+    // electron-updater/electron-log/adm-zip are excluded from externalization
+    // (i.e. bundled into out/main) because the packaged app ships only
+    // out/**/* + package.json — no client node_modules to resolve them from
+    // at runtime. adm-zip is pure JS (no native bindings), so bundling it is
+    // safe the same way the other two already are.
+    plugins: [externalizeDepsPlugin({ exclude: ['electron-updater', 'electron-log', 'adm-zip'] })],
     ssr: { external: ['electron'] },
     // Update-proxy coordinates, baked into the main bundle at build time (CI
     // supplies them; see electron/updater.ts for how they're used and why an
@@ -36,7 +38,10 @@ export default defineConfig({
     },
     build: {
       rollupOptions: {
-        input: { index: resolve(__dirname, 'electron/main.ts') },
+        input: {
+          index: resolve(__dirname, 'electron/main.ts'),
+          archiveCli: resolve(__dirname, 'electron/archiveCli.ts'),
+        },
       },
     },
   },

@@ -15,6 +15,8 @@ import { SECTION_ROUTES } from '../onboarding/tours.ts'
 import { requestTourReplay } from '../onboarding/tourReplay.ts'
 import { locationSettingsSchema, type LocationSettingsFormValues } from './settingsSchemas.ts'
 import { useLocationSettings, useUpdateLocationSettings } from './useLocationSettings.ts'
+import { BackupSection } from './BackupSection.tsx'
+import { hasGirovestBridge } from '../../lib/girovestBridge.ts'
 
 const THEME_OPTIONS: ThemePreference[] = ['system', 'light', 'dark']
 
@@ -199,6 +201,7 @@ export function SettingsPage() {
             ))}
           </div>
         </div>
+        {hasGirovestBridge() && <BackupSection />}
       </div>
     </div>
   )

@@ -19,4 +19,21 @@ contextBridge.exposeInMainWorld('girovest', {
   // that screen is a data: URL loaded into the same window, and the preload
   // applies to it too.
   retryActivation: (): Promise<string> => ipcRenderer.invoke('activation:retry'),
+  getBackupStatus: (): Promise<{
+    lastBackupAt: string | null
+    destination: string | null
+    snoozedUntil: string | null
+    installDate: string
+    inProgress: boolean
+  }> => ipcRenderer.invoke('backup:status'),
+  runBackup: (
+    chooseNewFolder?: boolean,
+    forceClaimDestination?: boolean,
+    explicitDestination?: string,
+  ): Promise<{ destination: string; archivePath: string }> =>
+    ipcRenderer.invoke('backup:run', { chooseNewFolder, forceClaimDestination, explicitDestination }),
+  snoozeBackupReminder: (): Promise<void> => ipcRenderer.invoke('backup:snooze'),
+  pickRestoreBackup: (): Promise<{ path: string; timestamp: string | null } | null> =>
+    ipcRenderer.invoke('backup:pickRestoreFile'),
+  restoreBackup: (backupPath: string): Promise<void> => ipcRenderer.invoke('backup:restore', { path: backupPath }),
 })

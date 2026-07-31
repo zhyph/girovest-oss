@@ -12,5 +12,16 @@
   "loading": "Carregando...",
   "error": "Erro ao carregar dados do painel. Tente novamente.",
   "upcoming": "Próximas alocações",
-  "upcomingEmpty": "Nada programado para os próximos dias."
+  "upcomingEmpty": "Nada programado para os próximos dias.",
+  "backupReminder": {
+    "neverBackedUp": "Você ainda não fez backup dos dados — já se passaram {{count}} dia desde a configuração.",
+    "neverBackedUp_other": "Você ainda não fez backup dos dados — já se passaram {{count}} dias desde a configuração.",
+    "overdue": "Já se passaram {{count}} dia desde o último backup.",
+    "overdue_other": "Já se passaram {{count}} dias desde o último backup.",
+    "backUpNow": "Fazer backup agora",
+    "backingUpNow": "Fazendo backup...",
+    "remindLater": "Lembrar depois",
+    "error": "Não foi possível concluir o backup.",
+    "destinationConflict": "A pasta de backup já foi usada por outra instalação. Vá até Configurações para escolher usá-la mesmo assim."
+  }
 }

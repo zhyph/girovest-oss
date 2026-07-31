@@ -34,7 +34,7 @@ globalThis.IntersectionObserver = MockIntersectionObserver as unknown as typeof 
 // for it as soon as it mounts, to wire up its drag-to-select handling —
 // unrelated to what any test here actually exercises, so returning null is
 // enough to keep it from throwing.
-if (!document.elementFromPoint) {
+if (typeof document !== 'undefined' && !document.elementFromPoint) {
   document.elementFromPoint = () => null
 }
 
@@ -42,7 +42,7 @@ if (!document.elementFromPoint) {
 // close the mobile drawer on a breakpoint crossing), so every test that
 // renders it needs at least a no-op stub; tests that care about the actual
 // 'change' behavior override this with their own mock.
-if (!window.matchMedia) {
+if (typeof window !== 'undefined' && !window.matchMedia) {
   window.matchMedia = ((query: string) => ({
     matches: false,
     media: query,

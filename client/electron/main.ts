@@ -5,6 +5,17 @@ import fs from 'fs'
 import net from 'net'
 import path from 'path'
 import { backupDatabaseIfNeeded, writeBackupMarker } from './backup.ts'
+import { runCreateArchive, runExtractArchive } from './archiveRunner.ts'
+import {
+  readBackupDestination,
+  readLastManualBackupAt,
+  readSnoozedUntil,
+  writeSnoozedUntil,
+  parseBackupTimestamp,
+  getDirectorySizeBytes,
+  resolveInstallDate,
+} from './manualBackup.ts'
+import { runManualBackup, runManualRestore, type RunManualBackupResult } from './manualBackupActions.ts'
 import { resolveInstallId } from './installId.ts'
 import { setupAutoUpdater } from './updater.ts'
 import { ensureActivated, type ActivationState } from './activation.ts'
@@ -114,6 +125,31 @@ export async function waitForPortFree(
     await new Promise((resolve) => setTimeout(resolve, intervalMs))
   }
   return false
+}
+
+// serverProcess.kill() is asynchronous — the OS may not have actually torn
+// the process down by the time `kill()` returns. Restore mutates dev.db's
+// sidecars and then renames a file over the live dev.db; on Windows in
+// particular, deleting or renaming over a file the just-killed server
+// process still has open throws EBUSY/EPERM, and unlike waitForPortFree's
+// existing use for the *next* server's startup, there was previously
+// nothing making the *current* restore wait for the *old* server to
+// actually be gone first.
+export function waitForProcessExit(child: ChildProcess, timeoutMs = 5_000): Promise<void> {
+  return new Promise((resolve) => {
+    if (child.exitCode !== null || child.signalCode !== null) {
+      resolve()
+      return
+    }
+    const timer = setTimeout(() => {
+      child.kill('SIGKILL')
+      resolve()
+    }, timeoutMs)
+    child.once('exit', () => {
+      clearTimeout(timer)
+      resolve()
+    })
+  })
 }
 
 export async function waitForServerReady(
@@ -553,6 +589,134 @@ if (app) {
       const next = await resolveActivation(installId, userDataPath)
       loadAppOrActivation(win, next)
       return next.state
+    })
+
+    let backupRunPromise: Promise<RunManualBackupResult> | null = null
+
+    ipcMain.handle('backup:status', () => {
+      return {
+        lastBackupAt: readLastManualBackupAt(userDataPath),
+        destination: readBackupDestination(userDataPath),
+        snoozedUntil: readSnoozedUntil(userDataPath),
+        installDate: resolveInstallDate(userDataPath),
+        inProgress: backupRunPromise !== null,
+      }
+    })
+
+    ipcMain.handle('backup:run', async (_event, args: { chooseNewFolder?: boolean; forceClaimDestination?: boolean; explicitDestination?: string } = {}) => {
+      if (backupRunPromise) return backupRunPromise
+      const stagingDbPath = path.join(userDataPath, 'backup-staging', 'dev.db')
+      const productPhotosDir = resolveProductPhotosDir(userDataPath)
+
+      backupRunPromise = runManualBackup(
+        {
+          userDataPath,
+          installId,
+          stagingDbPath,
+          productPhotosDir,
+          now: new Date(),
+          pickDestinationFolder: async () => {
+            const result = await dialog.showOpenDialog(win, {
+              properties: ['openDirectory', 'createDirectory'],
+            })
+            return result.canceled || result.filePaths.length === 0 ? null : result.filePaths[0]!
+          },
+          createArchive: (sources, destZipPath) =>
+            runCreateArchive(import.meta.dirname, sources, destZipPath),
+          estimateSourceBytes: () =>
+            (fs.existsSync(stagingDbPath) ? fs.statSync(stagingDbPath).size : 0) +
+            getDirectorySizeBytes(productPhotosDir),
+          estimateFreeBytes: (destinationDir) => {
+            try {
+              const stats = fs.statfsSync(destinationDir)
+              return stats.bavail * stats.bsize
+            } catch {
+              // Best-effort: an older platform/Node without fs.statfsSync
+              // support should not block the backup on a check it can't run.
+              return Number.POSITIVE_INFINITY
+            }
+          },
+        },
+        args.chooseNewFolder ?? false,
+        args.forceClaimDestination ?? false,
+        args.explicitDestination,
+      )
+      try {
+        return await backupRunPromise
+      } finally {
+        backupRunPromise = null
+      }
+    })
+
+    ipcMain.handle('backup:snooze', () => {
+      writeSnoozedUntil(userDataPath, new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString())
+    })
+
+    ipcMain.handle('backup:pickRestoreFile', async () => {
+      const result = await dialog.showOpenDialog(win, {
+        properties: ['openFile'],
+        filters: [{ name: 'Girovest Backup', extensions: ['zip'] }],
+      })
+      if (result.canceled || result.filePaths.length === 0) return null
+      const filePath = result.filePaths[0]!
+      return { path: filePath, timestamp: parseBackupTimestamp(path.basename(filePath)) }
+    })
+
+    ipcMain.handle('backup:restore', async (_event, args: { path: string }) => {
+      isShuttingDown = true
+      const dyingServer = serverProcess
+      serverProcess?.kill()
+      // Must actually be gone, not just asked to go, before touching
+      // dev.db's sidecars or renaming over the live file — see
+      // waitForProcessExit's comment.
+      if (dyingServer) await waitForProcessExit(dyingServer)
+      try {
+        const restoreResult = await runManualRestore({
+          archivePath: args.path,
+          userDataPath,
+          dbSidecarNames: ['dev.db-wal', 'dev.db-journal', 'dev.db-shm'],
+          productPhotosDir: resolveProductPhotosDir(userDataPath),
+          extractArchive: (zipPath, destDir) => runExtractArchive(import.meta.dirname, zipPath, destDir),
+          estimateFreeBytes: (destinationDir) => {
+            try {
+              const stats = fs.statfsSync(destinationDir)
+              return stats.bavail * stats.bsize
+            } catch {
+              return Number.POSITIVE_INFINITY
+            }
+          },
+        })
+        // The database has already committed at this point even when
+        // photosRestored is false (see runManualRestore's own comment) —
+        // this is the one place that fact can be surfaced anywhere, since
+        // nothing in that case throws.
+        if (!restoreResult.photosRestored) {
+          await logError(
+            'Restore: database restored, but the product-photos swap did not complete. ' +
+              'Recoverable from product-photos.old or restore-staging/product-photos in userData.',
+            undefined,
+          )
+        }
+      } catch (error) {
+        // A failed restore (bad archive, insufficient space) leaves the
+        // live dev.db/product-photos untouched per runManualRestore's own
+        // guarantee — but this handler already killed serverProcess before
+        // attempting it, so the app must restart the backend to remain
+        // usable rather than sitting dead. Same startServer() the app calls
+        // on launch; migrations/backupDatabaseIfNeeded are idempotent
+        // against an unchanged database, so re-running them here is safe.
+        isShuttingDown = false
+        const restartError = await startServer()
+        if (restartError !== null) {
+          dialog.showErrorBox(
+            'Restore Failed',
+            `The backup could not be restored, and the application server failed to restart.\n\n${restartError}`,
+          )
+        }
+        throw error
+      }
+      app.relaunch()
+      app.exit(0)
     })
 
     void setupAutoUpdater(installId)

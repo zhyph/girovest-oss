@@ -11,6 +11,7 @@ import { useClients } from '../clients/useClients.ts'
 import { useProducts } from '../products/useProducts.ts'
 import { useSectionTour } from '../onboarding/useSectionTour.ts'
 import { useDashboard } from './useDashboard.ts'
+import { BackupReminderBanner } from './BackupReminderBanner.tsx'
 
 function StatTile({ label, value, danger }: { label: string; value: number; danger?: boolean }) {
   const isUrgent = danger && value > 0
@@ -51,6 +52,7 @@ export function DashboardPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
+      <BackupReminderBanner />
       <h1 className="mb-4 flex-shrink-0 text-xl font-semibold" data-tour="dashboard.title">{t('title')}</h1>
       {isBrandNewShop && (
         <Card className="mb-4 flex-shrink-0 border-primary/30 bg-secondary" data-tour="dashboard.gettingStarted">
