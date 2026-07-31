@@ -351,10 +351,15 @@ describe('ProductDrawer', () => {
     expect(screen.getByLabelText('Nome')).toHaveValue('')
   })
 
-  it('calls onCreated with the saved values and stays open when "Salvar e adicionar outro" is checked', async () => {
+  it('calls onCreated with the created product and stays open when "Salvar e adicionar outro" is checked', async () => {
     const onClose = vi.fn()
     const onCreated = vi.fn()
-    const createImpl = vi.fn().mockResolvedValue(undefined)
+    const createdProduct = {
+      id: 'p2', locationId: 'l1', name: 'Vestido Verde', category: 'festa', size: 'M', color: 'verde',
+      rentalPrice: 150, depositAmount: 0, status: 'active' as const, availability: 'available' as const,
+      hasAllocationHistory: false, createdAt: '2026-01-02',
+    }
+    const createImpl = vi.fn().mockResolvedValue(createdProduct)
     mockProductHooks(vi.fn(), createImpl)
     renderWithToast(<ProductDrawer product={null} onClose={onClose} onCreated={onCreated} />)
 
@@ -368,9 +373,23 @@ describe('ProductDrawer', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
 
     expect(createImpl).toHaveBeenCalled()
-    expect(onCreated).toHaveBeenCalledWith(expect.objectContaining({ category: 'festa', size: 'M', color: 'verde' }))
+    expect(onCreated).toHaveBeenCalledWith(createdProduct)
     expect(onClose).not.toHaveBeenCalled()
     expect(screen.getByLabelText('Nome')).toHaveValue('')
+  })
+
+  it('prefills the name field from initialName in create mode', () => {
+    mockProductHooks(vi.fn())
+    renderWithToast(<ProductDrawer product={null} onClose={vi.fn()} initialName="Vestido Rosa" />)
+
+    expect(screen.getByLabelText('Nome')).toHaveValue('Vestido Rosa')
+  })
+
+  it('hides "Salvar e adicionar outro" when allowSaveAndAddAnother is false', () => {
+    mockProductHooks(vi.fn())
+    renderWithToast(<ProductDrawer product={null} onClose={vi.fn()} allowSaveAndAddAnother={false} />)
+
+    expect(screen.queryByLabelText('Salvar e adicionar outro')).not.toBeInTheDocument()
   })
 
   it('closes normally when "Salvar e adicionar outro" is left unchecked', async () => {

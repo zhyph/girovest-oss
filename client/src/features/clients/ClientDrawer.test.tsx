@@ -29,6 +29,45 @@ function mockClientHooks(
 }
 
 describe('ClientDrawer', () => {
+  it('prefills the name field from initialName in create mode only', () => {
+    mockClientHooks()
+    renderWithToast(<ClientDrawer client={null} initialName="Nova Cliente" onClose={vi.fn()} />)
+
+    expect(screen.getByLabelText('Nome')).toHaveValue('Nova Cliente')
+  })
+
+  it('ignores initialName when editing an existing client', () => {
+    mockClientHooks()
+    renderWithToast(<ClientDrawer client={client} initialName="Deveria Ser Ignorado" onClose={vi.fn()} />)
+
+    expect(screen.getByLabelText('Nome')).toHaveValue('Maria Silva')
+  })
+
+  it('calls onCreated with the created client on save, only in create mode', async () => {
+    const created: Client = { ...client, id: 'c-new', name: 'Nova Cliente' }
+    const createImpl = vi.fn().mockResolvedValue(created)
+    const onCreated = vi.fn()
+    mockClientHooks(vi.fn(), createImpl)
+    renderWithToast(<ClientDrawer client={null} onClose={vi.fn()} onCreated={onCreated} />)
+
+    await userEvent.type(screen.getByLabelText('Nome'), 'Nova Cliente')
+    await userEvent.type(screen.getByLabelText('Telefone'), '11999990000')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+
+    expect(onCreated).toHaveBeenCalledWith(created)
+  })
+
+  it('does not call onCreated when updating an existing client', async () => {
+    const updateImpl = vi.fn().mockResolvedValue(client)
+    const onCreated = vi.fn()
+    mockClientHooks(vi.fn(), vi.fn(), updateImpl)
+    renderWithToast(<ClientDrawer client={client} onClose={vi.fn()} onCreated={onCreated} />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+
+    expect(onCreated).not.toHaveBeenCalled()
+  })
+
   it('closes when the backdrop is clicked', async () => {
     const onClose = vi.fn()
     mockClientHooks()

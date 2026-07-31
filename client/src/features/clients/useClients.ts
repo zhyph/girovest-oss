@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api.ts'
 import type { Client, ClientFormValues } from './clientSchemas.ts'
 
-const CLIENTS_KEY = ['clients']
+export const CLIENTS_KEY = ['clients']
 
 export function useClients() {
   return useQuery({
@@ -16,7 +16,15 @@ export function useCreateClient() {
   return useMutation({
     mutationFn: (values: ClientFormValues) =>
       apiFetch<Client>('/api/clients', { method: 'POST', body: JSON.stringify(values) }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: CLIENTS_KEY }),
+    onSuccess: (created) => {
+      // Seeded ahead of the refetch below so a caller awaiting mutateAsync can
+      // immediately find the new client in useClients() — the refetch this
+      // still triggers is what reconciles it against the server's own state.
+      const current = queryClient.getQueryData<Client[]>(CLIENTS_KEY)
+      const newData = Array.isArray(current) ? [created, ...current] : [created]
+      queryClient.setQueryData<Client[]>(CLIENTS_KEY, newData)
+      queryClient.invalidateQueries({ queryKey: CLIENTS_KEY })
+    },
   })
 }
 

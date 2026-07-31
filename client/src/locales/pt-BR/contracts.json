@@ -44,6 +44,18 @@
     "confirmMessage": "Isso cancela todas as peças ainda reservadas neste contrato. Peças já retiradas ou devolvidas não são afetadas.",
     "confirm": "Cancelar contrato"
   },
+  "clientCombobox": {
+    "createNew": "Criar cliente \"{{name}}\"",
+    "duplicateHint": "Já existe um cliente com esse nome",
+    "emptyHint": "Digite um nome para buscar ou cadastrar um cliente",
+    "moreResults": "Mostrando {{shown}} de {{total}}. Refine a busca para ver mais."
+  },
+  "productCombobox": {
+    "createNew": "Criar produto \"{{name}}\"",
+    "duplicateHint": "Já existe um produto com esse nome",
+    "emptyHint": "Digite um nome para buscar ou cadastrar um produto",
+    "moreResults": "Mostrando {{shown}} de {{total}}. Refine a busca para ver mais."
+  },
   "print": {
     "action": "Imprimir",
     "back": "Voltar",
@@ -78,6 +90,7 @@
     "clientRequired": "Cliente é obrigatório",
     "eventDateRequired": "Data do evento é obrigatória",
     "eventDateInvalid": "Esta data não existe",
+    "productRequired": "Produto é obrigatório",
     "checkoutDateRequired": "Data de retirada é obrigatória",
     "checkoutDateInvalid": "Esta data não existe",
     "dueDateRequired": "Data de devolução é obrigatória",

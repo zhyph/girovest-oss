@@ -29,12 +29,16 @@ export function ProductDrawer({
   product,
   onClose,
   duplicateDefaults,
+  initialName,
+  allowSaveAndAddAnother = true,
   onCreated,
 }: {
   product: Product | null
   onClose: () => void
   duplicateDefaults?: Partial<ProductFormValues>
-  onCreated?: (values: ProductFormValues) => void
+  initialName?: string
+  allowSaveAndAddAnother?: boolean
+  onCreated?: (product: Product) => void
 }) {
   const { t } = useTranslation('products')
   const { staff } = useAuth()
@@ -57,7 +61,7 @@ export function ProductDrawer({
     resolver: zodResolver(productSchema),
     defaultValues: product ?? {
       locationId: staff?.locationId ?? '',
-      name: '',
+      name: initialName ?? '',
       category: duplicateDefaults?.category ?? '',
       size: duplicateDefaults?.size ?? '',
       color: duplicateDefaults?.color ?? '',
@@ -109,8 +113,8 @@ export function ProductDrawer({
         await updateProduct.mutateAsync({ id: product.id, values: { ...normalized, status, photos } })
         onClose()
       } else {
-        await createProduct.mutateAsync({ ...normalized, photos })
-        onCreated?.(normalized)
+        const created = await createProduct.mutateAsync({ ...normalized, photos })
+        onCreated?.(created)
         if (addAnotherAfterSave) {
           setPhotos([])
           reset({
@@ -312,7 +316,7 @@ export function ProductDrawer({
             </ul>
           )}
         </div>
-        {!product && (
+        {!product && allowSaveAndAddAnother && (
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"

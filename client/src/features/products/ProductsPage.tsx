@@ -141,14 +141,14 @@ export function ProductsPage() {
           product={editing}
           onClose={() => setEditing(undefined)}
           duplicateDefaults={editing === null ? (lastCreatedDefaults ?? undefined) : undefined}
-          onCreated={(values) =>
+          onCreated={(createdProduct) =>
             setLastCreatedDefaults({
-              category: values.category,
-              size: values.size,
-              color: values.color,
-              rentalPrice: values.rentalPrice,
-              depositAmount: values.depositAmount,
-              description: values.description,
+              category: createdProduct.category,
+              size: createdProduct.size,
+              color: createdProduct.color,
+              rentalPrice: createdProduct.rentalPrice,
+              depositAmount: createdProduct.depositAmount,
+              description: createdProduct.description ?? undefined,
             })
           }
         />

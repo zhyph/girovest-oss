@@ -20,7 +20,17 @@ import { normalizeToSuggestion } from '../../lib/autocompleteMatch.ts'
 import { clientSchema, type Client, type ClientFormValues } from './clientSchemas.ts'
 import { useClients, useCreateClient, useUpdateClient, useDeleteClient } from './useClients.ts'
 
-export function ClientDrawer({ client, onClose }: { client: Client | null; onClose: () => void }) {
+export function ClientDrawer({
+  client,
+  onClose,
+  initialName,
+  onCreated,
+}: {
+  client: Client | null
+  onClose: () => void
+  initialName?: string
+  onCreated?: (client: Client) => void
+}) {
   const { t } = useTranslation('clients')
   const { locale } = useLocale()
   const { data: allClients } = useClients()
@@ -54,7 +64,7 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
   } = useForm<ClientFormValues>({
     resolver: zodResolver(clientSchema),
     defaultValues: client ?? {
-      name: '',
+      name: initialName ?? '',
       phone: '',
       email: '',
       notes: '',
@@ -143,7 +153,8 @@ export function ClientDrawer({ client, onClose }: { client: Client | null; onClo
       if (client) {
         await updateClient.mutateAsync({ id: client.id, values: normalized })
       } else {
-        await createClient.mutateAsync(normalized)
+        const created = await createClient.mutateAsync(normalized)
+        onCreated?.(created)
       }
       onClose()
     } catch (error) {

@@ -17,7 +17,12 @@ export function useCreateProduct() {
   return useMutation({
     mutationFn: (values: ProductFormValues) =>
       apiFetch<Product>('/api/products', { method: 'POST', body: JSON.stringify(values) }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: PRODUCTS_KEY }),
+    onSuccess: (created) => {
+      const current = queryClient.getQueryData<Product[]>(PRODUCTS_KEY)
+      const newData = Array.isArray(current) ? [created, ...current] : [created]
+      queryClient.setQueryData<Product[]>(PRODUCTS_KEY, newData)
+      queryClient.invalidateQueries({ queryKey: PRODUCTS_KEY })
+    },
   })
 }
 

@@ -15,7 +15,14 @@ function SheetOverlay({ className, ...props }: React.ComponentProps<typeof Dialo
     <DialogPrimitive.Overlay
       data-slot="sheet-overlay"
       className={cn(
-        'fixed inset-0 z-40 bg-overlay opacity-100 transition-opacity duration-200 starting:opacity-0',
+        // Matches SheetContent's z-50 (not z-40) so a Sheet opened on top of
+        // another Sheet — e.g. the inline client/product create drawer over
+        // the contract form — dims the one beneath it. A lower overlay
+        // z-index would sit below the first Sheet's content and never
+        // visually cover it, since content and overlay share this stacking
+        // context. dialog.tsx's overlay already uses this same z-50 scheme,
+        // which is why ConfirmDialog-over-Sheet nesting looks correct today.
+        'fixed inset-0 z-50 bg-overlay opacity-100 transition-opacity duration-200 starting:opacity-0',
         className,
       )}
       {...props}

@@ -18,32 +18,38 @@ import { getMissingRequiredFields } from '../../lib/clientReadiness.ts'
 import { getPaymentMethods } from '../../lib/paymentMethodTemplate.ts'
 import { useClients } from '../clients/useClients.ts'
 import { ClientDrawer } from '../clients/ClientDrawer.tsx'
+import { ClientCombobox } from '../clients/ClientCombobox.tsx'
 import type { Client } from '../clients/clientSchemas.ts'
 import { useProducts } from '../products/useProducts.ts'
 import { useProductAvailability } from '../allocations/useAllocations.ts'
+import type { Product } from '../products/productSchemas.ts'
+import { ProductCombobox } from '../products/ProductCombobox.tsx'
+import { ProductDrawer } from '../products/ProductDrawer.tsx'
 import { newContractSchema, type NewContractFormValues } from './contractSchemas.ts'
 import { useCreateContract } from './useContracts.ts'
 
 function ItemRow({
   index,
   control,
-  register,
   activeProducts,
   setValue,
   onRemove,
   showRemove,
+  productIdError,
   checkoutDateError,
   dueDateError,
+  onCreateProduct,
 }: {
   index: number
   control: ReturnType<typeof useForm<NewContractFormValues>>['control']
-  register: ReturnType<typeof useForm<NewContractFormValues>>['register']
-  activeProducts: { id: string; name: string; rentalPrice: number }[]
+  activeProducts: Product[]
   setValue: ReturnType<typeof useForm<NewContractFormValues>>['setValue']
   onRemove: () => void
   showRemove: boolean
+  productIdError?: string
   checkoutDateError?: string
   dueDateError?: string
+  onCreateProduct: (index: number, name: string) => void
 }) {
   const { t } = useTranslation('contracts')
   const productId = useWatchField(control, `items.${index}.productId`)
@@ -56,26 +62,32 @@ function ItemRow({
       <div className="flex items-end gap-2">
         <label className="flex flex-1 flex-col gap-1 text-sm">
           <span>{t('fields.product')}<RequiredMark /></span>
-          <Select
-            {...register(`items.${index}.productId`, {
-              onChange: (event) => {
-                // Staff should not have to remember each piece's price. The
-                // field stays editable — a discount or a surcharge is still
-                // just typing over it — but it starts from the real number.
-                const picked = activeProducts.find((product) => product.id === event.target.value)
-                if (picked) {
-                  setValue(`items.${index}.priceCharged`, picked.rentalPrice, { shouldDirty: true })
-                }
-              },
-            })}
-            aria-label={t('fields.product')}
-            aria-required="true"
-          >
-            <option value="">—</option>
-            {activeProducts.map((product) => (
-              <option key={product.id} value={product.id}>{product.name}</option>
-            ))}
-          </Select>
+          <Controller
+            name={`items.${index}.productId`}
+            control={control}
+            render={({ field }) => (
+              <ProductCombobox
+                ref={field.ref}
+                products={activeProducts}
+                value={field.value}
+                onSelect={(id) => {
+                  field.onChange(id)
+                  // Staff should not have to remember each piece's price. The
+                  // field stays editable — a discount or a surcharge is still
+                  // just typing over it — but it starts from the real number.
+                  const picked = activeProducts.find((product) => product.id === id)
+                  if (picked) {
+                    setValue(`items.${index}.priceCharged`, picked.rentalPrice, { shouldDirty: true })
+                  }
+                }}
+                onCreateNew={(name) => onCreateProduct(index, name)}
+                aria-label={t('fields.product')}
+                aria-required="true"
+                aria-invalid={productIdError ? true : undefined}
+              />
+            )}
+          />
+          {productIdError && <span className="text-xs text-destructive">{productIdError}</span>}
         </label>
         {showRemove && (
           <Button type="button" variant="ghost" size="icon" onClick={onRemove} aria-label={t('items.remove')}>
@@ -150,10 +162,11 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
   const { data: products } = useProducts()
   const createContract = useCreateContract()
   const [completingClient, setCompletingClient] = useState<Client | null>(null)
+  const [creatingClientName, setCreatingClientName] = useState<string | null>(null)
+  const [creatingProduct, setCreatingProduct] = useState<{ index: number; name: string } | null>(null)
   const [pendingSubmitValues, setPendingSubmitValues] = useState<NewContractFormValues | null>(null)
 
   const {
-    register,
     handleSubmit,
     control,
     watch,
@@ -226,12 +239,22 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3">
           <label className="flex flex-col gap-1 text-sm">
             <span>{t('fields.client')}<RequiredMark /></span>
-            <Select {...register('clientId')} aria-label={t('fields.client')} aria-required="true">
-              <option value="">—</option>
-              {clients?.map((client) => (
-                <option key={client.id} value={client.id}>{client.name}</option>
-              ))}
-            </Select>
+            <Controller
+              name="clientId"
+              control={control}
+              render={({ field }) => (
+                <ClientCombobox
+                  ref={field.ref}
+                  clients={clients ?? []}
+                  value={field.value}
+                  onSelect={field.onChange}
+                  onCreateNew={(name) => setCreatingClientName(name)}
+                  aria-label={t('fields.client')}
+                  aria-required="true"
+                  aria-invalid={errors.clientId ? true : undefined}
+                />
+              )}
+            />
             {errors.clientId && <span className="text-xs text-destructive">{t('validation.clientRequired')}</span>}
           </label>
           {selectedClient && missingFields.length > 0 && (
@@ -270,11 +293,14 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
                 key={field.id}
                 index={index}
                 control={control}
-                register={register}
                 activeProducts={activeProducts}
                 setValue={setValue}
                 onRemove={() => items.remove(index)}
                 showRemove={items.fields.length > 1}
+                onCreateProduct={(idx, name) => setCreatingProduct({ index: idx, name })}
+                productIdError={
+                  errors.items?.[index]?.productId ? t('validation.productRequired') : undefined
+                }
                 checkoutDateError={
                   errors.items?.[index]?.checkoutDate
                     ? t(errors.items[index]?.checkoutDate?.type === 'custom' ? 'validation.checkoutDateInvalid' : 'validation.checkoutDateRequired')
@@ -303,12 +329,32 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
           </div>
           <label className="flex flex-col gap-1 text-sm">
             <span>{t('fields.paymentMethod')}<RequiredMark /></span>
-            <Select {...register('paymentMethod')} aria-label={t('fields.paymentMethod')} aria-required="true">
-              <option value="">—</option>
-              {paymentMethods.map((method) => (
-                <option key={method} value={method}>{method}</option>
-              ))}
-            </Select>
+            {/*
+              Controller-driven, not register-driven, even though this is a
+              plain native <select>: react-hook-form's shouldFocusError walk
+              always focuses a register()-registered field over a
+              Controller-registered one on submit, regardless of JSX order
+              — register() calls run synchronously during the parent's own
+              render, while Controller's registration only runs when React
+              renders that child component, a strictly later step. With
+              clientId/productId already Controller-driven, leaving this the
+              lone register()ed field meant it silently won the walk instead
+              of whichever field was actually first and invalid. Verified via
+              an isolated RHF repro outside this component, independent of
+              EntityCombobox/Radix.
+            */}
+            <Controller
+              name="paymentMethod"
+              control={control}
+              render={({ field }) => (
+                <Select {...field} aria-label={t('fields.paymentMethod')} aria-required="true">
+                  <option value="">—</option>
+                  {paymentMethods.map((method) => (
+                    <option key={method} value={method}>{method}</option>
+                  ))}
+                </Select>
+              )}
+            />
             {errors.paymentMethod && <span className="text-xs text-destructive">{t('validation.paymentMethodRequired')}</span>}
           </label>
           <div className="flex flex-col gap-2">
@@ -402,6 +448,30 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
       </SheetContent>
     </Sheet>
     {completingClient && <ClientDrawer client={completingClient} onClose={() => setCompletingClient(null)} />}
+    {creatingClientName !== null && (
+      <ClientDrawer
+        client={null}
+        initialName={creatingClientName}
+        onClose={() => setCreatingClientName(null)}
+        onCreated={(newClient) => {
+          setValue('clientId', newClient.id, { shouldDirty: true, shouldValidate: true })
+          setCreatingClientName(null)
+        }}
+      />
+    )}
+    {creatingProduct && (
+      <ProductDrawer
+        product={null}
+        initialName={creatingProduct.name}
+        allowSaveAndAddAnother={false}
+        onClose={() => setCreatingProduct(null)}
+        onCreated={(newProduct) => {
+          setValue(`items.${creatingProduct.index}.productId`, newProduct.id, { shouldDirty: true, shouldValidate: true })
+          setValue(`items.${creatingProduct.index}.priceCharged`, newProduct.rentalPrice, { shouldDirty: true })
+          setCreatingProduct(null)
+        }}
+      />
+    )}
     </>
   )
 }

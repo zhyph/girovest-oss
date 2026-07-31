@@ -100,7 +100,14 @@ describe('ProductsPage', () => {
   it('remembers the last created product\'s category/size/color and prefills a fresh Novo later in the session', async () => {
     vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [product], isLoading: false } as never)
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' }, isLoadingStaff: false, isErrorStaff: false, refetchStaff: vi.fn(), login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
-    vi.spyOn(useProductsModule, 'useCreateProduct').mockReturnValue({ mutateAsync: vi.fn().mockResolvedValue(undefined), isPending: false } as never)
+    vi.spyOn(useProductsModule, 'useCreateProduct').mockReturnValue({
+      mutateAsync: vi.fn().mockResolvedValue({
+        id: 'p2', locationId: 'l1', name: 'Vestido Verde', category: 'festa', size: 'M', color: 'verde',
+        rentalPrice: 150, depositAmount: 0, status: 'active', availability: 'available',
+        hasAllocationHistory: false, createdAt: '2026-01-02',
+      }),
+      isPending: false,
+    } as never)
     vi.spyOn(useProductsModule, 'useUpdateProduct').mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
     vi.spyOn(useProductsModule, 'useDeleteProduct').mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
 
@@ -131,7 +138,14 @@ describe('ProductsPage', () => {
   it('does not update the remembered defaults when the drawer is closed without saving', async () => {
     vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [product], isLoading: false } as never)
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' }, isLoadingStaff: false, isErrorStaff: false, refetchStaff: vi.fn(), login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
-    vi.spyOn(useProductsModule, 'useCreateProduct').mockReturnValue({ mutateAsync: vi.fn().mockResolvedValue(undefined), isPending: false } as never)
+    vi.spyOn(useProductsModule, 'useCreateProduct').mockReturnValue({
+      mutateAsync: vi.fn().mockResolvedValue({
+        id: 'p2', locationId: 'l1', name: 'Vestido Verde', category: 'festa', size: 'M', color: 'verde',
+        rentalPrice: 150, depositAmount: 0, status: 'active', availability: 'available',
+        hasAllocationHistory: false, createdAt: '2026-01-02',
+      }),
+      isPending: false,
+    } as never)
     vi.spyOn(useProductsModule, 'useUpdateProduct').mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
     vi.spyOn(useProductsModule, 'useDeleteProduct').mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
 
@@ -158,6 +172,38 @@ describe('ProductsPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Novo' }))
     expect(screen.getByLabelText('Categoria')).toHaveValue('festa')
     expect(screen.getByLabelText('Cor')).toHaveValue('verde')
+  })
+
+  it('does not crash and leaves Descrição blank when the created product has no description', async () => {
+    vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [product], isLoading: false } as never)
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' }, isLoadingStaff: false, isErrorStaff: false, refetchStaff: vi.fn(), login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
+    vi.spyOn(useProductsModule, 'useCreateProduct').mockReturnValue({
+      mutateAsync: vi.fn().mockResolvedValue({
+        id: 'p2', locationId: 'l1', name: 'Vestido Verde', description: null, category: 'festa', size: 'M', color: 'verde',
+        rentalPrice: 150, depositAmount: 0, status: 'active', availability: 'available',
+        hasAllocationHistory: false, createdAt: '2026-01-02',
+      }),
+      isPending: false,
+    } as never)
+    vi.spyOn(useProductsModule, 'useUpdateProduct').mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
+    vi.spyOn(useProductsModule, 'useDeleteProduct').mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
+
+    renderWithQueryClient(<ProductsPage />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Novo' }))
+    await userEvent.type(screen.getByLabelText('Nome'), 'Vestido Verde')
+    await userEvent.type(screen.getByLabelText('Categoria'), 'festa')
+    await userEvent.type(screen.getByLabelText('Tamanho'), 'M')
+    await userEvent.type(screen.getByLabelText('Cor'), 'verde')
+    await userEvent.clear(screen.getByLabelText('Preço do aluguel'))
+    await userEvent.type(screen.getByLabelText('Preço do aluguel'), '15000')
+    await userEvent.click(screen.getByLabelText('Salvar e adicionar outro'))
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+
+    // A `null` description handed straight to an uncontrolled register('description')
+    // input would render "null" (or throw, depending on the input type) — this
+    // must come through as an empty field instead.
+    expect(screen.getByLabelText('Descrição')).toHaveValue('')
   })
 
   it('keeps the header and search pinned outside the scrollable list region', () => {
