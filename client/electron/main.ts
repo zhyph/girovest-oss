@@ -23,6 +23,18 @@ export function resolveServerRuntimeCwd(
   return isPackaged ? path.join(resourcesPath, 'server') : resolveServerCwd(appRoot)
 }
 
+// Packaged builds get icon.png copied to the resources root by the
+// extraResources entry in electron-builder.yml. Dev mode reads the same
+// source PNG straight from build/ (app.getAppPath() is the client/ project
+// root in dev), since that directory is never packaged.
+export function resolveIconPath(
+  isPackaged: boolean,
+  appRoot: string,
+  resourcesPath: string,
+): string {
+  return isPackaged ? path.join(resourcesPath, 'icon.png') : path.join(appRoot, 'build', 'icon.png')
+}
+
 // Packaged builds ship a single esbuild-bundled file (server-bundle.mjs) that
 // inlines everything except the two native modules (bcrypt, better-sqlite3),
 // so the app isn't exposed to npm workspace hoisting silently dropping a
@@ -386,6 +398,7 @@ function createWindow(state: ActivationState): BrowserWindow {
     // resizing the window doesn't flash white before the first paint when
     // the app renders dark.
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#241c1b' : '#faf6f0',
+    icon: resolveIconPath(app.isPackaged, app.getAppPath(), process.resourcesPath),
     webPreferences: {
       preload: path.join(import.meta.dirname, '../preload/index.cjs'),
     },

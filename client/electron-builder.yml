@@ -2,6 +2,12 @@ appId: com.girovest.app
 productName: Girovest
 directories:
   output: release
+# Source for the generated .ico (Windows exe/installer) and the AppImage/.desktop
+# icon (Linux) — electron-builder derives both from this single PNG. Also copied
+# into extraResources below so the running app can set it as the BrowserWindow
+# icon (see resolveIconPath in electron/main.ts); electron-builder's own icon
+# handling only covers the packaged executable/bundle, not the runtime window.
+icon: build/icon.png
 # The three build targets are self-contained: electron-vite bundles the main
 # process (including electron-updater/electron-log — see the externalization
 # comment in electron.vite.config.ts), the preload, and the renderer into
@@ -30,6 +36,8 @@ files:
 # better-sqlite3 and the migration .sql files below. Keep this an allowlist:
 # a denylist over node_modules silently regrows with every new devDependency.
 extraResources:
+  - from: build/icon.png
+    to: icon.png
   - from: ../server/dist-bundle/server-bundle.mjs
     to: server/server-bundle.mjs
   - from: ../server/dist-bundle/migrate.mjs

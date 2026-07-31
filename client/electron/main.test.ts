@@ -6,6 +6,7 @@ import net from 'net'
 import {
   resolveServerCwd,
   resolveServerRuntimeCwd,
+  resolveIconPath,
   resolveServerEntry,
   resolveJwtSecret,
   resolveDatabaseUrl,
@@ -33,6 +34,18 @@ describe('resolveServerRuntimeCwd', () => {
   it('falls back to resolveServerCwd when not packaged', () => {
     const result = resolveServerRuntimeCwd(false, '/home/user/girovest/client', '/unused')
     expect(result).toBe(resolveServerCwd('/home/user/girovest/client'))
+  })
+})
+
+describe('resolveIconPath', () => {
+  it('resolves to icon.png under resourcesPath when packaged', () => {
+    const result = resolveIconPath(true, '/unused', '/opt/girovest/resources')
+    expect(result).toBe(path.join('/opt/girovest/resources', 'icon.png'))
+  })
+
+  it('resolves to build/icon.png under the app root when not packaged', () => {
+    const result = resolveIconPath(false, '/home/user/girovest/client', '/unused')
+    expect(result).toBe(path.join('/home/user/girovest/client', 'build', 'icon.png'))
   })
 })
 
