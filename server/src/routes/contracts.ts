@@ -21,15 +21,6 @@ import { isoDate } from '../lib/zodDate.js'
 export const contractsRouter = Router()
 contractsRouter.use(requireAuth)
 
-// A Contract's locationId drives its per-location sequential number and the
-// @@unique([locationId, number]) constraint — it must come from the
-// authenticated staff's own location, never from client-supplied input,
-// the same way locationSettings.ts's resolveLocationId already does.
-async function resolveLocationId(staffId: string): Promise<string> {
-  const staff = await prisma.staff.findUniqueOrThrow({ where: { id: staffId } })
-  return staff.locationId
-}
-
 // Mirrors server.ts's own binding decision exactly: when the main app is
 // bound to 0.0.0.0 (the standalone/non-Electron default), signingApp never
 // binds anywhere at all, and a candidate whose address equals the main
@@ -44,7 +35,7 @@ export function reachableSigningCandidates(): ReturnType<typeof detectLanCandida
 
 contractsRouter.get('/', async (req, res) => {
   if (!req.staff) throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Unauthorized')
-  const locationId = await resolveLocationId(req.staff.staffId)
+  const locationId = req.staff.locationId
   const page = Number(req.query.page ?? 1)
   const pageSize = Number(req.query.pageSize ?? 20)
   const search = typeof req.query.search === 'string' ? req.query.search : ''
@@ -53,7 +44,7 @@ contractsRouter.get('/', async (req, res) => {
 
 contractsRouter.get('/:id', async (req, res) => {
   if (!req.staff) throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Unauthorized')
-  const locationId = await resolveLocationId(req.staff.staffId)
+  const locationId = req.staff.locationId
   res.json(await getContract(req.params.id, locationId))
 })
 
@@ -82,14 +73,14 @@ contractsRouter.post('/', async (req, res) => {
   if (!parsed.success || !req.staff) {
     throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'Invalid contract payload')
   }
-  const locationId = await resolveLocationId(req.staff.staffId)
+  const locationId = req.staff.locationId
   const contract = await createContract({ ...parsed.data, locationId, staffId: req.staff.staffId })
   res.status(201).json(contract)
 })
 
 contractsRouter.post('/:id/cancel', async (req, res) => {
   if (!req.staff) throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Unauthorized')
-  const locationId = await resolveLocationId(req.staff.staffId)
+  const locationId = req.staff.locationId
   res.json(await cancelContract(req.params.id, locationId))
 })
 
@@ -101,7 +92,7 @@ contractsRouter.patch('/:contractId/installments/:installmentId', async (req, re
   if (!parsed.success) {
     throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'Invalid installment payload')
   }
-  const locationId = await resolveLocationId(req.staff.staffId)
+  const locationId = req.staff.locationId
   res.json(
     await setInstallmentPaid(req.params.contractId, req.params.installmentId, locationId, parsed.data.paid),
   )
@@ -109,7 +100,7 @@ contractsRouter.patch('/:contractId/installments/:installmentId', async (req, re
 
 contractsRouter.post('/:id/sign-token', async (req, res) => {
   if (!req.staff) throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Unauthorized')
-  const locationId = await resolveLocationId(req.staff.staffId)
+  const locationId = req.staff.locationId
   const { token, expiresAt } = await issueSigningToken(req.params.id, locationId)
 
   const location = await prisma.location.findUniqueOrThrow({ where: { id: locationId } })

@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from 'express'
+import { prisma } from '../db/client.js'
 import { AppError } from '../errors/AppError.js'
 import { ErrorCodes } from '../errors/errorCodes.js'
 import type { VerifiedStaffToken } from './jwt.js'
@@ -24,7 +25,7 @@ export const RENEWAL_EXCLUDED_PATHS = new Set(['/api/products/events/ticket'])
 // extend one.
 export const BACKGROUND_REQUEST_HEADER = 'X-Background-Request'
 
-export function requireAuth(req: Request, res: Response, next: NextFunction): void {
+export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const header = req.header('authorization')
   if (!header?.startsWith('Bearer ')) {
     throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Missing or malformed Authorization header')
@@ -37,7 +38,17 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
   } catch {
     throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Invalid or expired token')
   }
-  req.staff = { staffId: payload.staffId, role: payload.role }
+
+  // findUniqueOrThrow, not findUnique: a token for a staff member deleted
+  // after the token was issued must fail here, not proceed with an
+  // undefined locationId.
+  let staff
+  try {
+    staff = await prisma.staff.findUniqueOrThrow({ where: { id: payload.staffId } })
+  } catch {
+    throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Staff account no longer exists')
+  }
+  req.staff = { staffId: staff.id, role: staff.role as 'owner' | 'staff', locationId: staff.locationId }
 
   // Sliding renewal: a session that keeps being used keeps being extended, so
   // nobody is logged out mid-shift, while a session nobody uses reaches its own

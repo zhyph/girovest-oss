@@ -75,10 +75,9 @@ productsRouter.delete('/:id', async (req, res) => {
 
 productsRouter.post('/photo-session', async (req, res) => {
   if (!req.staff) throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Unauthorized')
-  const staff = await prisma.staff.findUniqueOrThrow({ where: { id: req.staff.staffId } })
-  const { token, expiresAt } = await issueProductPhotoSession(staff.id, staff.locationId)
+  const { token, expiresAt } = await issueProductPhotoSession(req.staff.staffId, req.staff.locationId)
 
-  const location = await prisma.location.findUniqueOrThrow({ where: { id: staff.locationId } })
+  const location = await prisma.location.findUniqueOrThrow({ where: { id: req.staff.locationId } })
   if (location.connectivityMode === 'relay') {
     const credentials = await relayCredentialsFromEnv()
     if (credentials) {
@@ -111,8 +110,7 @@ productsRouter.post('/photo-session', async (req, res) => {
 
 productsRouter.post('/events/ticket', async (req, res) => {
   if (!req.staff) throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Unauthorized')
-  const staff = await prisma.staff.findUniqueOrThrow({ where: { id: req.staff.staffId } })
-  const { ticket, expiresAt } = mintSseTicket(staff.id, staff.locationId)
+  const { ticket, expiresAt } = mintSseTicket(req.staff.staffId, req.staff.locationId)
   res.status(201).json({ ticket, expiresAt })
 })
 
