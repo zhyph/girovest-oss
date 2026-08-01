@@ -1,0 +1,19 @@
+id: no-unscoped-location-model
+language: TypeScript
+message: >-
+  Use scopedDb(locationId) from server/src/db/scopedClient.ts instead of the
+  bare prisma client for Client/Product — see docs/superpowers/specs/2026-07-31-location-scoping-design.md.
+  If this call site genuinely has no HTTP session (e.g. a token-based lookup
+  that already has its own locationId in hand), route it through
+  scopedDb(knownLocationId) instead of prisma directly.
+severity: error
+rule:
+  any:
+    - pattern: prisma.client.$METHOD($$$ARGS)
+    - pattern: prisma.product.$METHOD($$$ARGS)
+files:
+  - "src/**/*.ts"
+ignores:
+  - "src/db/scopedClient.ts"
+  - "src/**/*.test.ts"
+  - "src/generated/**"
