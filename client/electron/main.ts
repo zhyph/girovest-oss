@@ -127,6 +127,30 @@ export async function waitForPortFree(
   return false
 }
 
+// On an electron-updater restart, the new instance has no ChildProcess
+// handle to the OLD instance (unlike the restore flow's waitForProcessExit,
+// which waits on a process THIS instance spawned) — so the only reliable
+// check is to actually try opening the file for writing and retry on
+// failure, mirroring waitForPortFree's probe-until-free loop.
+export async function waitForFileWritable(
+  filePath: string,
+  timeoutMs = 5_000,
+  intervalMs = 150,
+): Promise<boolean> {
+  if (!fs.existsSync(filePath)) return true
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    try {
+      const fd = fs.openSync(filePath, 'r+')
+      fs.closeSync(fd)
+      return true
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, intervalMs))
+    }
+  }
+  return false
+}
+
 // serverProcess.kill() is asynchronous — the OS may not have actually torn
 // the process down by the time `kill()` returns. Restore mutates dev.db's
 // sidecars and then renames a file over the live dev.db; on Windows in
@@ -323,6 +347,13 @@ async function startServer(): Promise<string | null> {
   }
 
   try {
+    // Must happen before the backup, not just before migrations: the backup
+    // itself does three non-atomic copyFileSync calls, and a still-writing
+    // previous process could make each one individually succeed while the
+    // result is internally torn. Best-effort: proceeding after a timeout
+    // (rather than aborting) matches this app's existing "a locked file must
+    // not block startup forever" posture elsewhere in this function.
+    await waitForFileWritable(resolveDatabaseUrl(userDataPath).replace(/^file:/, ''))
     // Backup before migrating; if the backup itself throws (e.g. disk full),
     // deliberately abort startup rather than migrate without a safety copy.
     backupDatabaseIfNeeded(

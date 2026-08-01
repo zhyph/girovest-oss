@@ -15,6 +15,7 @@ import {
   resolveMigrateEntry,
   cleanupLegacyServerRuntime,
   waitForPortFree,
+  waitForFileWritable,
   recordCrashAndCheckLoop,
 } from './main.ts'
 
@@ -156,6 +157,31 @@ describe('waitForPortFree', () => {
     setTimeout(() => blocker.close(), 200)
 
     await expect(waitForPortFree(port, '127.0.0.1', 3000, 50)).resolves.toBe(true)
+  })
+})
+
+describe('waitForFileWritable', () => {
+  it('resolves true immediately when the file is not locked', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'file-lock-test-'))
+    const filePath = path.join(dir, 'dev.db')
+    fs.writeFileSync(filePath, 'x')
+    try {
+      const result = await waitForFileWritable(filePath, 500, 50)
+      expect(result).toBe(true)
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('resolves true immediately when the file does not exist yet (fresh install)', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'file-lock-test-'))
+    const filePath = path.join(dir, 'dev.db')
+    try {
+      const result = await waitForFileWritable(filePath, 500, 50)
+      expect(result).toBe(true)
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
 
