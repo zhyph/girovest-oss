@@ -41,14 +41,21 @@ describe('GET/PATCH/DELETE /api/clients/:id cross-location isolation', () => {
   })
 
   it("a created client is assigned to the creating staff's location, not a client-supplied one", async () => {
-    const { staffA, locationA } = await seedTwoLocations()
+    const { staffA, locationA, locationB } = await seedTwoLocations()
     const token = signStaffToken({ staffId: staffA.id, role: 'owner' })
 
     const res = await request(app)
       .post('/api/clients')
       .set('Authorization', `Bearer ${token}`)
-      .send({ name: 'New Client', phone: '1', email: 'n@example.com' })
+      .send({
+        id: 'forged-id',
+        locationId: locationB.id,
+        name: 'New Client',
+        phone: '1',
+        email: 'n@example.com',
+      })
     expect(res.status).toBe(201)
     expect(res.body.locationId).toBe(locationA.id)
+    expect(res.body.locationId).not.toBe(locationB.id)
   })
 })

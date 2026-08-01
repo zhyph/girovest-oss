@@ -141,11 +141,15 @@ export async function updateClient(locationId: string, id: string, data: UpdateC
   await getClient(locationId, id)
 
   await prisma.$transaction(async (tx) => {
-    // clientIdentityDocument/clientAddressLine carry no locationId column —
-    // they pass through scopedDb unmodified (see scopedClient.ts), but the
-    // top-level update below still needs the extended client so its own
-    // where clause stays scoped. getClient above already proved this id
-    // belongs to locationId, so a plain tx.client.update by id here is safe.
+    // This is the bare prisma $transaction, not scopedDb(locationId).$transaction,
+    // so tx.client.update's `where: { id }` below is NOT itself scoped to
+    // locationId. That's safe only because getClient(locationId, id) above
+    // already throws 404 if `id` doesn't belong to locationId — by the time
+    // we get here, id is proven to belong to this location, so every by-id
+    // operation inside this transaction (client, clientIdentityDocument,
+    // clientAddressLine) is safe without needing scopedDb's own scoping.
+    // Do not remove the getClient guard above as "redundant" — it is the
+    // only thing making this transaction location-safe.
     await tx.client.update({
       where: { id },
       data: { name: data.name, phone: data.phone, email: data.email, notes: data.notes },
