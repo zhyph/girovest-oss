@@ -4,7 +4,7 @@ import { DEFAULT_CONTRACT_CLAUSES } from '../constants/defaultContractClauses.js
 async function backfillOrphanAllocations(): Promise<void> {
   const orphans = await prisma.allocation.findMany({
     where: { contractId: null },
-    include: { product: true },
+    include: { product: true, client: true },
     orderBy: { createdAt: 'asc' },
   })
   if (orphans.length === 0) return
@@ -24,6 +24,21 @@ async function backfillOrphanAllocations(): Promise<void> {
     let nextNumber = (lastContract?.number ?? 0) + 1
 
     for (const orphan of locationOrphans) {
+      // Defensive check, not expected to trigger today (every allocation to
+      // date shares its product's and client's location, since only one
+      // Location has ever existed) — but once createContract enforces
+      // client/product location agreement for new allocations, this becomes
+      // the one remaining path that could ever disagree, and silently
+      // creating a cross-location Contract would be worse than skipping it.
+      if (orphan.product.locationId !== orphan.client.locationId) {
+        console.warn(
+          `contractBackfill: skipping orphaned allocation ${orphan.id} — ` +
+            `product location (${orphan.product.locationId}) and client location ` +
+            `(${orphan.client.locationId}) disagree`,
+        )
+        continue
+      }
+
       await prisma.contract.create({
         data: {
           number: nextNumber,

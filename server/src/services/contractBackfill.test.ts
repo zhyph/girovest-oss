@@ -38,7 +38,7 @@ describe('runContractBackfill', () => {
     const staff = await prisma.staff.create({
       data: { name: 'S', login: `staff-${Math.random()}`, passwordHash: 'x', role: 'staff', locationId: location.id },
     })
-    const client = await prisma.client.create({ data: { name: 'C', phone: '1', email: 'c@example.com' } })
+    const client = await prisma.client.create({ data: { locationId: location.id, name: 'C', phone: '1', email: 'c@example.com' } })
     const allocationA = await seedOrphanAllocation(location.id, staff.id, client.id, new Date('2026-01-01T00:00:00Z'))
     const allocationB = await seedOrphanAllocation(location.id, staff.id, client.id, new Date('2026-01-02T00:00:00Z'))
 
@@ -59,7 +59,7 @@ describe('runContractBackfill', () => {
     const staff = await prisma.staff.create({
       data: { name: 'S', login: `staff-${Math.random()}`, passwordHash: 'x', role: 'staff', locationId: location.id },
     })
-    const client = await prisma.client.create({ data: { name: 'C', phone: '1', email: 'c@example.com' } })
+    const client = await prisma.client.create({ data: { locationId: location.id, name: 'C', phone: '1', email: 'c@example.com' } })
     // Created out of chronological order on purpose.
     const later = await seedOrphanAllocation(location.id, staff.id, client.id, new Date('2026-01-05T00:00:00Z'))
     const earlier = await seedOrphanAllocation(location.id, staff.id, client.id, new Date('2026-01-01T00:00:00Z'))
@@ -81,7 +81,7 @@ describe('runContractBackfill', () => {
     const staff = await prisma.staff.create({
       data: { name: 'S', login: `staff-${Math.random()}`, passwordHash: 'x', role: 'staff', locationId: location.id },
     })
-    const client = await prisma.client.create({ data: { name: 'C', phone: '1', email: 'c@example.com' } })
+    const client = await prisma.client.create({ data: { locationId: location.id, name: 'C', phone: '1', email: 'c@example.com' } })
     const allocation = await seedOrphanAllocation(location.id, staff.id, client.id, new Date('2026-01-01'))
 
     await runContractBackfill()
@@ -126,7 +126,7 @@ describe('runContractBackfill', () => {
     const staff = await prisma.staff.create({
       data: { name: 'S', login: `staff-${Math.random()}`, passwordHash: 'x', role: 'staff', locationId: location.id },
     })
-    const client = await prisma.client.create({ data: { name: 'C', phone: '1', email: 'c@example.com' } })
+    const client = await prisma.client.create({ data: { locationId: location.id, name: 'C', phone: '1', email: 'c@example.com' } })
     await seedOrphanAllocation(location.id, staff.id, client.id, new Date('2026-01-01'))
 
     await runContractBackfill()
@@ -136,6 +136,26 @@ describe('runContractBackfill', () => {
     expect(contracts).toHaveLength(1)
     const clauses = await prisma.locationContractClause.findMany({ where: { locationId: location.id } })
     expect(clauses).toHaveLength(DEFAULT_CONTRACT_CLAUSES.length)
+  })
+
+  it('skips and does not create a Contract for an orphan whose client belongs to a different location than its product', async () => {
+    const locationA = await prisma.location.create({ data: { name: 'A', address: 'A' } })
+    const locationB = await prisma.location.create({ data: { name: 'B', address: 'B' } })
+    const staff = await prisma.staff.create({
+      data: { name: 'S', login: `bf-${Date.now()}`, passwordHash: 'x', role: 'owner', locationId: locationA.id },
+    })
+    const product = await prisma.product.create({
+      data: { locationId: locationA.id, name: 'P', category: 'dress', size: 'M', color: 'red', rentalPrice: 10, depositAmount: 5 },
+    })
+    const client = await prisma.client.create({ data: { locationId: locationB.id, name: 'C', phone: '1', email: 'c@x.com' } })
+    await prisma.allocation.create({
+      data: { productId: product.id, clientId: client.id, staffId: staff.id, checkoutDate: new Date(), dueDate: new Date(), status: 'reserved', priceCharged: 100 },
+    })
+
+    await runContractBackfill()
+
+    const contracts = await prisma.contract.findMany()
+    expect(contracts).toHaveLength(0)
   })
 
   it('does nothing when there are no orphan Allocations and every Location already has clauses', async () => {

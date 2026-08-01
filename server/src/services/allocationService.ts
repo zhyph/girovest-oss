@@ -1,4 +1,5 @@
 import { prisma } from '../db/client.js'
+import { scopedDb } from '../db/scopedClient.js'
 import { AppError } from '../errors/AppError.js'
 import { ErrorCodes } from '../errors/errorCodes.js'
 import { isOccupiedForRange, derivedAvailability } from '../domain/occupancy.js'
@@ -157,8 +158,8 @@ export async function cancelAllocation(locationId: string, id: string) {
 // location check of their own by design — these two functions are the
 // callers responsible for verifying ownership first.
 async function assertProductInLocation(locationId: string, productId: string): Promise<void> {
-  const product = await prisma.product.findUnique({ where: { id: productId } })
-  if (!product || product.locationId !== locationId) {
+  const product = await scopedDb(locationId).product.findUnique({ where: { id: productId } })
+  if (!product) {
     throw new AppError(ErrorCodes.NOT_FOUND, 404, `Product ${productId} not found`)
   }
 }

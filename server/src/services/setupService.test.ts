@@ -41,4 +41,16 @@ describe('completeSetup', () => {
     const location = await prisma.location.findUnique({ where: { id: result.locationId } })
     expect(location?.connectivityMode).toBe('relay')
   })
+
+  it('only one of two concurrent completeSetup calls succeeds', async () => {
+    const input = {
+      shopName: 'Shop', shopAddress: 'Addr', ownerName: 'Owner',
+      ownerLogin: `race-${Date.now()}`, ownerPassword: 'password123',
+    }
+    const results = await Promise.allSettled([completeSetup(input), completeSetup({ ...input, ownerLogin: `${input.ownerLogin}-2` })])
+    const fulfilled = results.filter((r) => r.status === 'fulfilled')
+    expect(fulfilled).toHaveLength(1)
+    const locationCount = await prisma.location.count()
+    expect(locationCount).toBe(1)
+  })
 })
