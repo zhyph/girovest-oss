@@ -66,6 +66,15 @@ export async function createContract(input: CreateContractInput) {
     }
   }
 
+  const client = await prisma.client.findUnique({ where: { id: input.clientId } })
+  // Same treatment as the product check just below: a client from another
+  // location is indistinguishable from a missing one, so this can't be used
+  // to probe whether a given client ID exists somewhere outside the
+  // caller's own location.
+  if (!client || client.locationId !== input.locationId) {
+    throw new AppError(ErrorCodes.NOT_FOUND, 404, `Client ${input.clientId} not found`)
+  }
+
   const products = await prisma.product.findMany({ where: { id: { in: input.items.map((item) => item.productId) } } })
   const productsById = new Map(products.map((product) => [product.id, product]))
   for (const item of input.items) {
