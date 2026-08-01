@@ -123,6 +123,10 @@ productsRouter.get('/:id/photos/:filename', async (req, res) => {
   if (!PHOTO_FILENAME_PATTERN.test(req.params.filename)) {
     throw new AppError(ErrorCodes.NOT_FOUND, 404, 'Photo not found')
   }
+  const product = await getProduct(req.staff!.locationId, req.params.id)
+  if (!product.photos.includes(req.params.filename)) {
+    throw new AppError(ErrorCodes.NOT_FOUND, 404, 'Photo not found')
+  }
   const dir = process.env.PRODUCT_PHOTOS_DIR ?? './product-photos'
   const root = path.resolve(dir)
   const filePath = path.join(root, req.params.filename)

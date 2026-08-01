@@ -212,6 +212,10 @@ describe('GET /:id/photos/:filename', () => {
   it('serves a photo file that was written to PRODUCT_PHOTOS_DIR', async () => {
     const filename = 'abc123.jpg'
     fs.writeFileSync(path.join(photosDir, filename), Buffer.from([0xff, 0xd8, 0xff, 0xd9]))
+    await prisma.product.update({
+      where: { id: productId },
+      data: { photos: JSON.stringify([filename]) },
+    })
 
     const response = await request(app)
       .get(`/api/products/${productId}/photos/${filename}`)
@@ -281,5 +285,29 @@ describe('GET /:id/photos/:filename', () => {
       process.env.PRODUCT_PHOTOS_DIR = previousPhotosDir
       fs.rmSync(dotPrefixedRoot, { recursive: true, force: true })
     }
+  })
+
+  it('404s when requesting a photo through a productId that belongs to another location', async () => {
+    const { staffA, productB } = await seedTwoLocations()
+    const token = signStaffToken({ staffId: staffA.id, role: 'owner' })
+    const photoBRow = await prisma.product.update({
+      where: { id: productB.id },
+      data: { photos: JSON.stringify(['abc-123.jpg']) },
+    })
+
+    const res = await request(app)
+      .get(`/api/products/${photoBRow.id}/photos/abc-123.jpg`)
+      .set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(404)
+  })
+
+  it("404s when the filename is not actually one of that product's own photos", async () => {
+    const { staffA, productA } = await seedTwoLocations()
+    const token = signStaffToken({ staffId: staffA.id, role: 'owner' })
+    // productA has no photos recorded, even though the filename pattern is valid
+    const res = await request(app)
+      .get(`/api/products/${productA.id}/photos/00000000-0000-0000-0000-000000000000.jpg`)
+      .set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(404)
   })
 })
