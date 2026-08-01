@@ -26,7 +26,7 @@ beforeEach(async () => {
   })
   staffId = staff.id
   staffToken = signStaffToken({ staffId: staff.id, role: 'staff' })
-  const client = await prisma.client.create({ data: { name: 'Maria Silva', phone: '1', email: 'm@e.com' } })
+  const client = await prisma.client.create({ data: { name: 'Maria Silva', phone: '1', email: 'm@e.com', locationId } })
   clientId = client.id
 })
 
@@ -98,7 +98,7 @@ describe('GET /api/contracts', () => {
 
   it('never returns a contract from another location', async () => {
     const otherLocation = await prisma.location.create({ data: { name: 'Other', address: 'B' } })
-    const otherClient = await prisma.client.create({ data: { name: 'X', phone: '1', email: 'x@e.com' } })
+    const otherClient = await prisma.client.create({ data: { name: 'X', phone: '1', email: 'x@e.com', locationId: otherLocation.id } })
     const otherStaff = await prisma.staff.create({
       data: { name: 'S2', login: `staff2-${Date.now()}-${Math.random()}`, passwordHash: 'x', role: 'staff', locationId: otherLocation.id },
     })
