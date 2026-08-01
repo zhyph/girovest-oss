@@ -98,4 +98,35 @@ describe('scopedDb', () => {
       expect(registered.has(model)).toBe(true)
     }
   })
+
+  it('passes a MANUALLY_SCOPED_MODELS entry through completely unscoped', async () => {
+    const { locationA, locationB } = await seedTwoLocations()
+    await prisma.staff.create({
+      data: { name: 'A staff', login: 'staff-a', passwordHash: 'x', role: 'owner', locationId: locationA.id },
+    })
+    await prisma.staff.create({
+      data: { name: 'B staff', login: 'staff-b', passwordHash: 'x', role: 'owner', locationId: locationB.id },
+    })
+    const dbA = scopedDb(locationA.id)
+    const results = await dbA.staff.findMany()
+    // staff is in MANUALLY_SCOPED_MODELS — scopedDb must NOT filter it, proving
+    // it's genuinely unscoped rather than accidentally scoped like client/product.
+    expect(results).toHaveLength(2)
+    expect(results.map((s) => s.name).sort()).toEqual(['A staff', 'B staff'])
+  })
+
+  it('throws the deny-by-default error for a model absent from both registries', async () => {
+    const { locationA } = await seedTwoLocations()
+    // Every real locationId-bearing model is registered somewhere by design,
+    // so to exercise the deny-by-default throw itself we temporarily register
+    // a model that carries no locationId column at all as if it did.
+    const mutableRegistry = MODELS_WITH_LOCATION_ID_COLUMN as unknown as Set<string>
+    mutableRegistry.add('allocation')
+    try {
+      const dbA = scopedDb(locationA.id)
+      await expect((dbA as any).allocation.findMany()).rejects.toThrow(/registered in neither/i)
+    } finally {
+      mutableRegistry.delete('allocation')
+    }
+  })
 })

@@ -9,7 +9,7 @@ export const LOCATION_SCOPED_MODELS = ['client', 'product'] as const
 // Models that carry a locationId column (see MODELS_WITH_LOCATION_ID_COLUMN)
 // but are deliberately NOT routed through scopedDb, each with why. These are
 // scoped by hand at their own call sites instead.
-export const MANUALLY_SCOPED_MODELS: Record<string, string> = {
+export const MANUALLY_SCOPED_MODELS: Readonly<Record<string, string>> = {
   staff: 'queried unscoped at login (authRoutes.ts), before any location is known',
   contract: 'already scoped by hand via explicit where: { locationId } clauses in contractService.ts',
   locationContractClause: 'already scoped by hand alongside Contract',
@@ -22,7 +22,7 @@ export const MANUALLY_SCOPED_MODELS: Record<string, string> = {
 // list is the deny-by-default backstop for Goal 2 ("a new model can't
 // reintroduce this bug silently"): a model with a locationId column that
 // lands in neither LOCATION_SCOPED_MODELS nor MANUALLY_SCOPED_MODELS throws.
-export const MODELS_WITH_LOCATION_ID_COLUMN = new Set([
+export const MODELS_WITH_LOCATION_ID_COLUMN: ReadonlySet<string> = new Set([
   'staff',
   'product',
   'contract',
@@ -48,6 +48,29 @@ function toModelKey(model: string): string {
   return model.charAt(0).toLowerCase() + model.slice(1)
 }
 
+// Limitations (read before using scopedDb for anything involving relations):
+//
+// This extension only intercepts top-level delegate calls (e.g.
+// `scopedDb(id).client.findMany(...)`). It does NOT intercept nested reads
+// or writes that travel through a relation on another model's query:
+//
+//   - `include`/`select` on a relation (e.g.
+//     `scopedDb(A).allocation.findMany({ include: { client: true, product: true } })`)
+//     returns the related Client/Product rows completely unscoped — a
+//     location-B client or product on a location-A allocation comes back
+//     unfiltered.
+//   - `connect`/nested `create` on a relation (e.g.
+//     `scopedDb(A).allocation.create({ data: { client: { connect: { id: <B's client> } } } })`)
+//     succeeds even when the connected row belongs to a different location.
+//
+// This is inherent to how Prisma's `$allOperations` query extension hooks
+// work (it only sees the outer operation, not relation traversal), not a
+// bug in this file. Any code that includes or connects a Client/Product
+// relation through a non-scoped-model query must verify the related row's
+// locationId by hand before doing so. See the design doc
+// (docs/superpowers/specs/2026-07-31-location-scoping-design.md, §4) for
+// the same caveat documented against contractService.getContract's nested
+// include.
 export function scopedDb(locationId: string) {
   return prisma.$extends({
     name: 'scopedDb',
@@ -64,9 +87,6 @@ export function scopedDb(locationId: string) {
               scopedArgs.data = Array.isArray(scopedArgs.data)
                 ? scopedArgs.data.map((row: Record<string, unknown>) => ({ ...row, locationId }))
                 : { ...scopedArgs.data, locationId }
-            } else if (operation === 'upsert') {
-              scopedArgs.where = { ...scopedArgs.where, locationId }
-              scopedArgs.create = { ...scopedArgs.create, locationId }
             } else if (OPERATIONS_MERGING_WHERE.has(operation)) {
               scopedArgs.where = { ...scopedArgs.where, locationId }
             } else {
