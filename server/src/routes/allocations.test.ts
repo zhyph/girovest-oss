@@ -124,6 +124,34 @@ describe('POST /api/allocations/:id/check-out', () => {
   })
 })
 
+// Same-location happy-path coverage. isProductAvailableForRange and
+// getProductAvailability both start with (locationId: string, productId:
+// string, ...) — the cross-location 404 tests below only prove the route
+// rejects a WRONG productId; they can't catch the two leading string
+// parameters being transposed in routes/allocations.ts (both requests would
+// still 404 in exactly the same way). These 200 assertions on a real,
+// known-good product are what would actually break under that regression.
+describe('GET /api/allocations/products/:productId/availability', () => {
+  it('reports an unallocated product as available, for the date-range query form', async () => {
+    const response = await request(app)
+      .get(`/api/allocations/products/${productId}/availability`)
+      .query({ checkoutDate: '2099-01-10', dueDate: '2099-01-15' })
+      .set('Authorization', `Bearer ${staffToken}`)
+
+    expect(response.status).toBe(200)
+    expect(response.body).toEqual({ available: true })
+  })
+
+  it('reports an unallocated product as available, for the asOf query form', async () => {
+    const response = await request(app)
+      .get(`/api/allocations/products/${productId}/availability`)
+      .set('Authorization', `Bearer ${staffToken}`)
+
+    expect(response.status).toBe(200)
+    expect(response.body).toEqual({ status: 'available' })
+  })
+})
+
 // Confirms the routes actually thread req.staff!.locationId through to the
 // service layer (allocationService.test.ts covers the service-level guard
 // itself in depth) — each case seeds a real Allocation/Product on location
@@ -151,6 +179,7 @@ describe('allocations routes cross-location isolation', () => {
       .set('Authorization', `Bearer ${tokenA}`)
       .send({ allowEarly: true })
     expect(checkOutRes.status).toBe(404)
+    expect(checkOutRes.body.code).toBe('NOT_FOUND')
     const untouchedCheckOut = await prisma.allocation.findUniqueOrThrow({ where: { id: reservedForCheckOut.id } })
     expect(untouchedCheckOut.status).toBe('reserved')
 
@@ -171,6 +200,7 @@ describe('allocations routes cross-location isolation', () => {
       .set('Authorization', `Bearer ${tokenA}`)
       .send({})
     expect(returnRes.status).toBe(404)
+    expect(returnRes.body.code).toBe('NOT_FOUND')
     const untouchedReturn = await prisma.allocation.findUniqueOrThrow({ where: { id: checkedOut.id } })
     expect(untouchedReturn.status).toBe('checked_out')
 
@@ -189,6 +219,7 @@ describe('allocations routes cross-location isolation', () => {
       .post(`/api/allocations/${reservedForCancel.id}/cancel`)
       .set('Authorization', `Bearer ${tokenA}`)
     expect(cancelRes.status).toBe(404)
+    expect(cancelRes.body.code).toBe('NOT_FOUND')
     const untouchedCancel = await prisma.allocation.findUniqueOrThrow({ where: { id: reservedForCancel.id } })
     expect(untouchedCancel.status).toBe('reserved')
   })
@@ -202,11 +233,13 @@ describe('allocations routes cross-location isolation', () => {
       .query({ checkoutDate: '2099-01-10', dueDate: '2099-01-15' })
       .set('Authorization', `Bearer ${tokenA}`)
     expect(rangeRes.status).toBe(404)
+    expect(rangeRes.body.code).toBe('NOT_FOUND')
 
     const statusRes = await request(app)
       .get(`/api/allocations/products/${productB.id}/availability`)
       .set('Authorization', `Bearer ${tokenA}`)
     expect(statusRes.status).toBe(404)
+    expect(statusRes.body.code).toBe('NOT_FOUND')
   })
 
   it("does not include location B's allocations in location A's list", async () => {
