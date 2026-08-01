@@ -329,6 +329,10 @@ describe('GET /:id/photos/:filename', () => {
       where: { id: productB.id },
       data: { photos: JSON.stringify([`/api/products/${productB.id}/photos/abc-123.jpg`]) },
     })
+    // The file must actually exist on disk here, or fs.existsSync's 404 (the
+    // route's LAST gate) would make this test pass even if the earlier
+    // location-ownership check (getProduct) were deleted entirely.
+    fs.writeFileSync(path.join(photosDir, 'abc-123.jpg'), Buffer.from([0xff, 0xd8, 0xff, 0xd9]))
 
     const res = await request(app)
       .get(`/api/products/${photoBRow.id}/photos/abc-123.jpg`)
@@ -340,8 +344,13 @@ describe('GET /:id/photos/:filename', () => {
     const { staffA, productA } = await seedTwoLocations()
     const token = signStaffToken({ staffId: staffA.id, role: 'owner' })
     // productA has no photos recorded, even though the filename pattern is valid
+    const filename = '00000000-0000-0000-0000-000000000000.jpg'
+    // The file must actually exist on disk here, or fs.existsSync's 404 (the
+    // route's LAST gate) would make this test pass even if the earlier
+    // photo-membership check (product.photos.includes) were deleted entirely.
+    fs.writeFileSync(path.join(photosDir, filename), Buffer.from([0xff, 0xd8, 0xff, 0xd9]))
     const res = await request(app)
-      .get(`/api/products/${productA.id}/photos/00000000-0000-0000-0000-000000000000.jpg`)
+      .get(`/api/products/${productA.id}/photos/${filename}`)
       .set('Authorization', `Bearer ${token}`)
     expect(res.status).toBe(404)
   })

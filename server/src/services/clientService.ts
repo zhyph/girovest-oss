@@ -150,6 +150,7 @@ export async function updateClient(locationId: string, id: string, data: UpdateC
     // clientAddressLine) is safe without needing scopedDb's own scoping.
     // Do not remove the getClient guard above as "redundant" — it is the
     // only thing making this transaction location-safe.
+    // ast-grep-ignore: no-unscoped-location-model — Safe only because getClient(locationId, id) above already 404s on a cross-location id; id is proven to belong to this location by the time we get here.
     await tx.client.update({
       where: { id },
       data: { name: data.name, phone: data.phone, email: data.email, notes: data.notes },

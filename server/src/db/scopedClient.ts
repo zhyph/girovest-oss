@@ -71,6 +71,25 @@ function toModelKey(model: string): string {
 // (docs/superpowers/specs/2026-07-31-location-scoping-design.md, §4) for
 // the same caveat documented against contractService.getContract's nested
 // include.
+//
+// Allocation/Calendar have NO automated backstop at all, not even the lint
+// rule. Allocation and Calendar carry no locationId column of their own, so
+// they're deliberately absent from both LOCATION_SCOPED_MODELS and
+// MODELS_WITH_LOCATION_ID_COLUMN above — they're scoped entirely by hand,
+// by joining through the owning Product's relation (e.g.
+// `where: { product: { locationId } }` in allocationService.ts and
+// calendarService.ts). The `no-unscoped-location-model` ast-grep rule
+// (server/rules/no-unscoped-location-model.yml) only flags a bare/unscoped
+// receiver for Client/Product (and tx.client/tx.product inside a
+// transaction) — it has no way to inspect whether a WHERE clause on
+// Allocation/Calendar actually includes the `product: { locationId }`
+// filter. A future `prisma.allocation.findMany(...)` (or the scoped
+// equivalent) that omits that filter would leak across locations and
+// nothing here — not scopedDb, not the registry test, not the lint rule —
+// would catch it. Closing that gap would need a rule that verifies a WHERE
+// clause's *shape*, which is a materially bigger undertaking than the
+// receiver-matching this rule does today; it's a known, accepted gap, not
+// an oversight.
 export function scopedDb(locationId: string) {
   return prisma.$extends({
     name: 'scopedDb',
