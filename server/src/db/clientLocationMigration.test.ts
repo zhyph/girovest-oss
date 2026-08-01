@@ -142,6 +142,26 @@ describe('add_client_location_id migration', () => {
     expect(columns.some((c) => c.name === 'locationId')).toBe(false)
   })
 
+  // Unreachable through any current production code path (nothing anywhere
+  // deletes a Location), but guarded rather than assumed: without the widened
+  // guard this shape passes the "> 1" check, backfills every locationId to
+  // NULL, and then dies mid-rebuild on the NOT NULL constraint — a
+  // half-migrated database that re-running cannot repair.
+  it('aborts cleanly when Client rows exist with no Location row, leaving Client untouched', () => {
+    applyAllRealMigrationsExceptClientLocationId()
+    seedRealisticData(0)
+    expect(() => applyClientLocationMigration()).toThrow(/Client rows exist with no Location row/)
+
+    const db = new Database(dbPath, { readonly: true })
+    const columns = db.prepare(`PRAGMA table_info("Client")`).all() as { name: string }[]
+    const newClient = db
+      .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='new_Client'`)
+      .get()
+    db.close()
+    expect(columns.some((c) => c.name === 'locationId')).toBe(false)
+    expect(newClient).toBeUndefined()
+  })
+
   it('preserves rows that reference Client across the table rebuild', () => {
     applyAllRealMigrationsExceptClientLocationId()
     seedRealisticData(1)
