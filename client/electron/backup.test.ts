@@ -77,7 +77,7 @@ describe('backupDatabaseIfNeeded', () => {
     expect(fs.readFileSync(path.join(dest!, 'dev.db'), 'utf-8')).toBe('legacy')
   })
 
-  it('overwrites an existing same-version backup dir (idempotent crash-loop retry)', () => {
+  it('renames incomplete prior backup aside and creates fresh backup at same location', () => {
     fs.writeFileSync(path.join(userData, 'dev.db'), 'current')
     writeBackupMarker(userData, '0.2.0')
     const staleDir = path.join(userData, 'backups', '0.2.0')
@@ -87,8 +87,9 @@ describe('backupDatabaseIfNeeded', () => {
 
     backupDatabaseIfNeeded(userData, '0.3.0', '2026-07-22')
 
+    // The new backup is at the same version-keyed location with fresh content
     expect(fs.readFileSync(path.join(staleDir, 'dev.db'), 'utf-8')).toBe('current')
-    // Full overwrite, not merge: files absent from the source must be gone.
+    // Old extra files are gone (fresh backup, not merge)
     expect(fs.existsSync(path.join(staleDir, 'dev.db-wal'))).toBe(false)
   })
 })
@@ -131,11 +132,16 @@ describe('backupDatabaseIfNeeded completion safety', () => {
     // Simulate a partial prior attempt: a destDir that exists but was never
     // completed (no completion signal) — e.g. from a crash mid-copy.
     const backupsDir = path.join(userDataPath, 'backups')
-    fs.mkdirSync(path.join(backupsDir, 'pre-updater-2026-08-01'), { recursive: true })
+    const incompleteDir = path.join(backupsDir, 'pre-updater-2026-08-01')
+    fs.mkdirSync(incompleteDir, { recursive: true })
     // Deliberately no sentinel/no atomic-rename marker written here.
 
     const destDir = backupDatabaseIfNeeded(userDataPath, '0.11.0', '2026-08-01')!
+    // Fresh backup has correct content
     expect(fs.readFileSync(path.join(destDir, 'dev.db'), 'utf-8')).toBe('original')
+    // Old incomplete backup was preserved (renamed aside, not deleted)
+    const entries = fs.readdirSync(backupsDir)
+    expect(entries.some((name) => name.startsWith('pre-updater-2026-08-01.unverified-'))).toBe(true)
   })
 
   it('the staging directory is never visible to pruneBackups', () => {
@@ -145,9 +151,14 @@ describe('backupDatabaseIfNeeded completion safety', () => {
     }
     const backupsDir = path.join(userDataPath, 'backups')
     const entries = fs.readdirSync(backupsDir)
-    expect(entries.every((name) => !name.startsWith('.staging'))).toBe(true)
+    // No staging dirs are visible in the final backups directory
+    // (staging dirs are created outside backupsDir, under userDataPath)
+    expect(entries.every((name) => !name.startsWith('.backup-staging-'))).toBe(true)
     // 5-slot retention still holds against only real, complete backups.
     expect(entries).toHaveLength(5)
+    // Also verify no orphaned staging dirs remain at userDataPath level
+    const allEntries = fs.readdirSync(userDataPath)
+    expect(allEntries.every((name) => !name.startsWith('.backup-staging-'))).toBe(true)
   })
 })
 
