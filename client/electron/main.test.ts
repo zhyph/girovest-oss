@@ -298,6 +298,20 @@ describe('buildStartupFailureDetail', () => {
     expect(detail.toLowerCase()).toContain('support')
   })
 
+  // backupDatabaseIfNeeded() copies every dev.db-* sidecar, and runManualRestore()
+  // restores all three. The manual instructions must name the same set: a stray
+  // surviving sidecar can leave a partially-applied transaction in place.
+  it('tells the operator to copy back every sidecar the backup captured, not just wal/shm', () => {
+    const detail = buildStartupFailureDetail(
+      'database migration exited with code 1',
+      '/data/backups/0.11.0',
+    )
+    const copyBackInstruction = detail.slice(detail.indexOf('then copy'))
+    expect(copyBackInstruction).toContain('dev.db-wal')
+    expect(copyBackInstruction).toContain('dev.db-journal')
+    expect(copyBackInstruction).toContain('dev.db-shm')
+  })
+
   it('a startup failure with nothing to back up (fresh install) does not print a bogus path', () => {
     const detail = buildStartupFailureDetail('some error', null)
     expect(detail).toContain('fresh install')

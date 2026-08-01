@@ -337,6 +337,13 @@ function attachConsoleLogging(win: BrowserWindow): void {
 // migrationRunner.ts) -- so "run prisma migrate resolve" is a dead end for
 // whoever reads this dialog. Lead with support, and point at the real backup
 // this launch just made (or explain why there isn't one) instead.
+//
+// The copy-back list must name every sidecar backupDatabaseIfNeeded() can have
+// captured -- it copies dev.db plus ALL "dev.db-*" files verbatim (see
+// backup.ts), so a backed-up WAL/journal belongs to, and must be restored
+// alongside, the dev.db copied with it. Restoring dev.db while leaving one of
+// its sidecars behind (or dropping one from this list) can leave a
+// partially-applied transaction in place.
 export function buildStartupFailureDetail(
   errorMessage: string,
   backupPath: string | null,
@@ -345,7 +352,8 @@ export function buildStartupFailureDetail(
     ? `Your data was backed up before this update ran, at:\n${backupPath}\n\n` +
       `To recover: quit the app, delete "dev.db-wal", "dev.db-journal", and "dev.db-shm" ` +
       `from the app's data folder if present, then copy "dev.db" (and any "dev.db-wal"/` +
-      `"dev.db-shm" files) from the backup folder above back into the data folder. ` +
+      `"dev.db-journal"/"dev.db-shm" files) from the backup folder above back into the ` +
+      `data folder. ` +
       `Restoring this backup will not by itself fix the update failure -- contact support ` +
       `with this message before retrying.`
     : `No backup was needed (this looks like a fresh install). Contact support with this message.`
