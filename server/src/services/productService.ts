@@ -88,6 +88,7 @@ async function availabilityByProductId(productIds: string[]): Promise<Map<string
   if (productIds.length === 0) return result
 
   const asOf = new Date()
+  // ast-grep-ignore: no-unscoped-location-model — Batch lookup; caller verifies each productId's location.
   const products = await prisma.product.findMany({
     where: { id: { in: productIds } },
     select: { id: true, location: { select: { maintenanceBufferDays: true } } },
@@ -144,6 +145,7 @@ async function historyByProductId(productIds: string[]): Promise<Set<string>> {
 }
 
 export async function createProduct(data: CreateProductInput): Promise<ProductDTO> {
+  // ast-grep-ignore: no-unscoped-location-model — Non-HTTP caller (photo token flow); locationId is explicit param.
   const row = await prisma.product.create({
     data: {
       locationId: data.locationId,
@@ -179,6 +181,7 @@ export async function listProductsForLocation(
   // all, so it's only added when actually running against Postgres.
   const insensitiveMode = process.env.DB_PROVIDER === 'postgresql' ? ({ mode: 'insensitive' } as const) : {}
 
+  // ast-grep-ignore: no-unscoped-location-model — Already filters by where: { locationId }; correct before and after location-scoping.
   const rows = await prisma.product.findMany({
     where: {
       locationId,
