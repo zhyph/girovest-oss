@@ -181,6 +181,17 @@ PRAGMA defer_foreign_keys=OFF;`,
     )
   })
 
+  it('a failed migration error message tells the operator to check the backup, not run a CLI that is not shipped', () => {
+    writeMigration('20260101000000_init', 'CREATE TABLE "A" ("id" TEXT PRIMARY KEY);')
+    writeMigration('20260102000000_broken', 'CREATE TABLE "A" ("id" TEXT PRIMARY KEY);')
+
+    expect(() => applyMigrations({ databasePath: dbPath, migrationsDir })).toThrow()
+    expect(() => applyMigrations({ databasePath: dbPath, migrationsDir })).toThrowError(/back ?up/i)
+    expect(() => applyMigrations({ databasePath: dbPath, migrationsDir })).not.toThrowError(
+      /prisma migrate resolve/i,
+    )
+  })
+
   it('retries a migration whose failed attempt was rolled back', () => {
     writeMigration('20260101000000_init', 'CREATE TABLE "A" ("id" TEXT PRIMARY KEY);')
     writeMigration('20260102000000_broken', 'CREATE TABLE "A" ("id" TEXT PRIMARY KEY);')

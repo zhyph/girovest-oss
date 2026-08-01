@@ -17,6 +17,7 @@ import {
   waitForPortFree,
   waitForFileWritable,
   recordCrashAndCheckLoop,
+  buildStartupFailureDetail,
 } from './main.ts'
 
 describe('resolveServerCwd', () => {
@@ -282,5 +283,32 @@ describe('recordCrashAndCheckLoop', () => {
     recordCrashAndCheckLoop(timestamps, 40_000, 30_000, 3)
     expect(recordCrashAndCheckLoop(timestamps, 80_000, 30_000, 3)).toBe(false)
     expect(timestamps).toEqual([80_000])
+  })
+})
+
+describe('buildStartupFailureDetail', () => {
+  it('a migration failure surfaces the actual backup directory, not a hardcoded pattern', () => {
+    const detail = buildStartupFailureDetail(
+      'database migration exited with code 1',
+      '/data/backups/0.11.0',
+    )
+    expect(detail).toContain('/data/backups/0.11.0')
+    expect(detail).toContain('dev.db-wal')
+    expect(detail).not.toContain('roll back to the previously-installed version')
+    expect(detail.toLowerCase()).toContain('support')
+  })
+
+  it('a startup failure with nothing to back up (fresh install) does not print a bogus path', () => {
+    const detail = buildStartupFailureDetail('some error', null)
+    expect(detail).toContain('fresh install')
+    expect(detail).not.toMatch(/backups[\\/]/)
+  })
+
+  it('never tells the operator to run the Prisma CLI, which the packaged app does not ship', () => {
+    const detail = buildStartupFailureDetail(
+      'A migration previously failed and was never resolved: "20260101000000_bad".',
+      '/data/backups/0.11.0',
+    )
+    expect(detail).not.toMatch(/prisma migrate resolve/i)
   })
 })

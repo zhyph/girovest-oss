@@ -88,7 +88,8 @@ export function applyMigrations(options: {
     if (failed) {
       throw new Error(
         `A migration previously failed and was never resolved: "${failed.migration_name}". ` +
-          'Resolve it (e.g. restore the pre-migration backup or run `prisma migrate resolve`) before retrying.',
+          'This database has not been modified further. Restore the pre-migration backup ' +
+          '(see the startup failure dialog for its exact location) or contact support before retrying.',
       )
     }
 

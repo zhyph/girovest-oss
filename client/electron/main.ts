@@ -332,6 +332,27 @@ function attachConsoleLogging(win: BrowserWindow): void {
   })
 }
 
+// This app ships no old build to roll back to (NSIS installs in place, no
+// downgrade path), and the packaged app never carries the Prisma CLI (see
+// migrationRunner.ts) -- so "run prisma migrate resolve" is a dead end for
+// whoever reads this dialog. Lead with support, and point at the real backup
+// this launch just made (or explain why there isn't one) instead.
+export function buildStartupFailureDetail(
+  errorMessage: string,
+  backupPath: string | null,
+): string {
+  const backupInstruction = backupPath
+    ? `Your data was backed up before this update ran, at:\n${backupPath}\n\n` +
+      `To recover: quit the app, delete "dev.db-wal", "dev.db-journal", and "dev.db-shm" ` +
+      `from the app's data folder if present, then copy "dev.db" (and any "dev.db-wal"/` +
+      `"dev.db-shm" files) from the backup folder above back into the data folder. ` +
+      `Restoring this backup will not by itself fix the update failure -- contact support ` +
+      `with this message before retrying.`
+    : `No backup was needed (this looks like a fresh install). Contact support with this message.`
+
+  return `${errorMessage}\n\n${backupInstruction}`
+}
+
 // Returns null on success, or the failure detail to show/log otherwise.
 async function startServer(): Promise<string | null> {
   const userDataPath = app.getPath('userData')
@@ -358,6 +379,11 @@ async function startServer(): Promise<string | null> {
     GIROVEST_INSTALL_ID: resolveInstallId(userDataPath),
   }
 
+  // Captured here (rather than left as backupDatabaseIfNeeded's discarded
+  // return value) so a subsequent migration failure can tell the operator
+  // exactly where their pre-update backup landed instead of leaving them to
+  // guess a path -- see buildStartupFailureDetail.
+  let backupPath: string | null = null
   try {
     // Must happen before the backup, not just before migrations: the backup
     // itself does three non-atomic copyFileSync calls, and a still-writing
@@ -368,7 +394,7 @@ async function startServer(): Promise<string | null> {
     await waitForFileWritable(resolveDatabaseUrl(userDataPath).replace(/^file:/, ''))
     // Backup before migrating; if the backup itself throws (e.g. disk full),
     // deliberately abort startup rather than migrate without a safety copy.
-    backupDatabaseIfNeeded(
+    backupPath = backupDatabaseIfNeeded(
       userDataPath,
       app.getVersion(),
       new Date().toISOString().slice(0, 10),
@@ -378,7 +404,10 @@ async function startServer(): Promise<string | null> {
     // launch attempt, so the marker can't move until migrations land.
     writeBackupMarker(userDataPath, app.getVersion())
   } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error)
+    const detail = buildStartupFailureDetail(
+      error instanceof Error ? error.message : String(error),
+      backupPath,
+    )
     await logError('Database preparation failed:', error)
     return detail
   }
