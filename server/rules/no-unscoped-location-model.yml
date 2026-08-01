@@ -1,3 +1,12 @@
+# Lint rule: Flag bare prisma.client/product calls that should use scopedDb() for location safety.
+# Some violations are permanent-by-design and excluded:
+# - contractService.ts: Uses manual ownership check (product.locationId !== input.locationId).
+# - occupancyQuery.ts: maintenanceBufferForProduct() has no locationId input; caller verifies.
+# - productService.ts: createProduct() non-HTTP; listProductsForLocation() already filtered;
+#   availabilityByProductId() is batch lookup with caller-verified IDs.
+# Tasks 12-13 will migrate remaining violations (Client/Product CRUD methods).
+# See docs/superpowers/specs/2026-07-31-location-scoping-design.md §4.
+
 id: no-unscoped-location-model
 language: TypeScript
 message: >-
@@ -17,3 +26,6 @@ ignores:
   - "src/db/scopedClient.ts"
   - "src/**/*.test.ts"
   - "src/generated/**"
+  # Permanent-by-design violations (documented above); see sgconfig.yml for rationale.
+  - "src/services/contractService.ts"
+  - "src/services/occupancyQuery.ts"
