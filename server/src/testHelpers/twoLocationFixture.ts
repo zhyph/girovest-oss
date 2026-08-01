@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto'
 import { expect } from 'vitest'
 import { prisma } from '../db/client.js'
 import { hashPassword } from '../auth/passwords.js'
@@ -9,10 +10,10 @@ export async function seedTwoLocations() {
 
   const passwordHash = await hashPassword('fixture-password12')
   const staffA = await prisma.staff.create({
-    data: { name: 'Staff A', login: `fixture-a-${Date.now()}`, passwordHash, role: 'owner', locationId: locationA.id },
+    data: { name: 'Staff A', login: `fixture-a-${randomUUID().slice(0, 8)}`, passwordHash, role: 'owner', locationId: locationA.id },
   })
   const staffB = await prisma.staff.create({
-    data: { name: 'Staff B', login: `fixture-b-${Date.now()}`, passwordHash, role: 'owner', locationId: locationB.id },
+    data: { name: 'Staff B', login: `fixture-b-${randomUUID().slice(0, 8)}`, passwordHash, role: 'owner', locationId: locationB.id },
   })
 
   const productA = await prisma.product.create({
@@ -47,6 +48,8 @@ export async function seedTwoLocations() {
 
   return { locationA, locationB, staffA, staffB, productA, productB, clientA, clientB }
 }
+
+export type TwoLocationFixture = Awaited<ReturnType<typeof seedTwoLocations>>
 
 // Shared assertion for "staff at location A can't see/touch location B's
 // resource" — every resource task in this plan reuses this exact check so
