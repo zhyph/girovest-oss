@@ -130,8 +130,21 @@ export async function waitForPortFree(
 // On an electron-updater restart, the new instance has no ChildProcess
 // handle to the OLD instance (unlike the restore flow's waitForProcessExit,
 // which waits on a process THIS instance spawned) — so the only reliable
-// check is to actually try opening the file for writing and retry on
-// failure, mirroring waitForPortFree's probe-until-free loop.
+// check is to try a file operation that will fail if another process holds it
+// open, and retry on failure, mirroring waitForPortFree's probe-until-free loop.
+// We use renameSync(filePath, filePath) rather than openSync for writability because
+// on POSIX, open() with 'r+' succeeds even if another process has the file open
+// (POSIX open() has no default exclusivity). On Windows, SQLite's default VFS
+// also opens db files with FILE_SHARE_READ | FILE_SHARE_WRITE, so a second open
+// is also likely to succeed rather than throw. Renaming or deleting a file,
+// however, throws EBUSY/EPERM on Windows when another process holds it open
+// without FILE_SHARE_DELETE — this app's own restore flow (see waitForProcessExit)
+// relies on precisely this mechanism to wait for a killed server process to
+// actually release its handles before touching the database. A self-rename
+// exercises that same check without actually moving anything, and it's a real
+// detector on the platform this app actually ships on (Windows via NSIS).
+// This is still a best-effort heuristic: no real detection exists on POSIX dev
+// machines/CI, but that's an accepted, pre-existing gap (this app doesn't ship for POSIX).
 export async function waitForFileWritable(
   filePath: string,
   timeoutMs = 5_000,
@@ -141,8 +154,7 @@ export async function waitForFileWritable(
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     try {
-      const fd = fs.openSync(filePath, 'r+')
-      fs.closeSync(fd)
+      fs.renameSync(filePath, filePath)
       return true
     } catch {
       await new Promise((resolve) => setTimeout(resolve, intervalMs))

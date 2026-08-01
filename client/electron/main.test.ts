@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
@@ -179,6 +179,57 @@ describe('waitForFileWritable', () => {
     try {
       const result = await waitForFileWritable(filePath, 500, 50)
       expect(result).toBe(true)
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('retries on failure and returns true once the rename succeeds', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'file-lock-test-'))
+    const filePath = path.join(dir, 'dev.db')
+    fs.writeFileSync(filePath, 'x')
+    try {
+      const renameSpy = vi.spyOn(fs, 'renameSync')
+      // Fail first 2 calls, then succeed on the 3rd
+      let callCount = 0
+      renameSpy.mockImplementation(() => {
+        callCount++
+        if (callCount <= 2) {
+          throw new Error('EBUSY: resource busy')
+        }
+        // After 2 failures, succeed (a self-rename is a no-op)
+        return undefined
+      })
+
+      const result = await waitForFileWritable(filePath, 5000, 50)
+      expect(result).toBe(true)
+      expect(renameSpy).toHaveBeenCalledWith(filePath, filePath)
+      expect(callCount).toBe(3)
+
+      renameSpy.mockRestore()
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('returns false when rename never succeeds within the timeout', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'file-lock-test-'))
+    const filePath = path.join(dir, 'dev.db')
+    fs.writeFileSync(filePath, 'x')
+    try {
+      const renameSpy = vi.spyOn(fs, 'renameSync')
+      // Always fail to simulate a file being locked
+      renameSpy.mockImplementation(() => {
+        throw new Error('EBUSY: resource busy')
+      })
+
+      const result = await waitForFileWritable(filePath, 200, 50)
+      expect(result).toBe(false)
+      expect(renameSpy).toHaveBeenCalledWith(filePath, filePath)
+      // Should have retried multiple times within the timeout
+      expect(renameSpy.mock.calls.length).toBeGreaterThanOrEqual(2)
+
+      renameSpy.mockRestore()
     } finally {
       fs.rmSync(dir, { recursive: true, force: true })
     }
