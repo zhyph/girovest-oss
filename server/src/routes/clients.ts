@@ -37,16 +37,16 @@ clientsRouter.post('/', async (req, res) => {
   if (!parsed.success) {
     throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'Invalid client payload')
   }
-  const client = await createClient(parsed.data)
+  const client = await createClient(req.staff!.locationId, parsed.data)
   res.status(201).json(client)
 })
 
-clientsRouter.get('/', async (_req, res) => {
-  res.json(await listClients())
+clientsRouter.get('/', async (req, res) => {
+  res.json(await listClients(req.staff!.locationId))
 })
 
 clientsRouter.get('/:id', async (req, res) => {
-  res.json(await getClient(req.params.id))
+  res.json(await getClient(req.staff!.locationId, req.params.id))
 })
 
 clientsRouter.patch('/:id', async (req, res) => {
@@ -54,10 +54,10 @@ clientsRouter.patch('/:id', async (req, res) => {
   if (!parsed.success) {
     throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'Invalid client payload')
   }
-  res.json(await updateClient(req.params.id, parsed.data))
+  res.json(await updateClient(req.staff!.locationId, req.params.id, parsed.data))
 })
 
 clientsRouter.delete('/:id', async (req, res) => {
-  await deleteClient(req.params.id)
+  await deleteClient(req.staff!.locationId, req.params.id)
   res.status(204).send()
 })
