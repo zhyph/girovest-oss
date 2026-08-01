@@ -28,8 +28,8 @@ describe('scopedDb model registry vs. models.prisma', () => {
   })
 
   it('every locationId-bearing model is registered in exactly one of the two lists', () => {
-    const scoped = new Set(LOCATION_SCOPED_MODELS)
-    const manual = new Set(Object.keys(MANUALLY_SCOPED_MODELS))
+    const scoped = new Set<string>(LOCATION_SCOPED_MODELS)
+    const manual = new Set<string>(Object.keys(MANUALLY_SCOPED_MODELS))
     for (const model of MODELS_WITH_LOCATION_ID_COLUMN) {
       const inScoped = scoped.has(model)
       const inManual = manual.has(model)
