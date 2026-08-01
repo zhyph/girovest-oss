@@ -158,6 +158,62 @@ describe('runContractBackfill', () => {
     expect(contracts).toHaveLength(0)
   })
 
+  it('does not consume a numbering slot for a cross-location orphan skipped within an otherwise-valid batch', async () => {
+    const locationA = await prisma.location.create({ data: { name: 'A', address: 'A' } })
+    const locationB = await prisma.location.create({ data: { name: 'B', address: 'B' } })
+    const staff = await prisma.staff.create({
+      data: { name: 'S', login: `bf2-${Date.now()}`, passwordHash: 'x', role: 'owner', locationId: locationA.id },
+    })
+    const product = await prisma.product.create({
+      data: { locationId: locationA.id, name: 'P', category: 'dress', size: 'M', color: 'red', rentalPrice: 10, depositAmount: 5 },
+    })
+    const crossLocationClient = await prisma.client.create({
+      data: { locationId: locationB.id, name: 'Cross', phone: '1', email: 'cross@x.com' },
+    })
+    const sameLocationClient = await prisma.client.create({
+      data: { locationId: locationA.id, name: 'Same', phone: '2', email: 'same@x.com' },
+    })
+
+    // The cross-location (skipped) orphan is created first, so a regression
+    // that consumes a numbering slot before skipping (e.g. `continue` moved
+    // after `nextNumber += 1`) would give the surviving Contract number 2
+    // instead of 1.
+    await prisma.allocation.create({
+      data: {
+        productId: product.id,
+        clientId: crossLocationClient.id,
+        staffId: staff.id,
+        checkoutDate: new Date(),
+        dueDate: new Date(),
+        status: 'reserved',
+        priceCharged: 100,
+        createdAt: new Date('2026-01-01T00:00:00Z'),
+      },
+    })
+    const survivingAllocation = await prisma.allocation.create({
+      data: {
+        productId: product.id,
+        clientId: sameLocationClient.id,
+        staffId: staff.id,
+        checkoutDate: new Date(),
+        dueDate: new Date(),
+        status: 'reserved',
+        priceCharged: 100,
+        createdAt: new Date('2026-01-02T00:00:00Z'),
+      },
+    })
+
+    await runContractBackfill()
+
+    const contracts = await prisma.contract.findMany()
+    expect(contracts).toHaveLength(1)
+    expect(contracts[0].number).toBe(1)
+    expect(contracts[0].clientId).toBe(sameLocationClient.id)
+
+    const refreshed = await prisma.allocation.findUniqueOrThrow({ where: { id: survivingAllocation.id } })
+    expect(refreshed.contractId).toBe(contracts[0].id)
+  })
+
   it('does nothing when there are no orphan Allocations and every Location already has clauses', async () => {
     await prisma.location.create({
       data: {
