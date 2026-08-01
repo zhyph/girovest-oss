@@ -20,6 +20,8 @@ describe('seedTwoLocations', () => {
     expect(fixture.staffB.locationId).toBe(fixture.locationB.id)
     expect(fixture.productA.locationId).toBe(fixture.locationA.id)
     expect(fixture.clientA.locationId).toBe(fixture.locationA.id)
+    expect(fixture.productB.locationId).toBe(fixture.locationB.id)
+    expect(fixture.clientB.locationId).toBe(fixture.locationB.id)
   })
 
   it('generates unique login values even when called multiple times with mocked time', async () => {
