@@ -16,8 +16,8 @@ import {
 export const allocationsRouter = Router()
 allocationsRouter.use(requireAuth)
 
-allocationsRouter.get('/', async (_req, res) => {
-  res.json(await listAllocations())
+allocationsRouter.get('/', async (req, res) => {
+  res.json(await listAllocations(req.staff!.locationId))
 })
 
 const checkOutSchema = z.object({
@@ -38,7 +38,7 @@ allocationsRouter.post('/:id/check-out', async (req, res) => {
   if (!parsed.success) {
     throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'Invalid check-out payload')
   }
-  res.json(await checkOutAllocation(req.params.id, parsed.data))
+  res.json(await checkOutAllocation(req.staff!.locationId, req.params.id, parsed.data))
 })
 
 allocationsRouter.post('/:id/return', async (req, res) => {
@@ -46,11 +46,11 @@ allocationsRouter.post('/:id/return', async (req, res) => {
   if (!parsed.success) {
     throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'Invalid return payload')
   }
-  res.json(await returnAllocation(req.params.id, parsed.data))
+  res.json(await returnAllocation(req.staff!.locationId, req.params.id, parsed.data))
 })
 
 allocationsRouter.post('/:id/cancel', async (req, res) => {
-  res.json(await cancelAllocation(req.params.id))
+  res.json(await cancelAllocation(req.staff!.locationId, req.params.id))
 })
 
 const availabilityRangeSchema = z.object({
@@ -62,6 +62,7 @@ allocationsRouter.get('/products/:productId/availability', async (req, res) => {
   const rangeParsed = availabilityRangeSchema.safeParse(req.query)
   if (rangeParsed.success) {
     const available = await isProductAvailableForRange(
+      req.staff!.locationId,
       req.params.productId,
       rangeParsed.data.checkoutDate,
       rangeParsed.data.dueDate,
@@ -72,5 +73,5 @@ allocationsRouter.get('/products/:productId/availability', async (req, res) => {
 
   const asOfQuery = req.query.asOf
   const asOf = typeof asOfQuery === 'string' ? new Date(asOfQuery) : new Date()
-  res.json({ status: await getProductAvailability(req.params.productId, asOf) })
+  res.json({ status: await getProductAvailability(req.staff!.locationId, req.params.productId, asOf) })
 })

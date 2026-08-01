@@ -6,6 +6,7 @@ declare global {
       staff?: {
         staffId: string
         role: 'owner' | 'staff'
+        locationId: string
       }
     }
   }

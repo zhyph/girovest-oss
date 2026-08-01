@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
@@ -15,7 +15,9 @@ import {
   resolveMigrateEntry,
   cleanupLegacyServerRuntime,
   waitForPortFree,
+  waitForFileWritable,
   recordCrashAndCheckLoop,
+  buildStartupFailureDetail,
 } from './main.ts'
 
 describe('resolveServerCwd', () => {
@@ -159,6 +161,82 @@ describe('waitForPortFree', () => {
   })
 })
 
+describe('waitForFileWritable', () => {
+  it('resolves true immediately when the file is not locked', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'file-lock-test-'))
+    const filePath = path.join(dir, 'dev.db')
+    fs.writeFileSync(filePath, 'x')
+    try {
+      const result = await waitForFileWritable(filePath, 500, 50)
+      expect(result).toBe(true)
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('resolves true immediately when the file does not exist yet (fresh install)', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'file-lock-test-'))
+    const filePath = path.join(dir, 'dev.db')
+    try {
+      const result = await waitForFileWritable(filePath, 500, 50)
+      expect(result).toBe(true)
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('retries on failure and returns true once the rename succeeds', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'file-lock-test-'))
+    const filePath = path.join(dir, 'dev.db')
+    fs.writeFileSync(filePath, 'x')
+    try {
+      const renameSpy = vi.spyOn(fs, 'renameSync')
+      // Fail first 2 calls, then succeed on the 3rd
+      let callCount = 0
+      renameSpy.mockImplementation(() => {
+        callCount++
+        if (callCount <= 2) {
+          throw new Error('EBUSY: resource busy')
+        }
+        // After 2 failures, succeed (a self-rename is a no-op)
+        return undefined
+      })
+
+      const result = await waitForFileWritable(filePath, 5000, 50)
+      expect(result).toBe(true)
+      expect(renameSpy).toHaveBeenCalledWith(filePath, filePath)
+      expect(callCount).toBe(3)
+
+      renameSpy.mockRestore()
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('returns false when rename never succeeds within the timeout', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'file-lock-test-'))
+    const filePath = path.join(dir, 'dev.db')
+    fs.writeFileSync(filePath, 'x')
+    try {
+      const renameSpy = vi.spyOn(fs, 'renameSync')
+      // Always fail to simulate a file being locked
+      renameSpy.mockImplementation(() => {
+        throw new Error('EBUSY: resource busy')
+      })
+
+      const result = await waitForFileWritable(filePath, 200, 50)
+      expect(result).toBe(false)
+      expect(renameSpy).toHaveBeenCalledWith(filePath, filePath)
+      // Should have retried multiple times within the timeout
+      expect(renameSpy.mock.calls.length).toBeGreaterThanOrEqual(2)
+
+      renameSpy.mockRestore()
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
 describe('cleanupLegacyServerRuntime', () => {
   let userDataPath: string
 
@@ -205,5 +283,46 @@ describe('recordCrashAndCheckLoop', () => {
     recordCrashAndCheckLoop(timestamps, 40_000, 30_000, 3)
     expect(recordCrashAndCheckLoop(timestamps, 80_000, 30_000, 3)).toBe(false)
     expect(timestamps).toEqual([80_000])
+  })
+})
+
+describe('buildStartupFailureDetail', () => {
+  it('a migration failure surfaces the actual backup directory, not a hardcoded pattern', () => {
+    const detail = buildStartupFailureDetail(
+      'database migration exited with code 1',
+      '/data/backups/0.11.0',
+    )
+    expect(detail).toContain('/data/backups/0.11.0')
+    expect(detail).toContain('dev.db-wal')
+    expect(detail).not.toContain('roll back to the previously-installed version')
+    expect(detail.toLowerCase()).toContain('support')
+  })
+
+  // backupDatabaseIfNeeded() copies every dev.db-* sidecar, and runManualRestore()
+  // restores all three. The manual instructions must name the same set: a stray
+  // surviving sidecar can leave a partially-applied transaction in place.
+  it('tells the operator to copy back every sidecar the backup captured, not just wal/shm', () => {
+    const detail = buildStartupFailureDetail(
+      'database migration exited with code 1',
+      '/data/backups/0.11.0',
+    )
+    const copyBackInstruction = detail.slice(detail.indexOf('then copy'))
+    expect(copyBackInstruction).toContain('dev.db-wal')
+    expect(copyBackInstruction).toContain('dev.db-journal')
+    expect(copyBackInstruction).toContain('dev.db-shm')
+  })
+
+  it('a startup failure with nothing to back up (fresh install) does not print a bogus path', () => {
+    const detail = buildStartupFailureDetail('some error', null)
+    expect(detail).toContain('fresh install')
+    expect(detail).not.toMatch(/backups[\\/]/)
+  })
+
+  it('never tells the operator to run the Prisma CLI, which the packaged app does not ship', () => {
+    const detail = buildStartupFailureDetail(
+      'A migration previously failed and was never resolved: "20260101000000_bad".',
+      '/data/backups/0.11.0',
+    )
+    expect(detail).not.toMatch(/prisma migrate resolve/i)
   })
 })

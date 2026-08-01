@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, afterEach, beforeEach } from 'vitest'
 import { prisma } from '../db/client.js'
 import { AppError } from '../errors/AppError.js'
 import {
@@ -9,6 +9,16 @@ import {
   deleteClient,
 } from './clientService.js'
 
+let locationId: string
+let otherLocationId: string
+
+beforeEach(async () => {
+  const location = await prisma.location.create({ data: { name: 'L', address: 'A' } })
+  locationId = location.id
+  const other = await prisma.location.create({ data: { name: 'L2', address: 'A2' } })
+  otherLocationId = other.id
+})
+
 afterEach(async () => {
   await prisma.allocation.deleteMany()
   await prisma.client.deleteMany()
@@ -18,49 +28,65 @@ afterEach(async () => {
 })
 
 describe('clientService', () => {
-  it('creates and fetches a client', async () => {
-    const created = await createClient({
+  it('creates and fetches a client scoped to a location', async () => {
+    const created = await createClient(locationId, {
       name: 'Maria Silva',
       phone: '11999990000',
       email: 'maria@example.com',
     })
+    expect(created.locationId).toBe(locationId)
 
-    const fetched = await getClient(created.id)
+    const fetched = await getClient(locationId, created.id)
     expect(fetched.name).toBe('Maria Silva')
   })
 
-  it('lists clients', async () => {
-    await createClient({ name: 'Maria', phone: '1', email: 'a@example.com' })
-    await createClient({ name: 'Joana', phone: '2', email: 'b@example.com' })
+  it('lists only clients belonging to the given location', async () => {
+    await createClient(locationId, { name: 'Maria', phone: '1', email: 'a@example.com' })
+    await createClient(otherLocationId, { name: 'Elsewhere', phone: '9', email: 'z@example.com' })
 
-    const clients = await listClients()
-    expect(clients).toHaveLength(2)
+    const clients = await listClients(locationId)
+    expect(clients).toHaveLength(1)
+    expect(clients[0]!.name).toBe('Maria')
   })
 
   it('throws NOT_FOUND for a missing client', async () => {
-    await expect(getClient('does-not-exist')).rejects.toThrow(AppError)
+    await expect(getClient(locationId, 'does-not-exist')).rejects.toThrow(AppError)
+  })
+
+  it('throws NOT_FOUND when fetching a client that belongs to another location', async () => {
+    const created = await createClient(otherLocationId, { name: 'Elsewhere', phone: '9', email: 'z@example.com' })
+    await expect(getClient(locationId, created.id)).rejects.toThrow(AppError)
   })
 
   it('updates a client', async () => {
-    const created = await createClient({ name: 'Maria', phone: '1', email: 'a@example.com' })
-    const updated = await updateClient(created.id, { phone: '2' })
+    const created = await createClient(locationId, { name: 'Maria', phone: '1', email: 'a@example.com' })
+    const updated = await updateClient(locationId, created.id, { phone: '2' })
     expect(updated.phone).toBe('2')
   })
 
+  it('refuses to update a client belonging to another location', async () => {
+    const created = await createClient(otherLocationId, { name: 'Elsewhere', phone: '9', email: 'z@example.com' })
+    await expect(updateClient(locationId, created.id, { phone: '2' })).rejects.toThrow(AppError)
+  })
+
   it('deletes a client with no allocation history', async () => {
-    const created = await createClient({ name: 'Maria', phone: '1', email: 'a@example.com' })
-    await deleteClient(created.id)
-    await expect(getClient(created.id)).rejects.toThrow(AppError)
+    const created = await createClient(locationId, { name: 'Maria', phone: '1', email: 'a@example.com' })
+    await deleteClient(locationId, created.id)
+    await expect(getClient(locationId, created.id)).rejects.toThrow(AppError)
+  })
+
+  it('refuses to delete a client belonging to another location', async () => {
+    const created = await createClient(otherLocationId, { name: 'Elsewhere', phone: '9', email: 'z@example.com' })
+    await expect(deleteClient(locationId, created.id)).rejects.toThrow(AppError)
   })
 
   it('refuses to delete a client with allocation history', async () => {
-    const location = await prisma.location.create({ data: { name: 'L', address: 'A' } })
     const staff = await prisma.staff.create({
-      data: { name: 'S', login: 'staff1', passwordHash: 'x', role: 'staff', locationId: location.id },
+      data: { name: 'S', login: 'staff1', passwordHash: 'x', role: 'staff', locationId },
     })
     const product = await prisma.product.create({
       data: {
-        locationId: location.id,
+        locationId,
         name: 'Vestido',
         category: 'festa',
         size: 'M',
@@ -69,7 +95,7 @@ describe('clientService', () => {
         depositAmount: 50,
       },
     })
-    const client = await createClient({ name: 'Maria', phone: '1', email: 'a@example.com' })
+    const client = await createClient(locationId, { name: 'Maria', phone: '1', email: 'a@example.com' })
     await prisma.allocation.create({
       data: {
         productId: product.id,
@@ -82,32 +108,31 @@ describe('clientService', () => {
       },
     })
 
-    await expect(deleteClient(client.id)).rejects.toMatchObject({ code: 'CANNOT_DELETE_WITH_HISTORY' })
+    await expect(deleteClient(locationId, client.id)).rejects.toMatchObject({ code: 'CANNOT_DELETE_WITH_HISTORY' })
   })
 
   it('reports hasAllocationHistory false for a client with no allocations', async () => {
-    const created = await createClient({ name: 'Maria', phone: '119', email: 'm@x.com' })
+    const created = await createClient(locationId, { name: 'Maria', phone: '119', email: 'm@x.com' })
     expect(created.hasAllocationHistory).toBe(false)
 
-    const fetched = await getClient(created.id)
+    const fetched = await getClient(locationId, created.id)
     expect(fetched.hasAllocationHistory).toBe(false)
 
-    const [listed] = await listClients()
+    const [listed] = await listClients(locationId)
     expect(listed.hasAllocationHistory).toBe(false)
   })
 
   it('reports hasAllocationHistory true once the client has an allocation, even after it is returned', async () => {
-    const location = await prisma.location.create({ data: { name: 'L', address: 'A' } })
     const staff = await prisma.staff.create({
-      data: { name: 'S', login: 'staff-hist', passwordHash: 'x', role: 'staff', locationId: location.id },
+      data: { name: 'S', login: 'staff-hist', passwordHash: 'x', role: 'staff', locationId },
     })
     const product = await prisma.product.create({
       data: {
-        locationId: location.id, name: 'Vestido', category: 'festa', size: 'M', color: 'azul',
+        locationId, name: 'Vestido', category: 'festa', size: 'M', color: 'azul',
         rentalPrice: 100, depositAmount: 50, photos: '[]',
       },
     })
-    const client = await createClient({ name: 'Beatriz', phone: '129', email: 'b@x.com' })
+    const client = await createClient(locationId, { name: 'Beatriz', phone: '129', email: 'b@x.com' })
 
     await prisma.allocation.create({
       data: {
@@ -117,15 +142,15 @@ describe('clientService', () => {
       },
     })
 
-    const fetched = await getClient(client.id)
+    const fetched = await getClient(locationId, client.id)
     expect(fetched.hasAllocationHistory).toBe(true)
 
-    const updated = await updateClient(client.id, { notes: 'updated' })
+    const updated = await updateClient(locationId, client.id, { notes: 'updated' })
     expect(updated.hasAllocationHistory).toBe(true)
   })
 
   it('creates a client with identity documents and address lines', async () => {
-    const created = await createClient({
+    const created = await createClient(locationId, {
       name: 'Maria Silva',
       phone: '11999990000',
       email: 'maria@example.com',
@@ -146,13 +171,13 @@ describe('clientService', () => {
   })
 
   it('creates a client with no identity documents or address lines when omitted', async () => {
-    const created = await createClient({ name: 'Joana', phone: '1', email: 'a@example.com' })
+    const created = await createClient(locationId, { name: 'Joana', phone: '1', email: 'a@example.com' })
     expect(created.identityDocuments).toEqual([])
     expect(created.addressLines).toEqual([])
   })
 
   it('returns address lines ordered by sortOrder regardless of insertion order', async () => {
-    const created = await createClient({
+    const created = await createClient(locationId, {
       name: 'Maria',
       phone: '1',
       email: 'a@example.com',
@@ -161,19 +186,19 @@ describe('clientService', () => {
         { label: 'Endereço', value: 'Rua X', sortOrder: 0 },
       ],
     })
-    const fetched = await getClient(created.id)
+    const fetched = await getClient(locationId, created.id)
     expect(fetched.addressLines.map((line) => line.label)).toEqual(['Endereço', 'Cidade'])
   })
 
   it('replaces all identity documents on update when the field is provided', async () => {
-    const created = await createClient({
+    const created = await createClient(locationId, {
       name: 'Maria',
       phone: '1',
       email: 'a@example.com',
       identityDocuments: [{ label: 'CPF', value: 'old-value' }],
     })
 
-    const updated = await updateClient(created.id, {
+    const updated = await updateClient(locationId, created.id, {
       identityDocuments: [{ label: 'CPF', value: 'new-value' }, { label: 'RG', value: '00.000.000-0' }],
     })
 
@@ -182,33 +207,33 @@ describe('clientService', () => {
   })
 
   it('clears all identity documents on update when given an empty array', async () => {
-    const created = await createClient({
+    const created = await createClient(locationId, {
       name: 'Maria',
       phone: '1',
       email: 'a@example.com',
       identityDocuments: [{ label: 'CPF', value: 'x' }],
     })
 
-    const updated = await updateClient(created.id, { identityDocuments: [] })
+    const updated = await updateClient(locationId, created.id, { identityDocuments: [] })
 
     expect(updated.identityDocuments).toEqual([])
   })
 
   it('leaves identity documents untouched when the field is omitted from an update', async () => {
-    const created = await createClient({
+    const created = await createClient(locationId, {
       name: 'Maria',
       phone: '1',
       email: 'a@example.com',
       identityDocuments: [{ label: 'CPF', value: 'x' }],
     })
 
-    const updated = await updateClient(created.id, { phone: '2' })
+    const updated = await updateClient(locationId, created.id, { phone: '2' })
 
     expect(updated.identityDocuments).toEqual([expect.objectContaining({ label: 'CPF', value: 'x' })])
   })
 
   it('deletes identity documents and address lines when the client is deleted', async () => {
-    const created = await createClient({
+    const created = await createClient(locationId, {
       name: 'Maria',
       phone: '1',
       email: 'a@example.com',
@@ -216,7 +241,7 @@ describe('clientService', () => {
       addressLines: [{ label: 'Cidade', value: 'Piedade', sortOrder: 0 }],
     })
 
-    await deleteClient(created.id)
+    await deleteClient(locationId, created.id)
 
     const remainingDocs = await prisma.clientIdentityDocument.findMany({ where: { clientId: created.id } })
     const remainingLines = await prisma.clientAddressLine.findMany({ where: { clientId: created.id } })

@@ -80,6 +80,33 @@ tearing down, the shared generated client may be left in `postgresql`
 mode — run `npm run db:generate` (with no `DB_PROVIDER` set, or explicitly
 `DB_PROVIDER=sqlite`) to restore it before running `npm test` again.
 
+## Location scoping
+
+`Client` and `Product` rows belong to a `Location`. Any query or write
+against either model must go through `scopedDb(locationId)`
+(`src/db/scopedClient.ts`) instead of the bare `prisma` client — it
+auto-injects `locationId` into `where`/`data` and throws on any operation
+it doesn't explicitly handle, rather than silently running unscoped.
+`Allocation`/`Calendar` have no `locationId` column of their own and are
+scoped by hand instead, via an explicit `where: { product: { locationId } }`
+join (see `allocationService.ts`/`calendarService.ts`) — `scopedDb` can't
+reach through a relation, only top-level calls on the model itself.
+
+Run `npm run lint:location-scoping` (an `ast-grep` check, see
+`rules/no-unscoped-location-model.yml`) before committing any change that
+touches `clientService.ts`/`productService.ts` or adds a new Prisma query
+against either model — it fails the build on a bare `prisma.client`/
+`prisma.product` call (or `tx.client`/`tx.product` inside a transaction)
+outside the few permanently-exempt, individually-commented call sites.
+
+If you add a `locationId` column to a new model, register it in
+`scopedClient.ts`'s `LOCATION_SCOPED_MODELS` (routed through `scopedDb`) or
+`MANUALLY_SCOPED_MODELS` (scoped by hand elsewhere, with a one-line reason)
+— `scopedClient.registry.test.ts` parses `prisma/models.prisma` and fails
+if a `locationId`-bearing model isn't registered in exactly one of the two.
+
+Full design rationale: `docs/superpowers/specs/2026-07-31-location-scoping-design.md`.
+
 ## Database tools
 
 ```bash

@@ -3,19 +3,13 @@ import { z } from 'zod'
 import { requireAuth } from '../auth/authMiddleware.js'
 import { AppError } from '../errors/AppError.js'
 import { ErrorCodes } from '../errors/errorCodes.js'
-import { prisma } from '../db/client.js'
 import { getLocationSettings, updateLocationSettings } from '../services/locationSettingsService.js'
 
 export const locationSettingsRouter = Router()
 locationSettingsRouter.use(requireAuth)
 
-async function resolveLocationId(staffId: string): Promise<string> {
-  const staff = await prisma.staff.findUniqueOrThrow({ where: { id: staffId } })
-  return staff.locationId
-}
-
 locationSettingsRouter.get('/', async (req, res) => {
-  const locationId = await resolveLocationId(req.staff!.staffId)
+  const locationId = req.staff!.locationId
   res.json(await getLocationSettings(locationId))
 })
 
@@ -35,6 +29,6 @@ locationSettingsRouter.patch('/', async (req, res) => {
   if (!parsed.success || !req.staff) {
     throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'Invalid settings payload')
   }
-  const locationId = await resolveLocationId(req.staff.staffId)
+  const locationId = req.staff.locationId
   res.json(await updateLocationSettings(locationId, parsed.data))
 })

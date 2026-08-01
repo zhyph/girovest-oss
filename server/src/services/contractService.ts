@@ -66,6 +66,17 @@ export async function createContract(input: CreateContractInput) {
     }
   }
 
+  // ast-grep-ignore: no-unscoped-location-model — Deliberately unscoped: the row is fetched, then its locationId is checked against input.locationId below so a cross-location hit is indistinguishable from a miss.
+  const client = await prisma.client.findUnique({ where: { id: input.clientId } })
+  // Same treatment as the product check just below: a client from another
+  // location is indistinguishable from a missing one, so this can't be used
+  // to probe whether a given client ID exists somewhere outside the
+  // caller's own location.
+  if (!client || client.locationId !== input.locationId) {
+    throw new AppError(ErrorCodes.NOT_FOUND, 404, `Client ${input.clientId} not found`)
+  }
+
+  // ast-grep-ignore: no-unscoped-location-model — Deliberately unscoped: each row's locationId is checked against input.locationId in the loop below so a cross-location hit is indistinguishable from a miss.
   const products = await prisma.product.findMany({ where: { id: { in: input.items.map((item) => item.productId) } } })
   const productsById = new Map(products.map((product) => [product.id, product]))
   for (const item of input.items) {

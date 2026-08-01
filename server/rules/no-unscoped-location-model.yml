@@ -1,0 +1,54 @@
+# Lint rule: deny-by-default. Every bare prisma.client/prisma.product call under
+# src/ is an error; location-bearing reads and writes must go through
+# scopedDb(locationId) (server/src/db/scopedClient.ts). This also covers
+# tx.client/tx.product inside a `prisma.$transaction(async (tx) => { ... })`
+# callback — `tx` is this codebase's consistent convention for the
+# transaction client (grep `\$transaction(async (tx)`), and it is just as
+# unscoped as bare `prisma` unless the code guards it by hand.
+#
+# The migration is complete — no known-unfixed violations remain. The remaining
+# exemptions are permanent by design, and each is suppressed INLINE with an
+# `// ast-grep-ignore: no-unscoped-location-model — <reason>` comment on the line
+# directly above the call, so that any NEW unscoped call added to the same file
+# is still caught. Current inline exemptions:
+# - contractService.ts: the client and product lookups in createContract() are
+#   deliberately unscoped and then ownership-checked by hand, so a
+#   cross-location row is reported identically to a missing one.
+# - occupancyQuery.ts: maintenanceBufferForProduct() takes no locationId by
+#   design — it reads the buffer of whichever location owns the product.
+# - productService.ts: createProduct() (non-HTTP photo-token flow, explicit
+#   locationId param), listProductsForLocation() (already filters by
+#   locationId), availabilityByProductId() (batch lookup, caller-verified IDs).
+# - clientService.ts: updateClient()'s tx.client.update is safe only because
+#   the getClient(locationId, id) call immediately above the transaction
+#   already 404s on a cross-location id — see the comment at that call site
+#   before copying this pattern elsewhere.
+#
+# The file-level `ignores:` below is only for files where scoping is meaningless:
+# scopedClient.ts itself (it IS the wrapper), tests (they seed fixtures across
+# locations on purpose), and generated code. Do NOT add a product-code file
+# there — use an inline suppression on the specific call site instead.
+# See docs/superpowers/specs/2026-07-31-location-scoping-design.md §4.
+
+id: no-unscoped-location-model
+language: TypeScript
+message: >-
+  Use scopedDb(locationId) from server/src/db/scopedClient.ts instead of the
+  bare prisma client (or a $transaction callback's tx) for Client/Product —
+  see docs/superpowers/specs/2026-07-31-location-scoping-design.md.
+  If this call site genuinely has no HTTP session (e.g. a token-based lookup
+  that already has its own locationId in hand), route it through
+  scopedDb(knownLocationId) instead of prisma/tx directly.
+severity: error
+rule:
+  any:
+    - pattern: prisma.client.$METHOD($$$ARGS)
+    - pattern: prisma.product.$METHOD($$$ARGS)
+    - pattern: tx.client.$METHOD($$$ARGS)
+    - pattern: tx.product.$METHOD($$$ARGS)
+files:
+  - "src/**/*.ts"
+ignores:
+  - "src/db/scopedClient.ts"
+  - "src/**/*.test.ts"
+  - "src/generated/**"

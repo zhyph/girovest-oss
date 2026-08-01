@@ -4,9 +4,11 @@ import fs from 'fs'
 import os from 'os'
 import path from 'path'
 import { app } from '../app.js'
+import { signingApp } from '../signingApp.js'
 import { prisma } from '../db/client.js'
 import jwt from 'jsonwebtoken'
 import { SESSION_TTL_SECONDS, signStaffToken } from '../auth/jwt.js'
+import { seedTwoLocations } from '../testHelpers/twoLocationFixture.js'
 
 // Real openRelayConnection() opens an actual outbound WebSocket to
 // credentials.url, which in relay-mode tests below is a fake host —
@@ -17,6 +19,10 @@ vi.mock('../network/relayClient.js', async (importOriginal) => {
 })
 
 const RELAY_ENV_KEYS = ['GIROVEST_UPDATE_URL', 'GIROVEST_UPDATE_KEY', 'GIROVEST_INSTALL_ID'] as const
+
+// Smallest valid JPEG data URL that submitPhotos() will accept.
+const TINY_JPEG =
+  'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACP/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AVN//2Q=='
 
 let locationId: string
 let staffToken: string
@@ -56,8 +62,50 @@ afterEach(async () => {
   await prisma.allocation.deleteMany()
   await prisma.product.deleteMany()
   await prisma.staff.deleteMany()
+  await prisma.client.deleteMany()
   await prisma.location.deleteMany()
   for (const key of RELAY_ENV_KEYS) delete process.env[key]
+})
+
+describe('GET/PATCH/DELETE /api/products/:id cross-location isolation', () => {
+  it("404s when staff at location A requests location B's product", async () => {
+    const { staffA, productB } = await seedTwoLocations()
+    const token = signStaffToken({ staffId: staffA.id, role: 'owner' })
+
+    const getRes = await request(app).get(`/api/products/${productB.id}`).set('Authorization', `Bearer ${token}`)
+    expect(getRes.status).toBe(404)
+
+    const patchRes = await request(app)
+      .patch(`/api/products/${productB.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ color: 'green' })
+    expect(patchRes.status).toBe(404)
+
+    const deleteRes = await request(app).delete(`/api/products/${productB.id}`).set('Authorization', `Bearer ${token}`)
+    expect(deleteRes.status).toBe(404)
+  })
+
+  it("does not include location B's products in location A's list", async () => {
+    const { staffA, productA } = await seedTwoLocations()
+    const token = signStaffToken({ staffId: staffA.id, role: 'owner' })
+
+    const res = await request(app).get('/api/products').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(200)
+    expect(res.body.map((p: { id: string }) => p.id)).toEqual([productA.id])
+  })
+
+  it('ignores a client-supplied locationId and uses the authenticated staff\'s own', async () => {
+    const { staffA, locationA, locationB } = await seedTwoLocations()
+    const token = signStaffToken({ staffId: staffA.id, role: 'owner' })
+
+    const res = await request(app)
+      .post('/api/products')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ locationId: locationB.id, name: 'X', category: 'dress', size: 'M', color: 'red', rentalPrice: 10, depositAmount: 5 })
+    expect(res.status).toBe(201)
+    expect(res.body.locationId).toBe(locationA.id)
+    expect(res.body.locationId).not.toBe(locationB.id)
+  })
 })
 
 describe('POST /api/products/photo-session', () => {
@@ -169,6 +217,11 @@ describe('GET /:id/photos/:filename', () => {
   it('serves a photo file that was written to PRODUCT_PHOTOS_DIR', async () => {
     const filename = 'abc123.jpg'
     fs.writeFileSync(path.join(photosDir, filename), Buffer.from([0xff, 0xd8, 0xff, 0xd9]))
+    await prisma.product.update({
+      where: { id: productId },
+      // Production shape: submitPhotos() stores full URL paths, never bare filenames.
+      data: { photos: JSON.stringify([`/api/products/${productId}/photos/${filename}`]) },
+    })
 
     const response = await request(app)
       .get(`/api/products/${productId}/photos/${filename}`)
@@ -176,6 +229,35 @@ describe('GET /:id/photos/:filename', () => {
 
     expect(response.status).toBe(200)
     expect(response.headers['content-type']).toContain('image/jpeg')
+  })
+
+  // The one test in this file that seeds nothing by hand: it mints a photo
+  // session over HTTP, submits a photo through the signing app exactly as the
+  // phone does, and then fetches whatever path the write path actually stored.
+  // Route tests and service tests that each seed their own `photos` fixtures
+  // can drift on the stored shape without either one failing -- that drift is
+  // precisely the bug this test exists to catch.
+  it('serves a photo captured through the real phone-photo submission flow', async () => {
+    const sessionRes = await request(app)
+      .post('/api/products/photo-session')
+      .set('Authorization', `Bearer ${staffToken}`)
+    expect(sessionRes.status).toBe(201)
+
+    const submitRes = await request(signingApp)
+      .post(`/product-photos/${sessionRes.body.token}/submit`)
+      .send({ productId, photos: [TINY_JPEG] })
+    expect(submitRes.status).toBe(200)
+
+    const productRes = await request(app)
+      .get(`/api/products/${productId}`)
+      .set('Authorization', `Bearer ${staffToken}`)
+    expect(productRes.status).toBe(200)
+    const storedPath = productRes.body.photos[0] as string
+    expect(storedPath).toMatch(new RegExp(`^/api/products/${productId}/photos/[0-9a-f-]+\\.jpg$`))
+
+    const photoRes = await request(app).get(storedPath).set('Authorization', `Bearer ${staffToken}`)
+    expect(photoRes.status).toBe(200)
+    expect(photoRes.headers['content-type']).toContain('image/jpeg')
   })
 
   it('returns 404 for a nonexistent filename', async () => {
@@ -224,7 +306,7 @@ describe('GET /:id/photos/:filename', () => {
 
       await prisma.product.update({
         where: { id: productId },
-        data: { photos: JSON.stringify([filename]) },
+        data: { photos: JSON.stringify([`/api/products/${productId}/photos/${filename}`]) },
       })
 
       const response = await request(app)
@@ -238,5 +320,38 @@ describe('GET /:id/photos/:filename', () => {
       process.env.PRODUCT_PHOTOS_DIR = previousPhotosDir
       fs.rmSync(dotPrefixedRoot, { recursive: true, force: true })
     }
+  })
+
+  it('404s when requesting a photo through a productId that belongs to another location', async () => {
+    const { staffA, productB } = await seedTwoLocations()
+    const token = signStaffToken({ staffId: staffA.id, role: 'owner' })
+    const photoBRow = await prisma.product.update({
+      where: { id: productB.id },
+      data: { photos: JSON.stringify([`/api/products/${productB.id}/photos/abc-123.jpg`]) },
+    })
+    // The file must actually exist on disk here, or fs.existsSync's 404 (the
+    // route's LAST gate) would make this test pass even if the earlier
+    // location-ownership check (getProduct) were deleted entirely.
+    fs.writeFileSync(path.join(photosDir, 'abc-123.jpg'), Buffer.from([0xff, 0xd8, 0xff, 0xd9]))
+
+    const res = await request(app)
+      .get(`/api/products/${photoBRow.id}/photos/abc-123.jpg`)
+      .set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(404)
+  })
+
+  it("404s when the filename is not actually one of that product's own photos", async () => {
+    const { staffA, productA } = await seedTwoLocations()
+    const token = signStaffToken({ staffId: staffA.id, role: 'owner' })
+    // productA has no photos recorded, even though the filename pattern is valid
+    const filename = '00000000-0000-0000-0000-000000000000.jpg'
+    // The file must actually exist on disk here, or fs.existsSync's 404 (the
+    // route's LAST gate) would make this test pass even if the earlier
+    // photo-membership check (product.photos.includes) were deleted entirely.
+    fs.writeFileSync(path.join(photosDir, filename), Buffer.from([0xff, 0xd8, 0xff, 0xd9]))
+    const res = await request(app)
+      .get(`/api/products/${productA.id}/photos/${filename}`)
+      .set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(404)
   })
 })

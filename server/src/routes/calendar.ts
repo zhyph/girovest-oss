@@ -18,7 +18,7 @@ calendarRouter.get('/going-out', async (req, res) => {
   if (!parsed.success) {
     throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'from and to query params are required')
   }
-  res.json(await listGoingOut(parsed.data.from, parsed.data.to))
+  res.json(await listGoingOut(req.staff!.locationId, parsed.data.from, parsed.data.to))
 })
 
 calendarRouter.get('/due-back', async (req, res) => {
@@ -26,11 +26,11 @@ calendarRouter.get('/due-back', async (req, res) => {
   if (!parsed.success) {
     throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'from and to query params are required')
   }
-  res.json(await listDueBack(parsed.data.from, parsed.data.to))
+  res.json(await listDueBack(req.staff!.locationId, parsed.data.from, parsed.data.to))
 })
 
 calendarRouter.get('/overdue', async (req, res) => {
   const asOfQuery = req.query.asOf
   const asOf = typeof asOfQuery === 'string' ? new Date(asOfQuery) : new Date()
-  res.json(await listOverdue(asOf))
+  res.json(await listOverdue(req.staff!.locationId, asOf))
 })

@@ -22,7 +22,7 @@ beforeEach(async () => {
     data: { name: 'S', login: `staff-${Date.now()}-${Math.random()}`, passwordHash: 'x', role: 'staff', locationId },
   })
   staffId = staff.id
-  const client = await prisma.client.create({ data: { name: 'C', phone: '1', email: 'c@example.com' } })
+  const client = await prisma.client.create({ data: { name: 'C', phone: '1', email: 'c@example.com', locationId } })
   const contract = await prisma.contract.create({
     data: { number: 1, locationId, clientId: client.id, staffId: staff.id, eventDate: new Date('2026-10-03'), paymentMethod: 'PIX' },
   })

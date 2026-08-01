@@ -77,7 +77,7 @@ describe('backupDatabaseIfNeeded', () => {
     expect(fs.readFileSync(path.join(dest!, 'dev.db'), 'utf-8')).toBe('legacy')
   })
 
-  it('overwrites an existing same-version backup dir (idempotent crash-loop retry)', () => {
+  it('renames incomplete prior backup aside and creates fresh backup at same location', () => {
     fs.writeFileSync(path.join(userData, 'dev.db'), 'current')
     writeBackupMarker(userData, '0.2.0')
     const staleDir = path.join(userData, 'backups', '0.2.0')
@@ -87,9 +87,78 @@ describe('backupDatabaseIfNeeded', () => {
 
     backupDatabaseIfNeeded(userData, '0.3.0', '2026-07-22')
 
+    // The new backup is at the same version-keyed location with fresh content
     expect(fs.readFileSync(path.join(staleDir, 'dev.db'), 'utf-8')).toBe('current')
-    // Full overwrite, not merge: files absent from the source must be gone.
+    // Old extra files are gone (fresh backup, not merge)
     expect(fs.existsSync(path.join(staleDir, 'dev.db-wal'))).toBe(false)
+  })
+})
+
+describe('backupDatabaseIfNeeded completion safety', () => {
+  let userDataPath: string
+
+  beforeEach(() => {
+    userDataPath = fs.mkdtempSync(path.join(os.tmpdir(), 'backup-test-'))
+  })
+
+  afterEach(() => {
+    fs.rmSync(userDataPath, { recursive: true, force: true })
+  })
+
+  function writeDb(content = 'db-bytes') {
+    fs.writeFileSync(path.join(userDataPath, 'dev.db'), content)
+  }
+
+  it('a completed backup is provably complete on disk', () => {
+    writeDb('original')
+    const destDir = backupDatabaseIfNeeded(userDataPath, '0.11.0', '2026-08-01')
+    expect(destDir).toBeTruthy()
+    expect(fs.readFileSync(path.join(destDir!, 'dev.db'), 'utf-8')).toBe('original')
+  })
+
+  it('a retry after the DB was corrupted mid-migration does not overwrite the good backup', () => {
+    writeDb('original')
+    const destDir = backupDatabaseIfNeeded(userDataPath, '0.11.0', '2026-08-01')!
+    // Simulate the migration corrupting dev.db without ever advancing the marker
+    // (writeBackupMarker only runs after migrations succeed — see main.ts).
+    writeDb('corrupted-mid-migration')
+    const retryDestDir = backupDatabaseIfNeeded(userDataPath, '0.11.0', '2026-08-01')
+    expect(retryDestDir).toBe(destDir)
+    expect(fs.readFileSync(path.join(destDir, 'dev.db'), 'utf-8')).toBe('original')
+  })
+
+  it('a truncated backup (copy itself failed partway) is redone on retry, not trusted as complete', () => {
+    writeDb('original')
+    // Simulate a partial prior attempt: a destDir that exists but was never
+    // completed (no completion signal) — e.g. from a crash mid-copy.
+    const backupsDir = path.join(userDataPath, 'backups')
+    const incompleteDir = path.join(backupsDir, 'pre-updater-2026-08-01')
+    fs.mkdirSync(incompleteDir, { recursive: true })
+    // Deliberately no sentinel/no atomic-rename marker written here.
+
+    const destDir = backupDatabaseIfNeeded(userDataPath, '0.11.0', '2026-08-01')!
+    // Fresh backup has correct content
+    expect(fs.readFileSync(path.join(destDir, 'dev.db'), 'utf-8')).toBe('original')
+    // Old incomplete backup was preserved (renamed aside, not deleted)
+    const entries = fs.readdirSync(backupsDir)
+    expect(entries.some((name) => name.startsWith('pre-updater-2026-08-01.unverified-'))).toBe(true)
+  })
+
+  it('the staging directory is never visible to pruneBackups', () => {
+    for (let i = 0; i < 7; i++) {
+      writeDb(`v${i}`)
+      backupDatabaseIfNeeded(userDataPath, `0.${i}.0`, `2026-08-0${(i % 9) + 1}`)
+    }
+    const backupsDir = path.join(userDataPath, 'backups')
+    const entries = fs.readdirSync(backupsDir)
+    // No staging dirs are visible in the final backups directory
+    // (staging dirs are created outside backupsDir, under userDataPath)
+    expect(entries.every((name) => !name.startsWith('.backup-staging-'))).toBe(true)
+    // 5-slot retention still holds against only real, complete backups.
+    expect(entries).toHaveLength(5)
+    // Also verify no orphaned staging dirs remain at userDataPath level
+    const allEntries = fs.readdirSync(userDataPath)
+    expect(allEntries.every((name) => !name.startsWith('.backup-staging-'))).toBe(true)
   })
 })
 

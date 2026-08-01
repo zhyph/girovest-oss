@@ -17,7 +17,7 @@ beforeEach(async () => {
     data: { name: 'S', login: `staff-${Date.now()}-${Math.random()}`, passwordHash: 'x', role: 'staff', locationId },
   })
   staffId = staff.id
-  const client = await prisma.client.create({ data: { name: 'C', phone: '1', email: 'c@example.com' } })
+  const client = await prisma.client.create({ data: { locationId, name: 'C', phone: '1', email: 'c@example.com' } })
   clientId = client.id
   const product = await prisma.product.create({
     data: { locationId, name: 'Vestido', category: 'festa', size: 'M', color: 'azul', rentalPrice: 100, depositAmount: 50 },
@@ -190,7 +190,7 @@ describe('createContract', () => {
 
   it('CRITICAL: a product taken out early cannot be booked for the days between the real pickup and its planned checkout date', async () => {
     const contract = await createContract(baseInput())
-    await checkOutAllocation(contract.allocations[0].id, { allowEarly: true }, new Date('2026-09-25T09:00:00.000Z'))
+    await checkOutAllocation(locationId, contract.allocations[0].id, { allowEarly: true }, new Date('2026-09-25T09:00:00.000Z'))
 
     // The dress left the store on Sep 25 even though the contract said Oct 2 —
     // those days are physically taken and must not be bookable.
@@ -203,6 +203,21 @@ describe('createContract', () => {
         }),
       ),
     ).rejects.toMatchObject({ code: 'PRODUCT_UNAVAILABLE' })
+  })
+
+  it('throws NOT_FOUND when the client belongs to a different location than the contract', async () => {
+    const otherLocation = await prisma.location.create({ data: { name: 'Other', address: 'X' } })
+    const clientElsewhere = await prisma.client.create({
+      data: { locationId: otherLocation.id, name: 'C', phone: '1', email: 'c@x.com' },
+    })
+
+    await expect(
+      createContract(
+        baseInput({
+          clientId: clientElsewhere.id,
+        }),
+      ),
+    ).rejects.toThrow(AppError)
   })
 })
 
@@ -268,7 +283,7 @@ describe('listContracts pagination and search', () => {
   it('returns only pageSize contracts per page, newest first', async () => {
     const location = await prisma.location.create({ data: { name: 'L', address: 'A' } })
     const staff = await prisma.staff.create({ data: { name: 'S', login: `s-${Date.now()}`, passwordHash: 'x', role: 'staff', locationId: location.id } })
-    const client = await prisma.client.create({ data: { name: 'C', phone: '1', email: 'c@e.com' } })
+    const client = await prisma.client.create({ data: { locationId: location.id, name: 'C', phone: '1', email: 'c@e.com' } })
     for (let i = 0; i < 25; i++) {
       await prisma.contract.create({
         data: { number: i + 1, locationId: location.id, clientId: client.id, staffId: staff.id, eventDate: new Date(), paymentMethod: 'PIX' },
@@ -284,7 +299,7 @@ describe('listContracts pagination and search', () => {
   it('searches by client name, case-insensitive', async () => {
     const location = await prisma.location.create({ data: { name: 'L2', address: 'A' } })
     const staff = await prisma.staff.create({ data: { name: 'S', login: `s2-${Date.now()}`, passwordHash: 'x', role: 'staff', locationId: location.id } })
-    const client = await prisma.client.create({ data: { name: 'Maria Silva', phone: '1', email: 'm@e.com' } })
+    const client = await prisma.client.create({ data: { locationId: location.id, name: 'Maria Silva', phone: '1', email: 'm@e.com' } })
     await prisma.contract.create({
       data: { number: 1, locationId: location.id, clientId: client.id, staffId: staff.id, eventDate: new Date(), paymentMethod: 'PIX' },
     })
@@ -297,7 +312,7 @@ describe('listContracts pagination and search', () => {
   it('searches by contract number', async () => {
     const location = await prisma.location.create({ data: { name: 'L3', address: 'A' } })
     const staff = await prisma.staff.create({ data: { name: 'S', login: `s3-${Date.now()}`, passwordHash: 'x', role: 'staff', locationId: location.id } })
-    const client = await prisma.client.create({ data: { name: 'Joana Souza', phone: '1', email: 'j@e.com' } })
+    const client = await prisma.client.create({ data: { locationId: location.id, name: 'Joana Souza', phone: '1', email: 'j@e.com' } })
     await prisma.contract.create({
       data: { number: 42, locationId: location.id, clientId: client.id, staffId: staff.id, eventDate: new Date(), paymentMethod: 'PIX' },
     })
@@ -313,7 +328,7 @@ describe('listContracts pagination and search', () => {
   it('returns zero results for a search term matching neither client name nor any contract number', async () => {
     const location = await prisma.location.create({ data: { name: 'L4', address: 'A' } })
     const staff = await prisma.staff.create({ data: { name: 'S', login: `s4-${Date.now()}`, passwordHash: 'x', role: 'staff', locationId: location.id } })
-    const client = await prisma.client.create({ data: { name: 'Joana Souza', phone: '1', email: 'j2@e.com' } })
+    const client = await prisma.client.create({ data: { locationId: location.id, name: 'Joana Souza', phone: '1', email: 'j2@e.com' } })
     await prisma.contract.create({
       data: { number: 42, locationId: location.id, clientId: client.id, staffId: staff.id, eventDate: new Date(), paymentMethod: 'PIX' },
     })
@@ -325,7 +340,7 @@ describe('listContracts pagination and search', () => {
   it('falls back to name-only matching for a non-numeric search term without crashing', async () => {
     const location = await prisma.location.create({ data: { name: 'L5', address: 'A' } })
     const staff = await prisma.staff.create({ data: { name: 'S', login: `s5-${Date.now()}`, passwordHash: 'x', role: 'staff', locationId: location.id } })
-    const client = await prisma.client.create({ data: { name: 'Joana Souza', phone: '1', email: 'j3@e.com' } })
+    const client = await prisma.client.create({ data: { locationId: location.id, name: 'Joana Souza', phone: '1', email: 'j3@e.com' } })
     await prisma.contract.create({
       data: { number: 42, locationId: location.id, clientId: client.id, staffId: staff.id, eventDate: new Date(), paymentMethod: 'PIX' },
     })
@@ -341,7 +356,7 @@ describe('listContracts pagination and search', () => {
     const locationA = await prisma.location.create({ data: { name: 'LA', address: 'A' } })
     const locationB = await prisma.location.create({ data: { name: 'LB', address: 'A' } })
     const staffA = await prisma.staff.create({ data: { name: 'S', login: `sa-${Date.now()}`, passwordHash: 'x', role: 'staff', locationId: locationA.id } })
-    const clientA = await prisma.client.create({ data: { name: 'X', phone: '1', email: 'x@e.com' } })
+    const clientA = await prisma.client.create({ data: { locationId: locationA.id, name: 'X', phone: '1', email: 'x@e.com' } })
     await prisma.contract.create({
       data: { number: 1, locationId: locationB.id, clientId: clientA.id, staffId: staffA.id, eventDate: new Date(), paymentMethod: 'PIX' },
     })
@@ -400,7 +415,7 @@ describe('booking a piece that is already out on an active contract', () => {
     )
     // The dress physically leaves the store, so the allocation is checked_out
     // and its planned return is still ahead.
-    await checkOutAllocation(first.allocations[0].id, {}, new Date('2026-10-02'))
+    await checkOutAllocation(locationId, first.allocations[0].id, {}, new Date('2026-10-02'))
 
     const second = await createContract(
       baseInput({
@@ -417,7 +432,7 @@ describe('booking a piece that is already out on an active contract', () => {
 
   it('still refuses a booking that overlaps the days the piece is out', async () => {
     const first = await createContract(baseInput())
-    await checkOutAllocation(first.allocations[0].id, {}, new Date('2026-10-02'))
+    await checkOutAllocation(locationId, first.allocations[0].id, {}, new Date('2026-10-02'))
 
     await expect(
       createContract(

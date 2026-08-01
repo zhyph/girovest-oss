@@ -2,6 +2,7 @@ import crypto from 'crypto'
 import fs from 'fs'
 import path from 'path'
 import { prisma } from '../db/client.js'
+import { scopedDb } from '../db/scopedClient.js'
 import { AppError } from '../errors/AppError.js'
 import { ErrorCodes } from '../errors/errorCodes.js'
 import { productPhotoEvents } from '../events/productPhotoEvents.js'
@@ -56,7 +57,7 @@ export async function submitPhotos(
 ): Promise<{ photos: string[] }> {
   const photoToken = await requireValidToken(token)
 
-  const product = await prisma.product.findUnique({ where: { id: productId } })
+  const product = await scopedDb(photoToken.locationId).product.findUnique({ where: { id: productId } })
   if (!product || product.locationId !== photoToken.locationId) {
     throw new AppError(ErrorCodes.NOT_FOUND, 404, `Product ${productId} not found`)
   }
@@ -75,7 +76,7 @@ export async function submitPhotos(
 
   const existingPhotos = JSON.parse(product.photos) as string[]
   const updatedPhotos = [...existingPhotos, ...writtenPaths]
-  await prisma.product.update({
+  await scopedDb(photoToken.locationId).product.update({
     where: { id: productId },
     data: { photos: JSON.stringify(updatedPhotos) },
   })

@@ -31,6 +31,7 @@ export async function maintenanceBufferForLocation(locationId: string): Promise<
 }
 
 export async function maintenanceBufferForProduct(productId: string): Promise<number> {
+  // ast-grep-ignore: no-unscoped-location-model — Permanently unscoped: the function takes no locationId, since the point is to read the buffer of whichever location the product itself belongs to. Callers (productService/allocationService) location-check the productId first; the only thing returned is a buffer-days number, so it carries no cross-location data either way.
   const product = await prisma.product.findUnique({
     where: { id: productId },
     select: { location: { select: { maintenanceBufferDays: true } } },

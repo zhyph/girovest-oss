@@ -1,6 +1,7 @@
-import { prisma } from '../db/client.js'
+import { scopedDb } from '../db/scopedClient.js'
 import { AppError } from '../errors/AppError.js'
 import { ErrorCodes } from '../errors/errorCodes.js'
+import { prisma } from '../db/client.js'
 
 export interface IdentityDocumentInput {
   label: string
@@ -50,6 +51,7 @@ export interface AddressLineDTO {
 
 export interface ClientDTO {
   id: string
+  locationId: string
   name: string
   phone: string
   email: string
@@ -62,6 +64,7 @@ export interface ClientDTO {
 
 interface ClientRow {
   id: string
+  locationId: string
   name: string
   phone: string
   email: string
@@ -81,6 +84,9 @@ function toDTO(row: ClientRow, hasAllocationHistory: boolean): ClientDTO {
 }
 
 async function hasHistory(clientId: string): Promise<boolean> {
+  // Allocation has no locationId column — it's reached via product/client
+  // relations, so this stays on the bare prisma client (Allocation isn't in
+  // scopedDb's registry; see scopedClient.ts).
   const count = await prisma.allocation.count({ where: { clientId } })
   return count > 0
 }
@@ -99,8 +105,8 @@ async function historyByClientId(clientIds: string[]): Promise<Set<string>> {
   return result
 }
 
-export async function createClient(data: CreateClientInput): Promise<ClientDTO> {
-  const row = await prisma.client.create({
+export async function createClient(locationId: string, data: CreateClientInput): Promise<ClientDTO> {
+  const row = await scopedDb(locationId).client.create({
     data: {
       name: data.name,
       phone: data.phone,
@@ -108,30 +114,43 @@ export async function createClient(data: CreateClientInput): Promise<ClientDTO> 
       notes: data.notes,
       identityDocuments: data.identityDocuments ? { create: data.identityDocuments } : undefined,
       addressLines: data.addressLines ? { create: data.addressLines } : undefined,
-    },
+    } as any,
     include: CLIENT_INCLUDE,
   })
   return toDTO(row, false)
 }
 
-export async function listClients(): Promise<ClientDTO[]> {
-  const rows = await prisma.client.findMany({ orderBy: { createdAt: 'desc' }, include: CLIENT_INCLUDE })
+export async function listClients(locationId: string): Promise<ClientDTO[]> {
+  const rows = await scopedDb(locationId).client.findMany({
+    orderBy: { createdAt: 'desc' },
+    include: CLIENT_INCLUDE,
+  })
   const withHistory = await historyByClientId(rows.map((row) => row.id))
   return rows.map((row) => toDTO(row, withHistory.has(row.id)))
 }
 
-export async function getClient(id: string): Promise<ClientDTO> {
-  const row = await prisma.client.findUnique({ where: { id }, include: CLIENT_INCLUDE })
+export async function getClient(locationId: string, id: string): Promise<ClientDTO> {
+  const row = await scopedDb(locationId).client.findUnique({ where: { id }, include: CLIENT_INCLUDE })
   if (!row) {
     throw new AppError(ErrorCodes.NOT_FOUND, 404, `Client ${id} not found`)
   }
   return toDTO(row, await hasHistory(id))
 }
 
-export async function updateClient(id: string, data: UpdateClientInput): Promise<ClientDTO> {
-  await getClient(id)
+export async function updateClient(locationId: string, id: string, data: UpdateClientInput): Promise<ClientDTO> {
+  await getClient(locationId, id)
 
   await prisma.$transaction(async (tx) => {
+    // This is the bare prisma $transaction, not scopedDb(locationId).$transaction,
+    // so tx.client.update's `where: { id }` below is NOT itself scoped to
+    // locationId. That's safe only because getClient(locationId, id) above
+    // already throws 404 if `id` doesn't belong to locationId — by the time
+    // we get here, id is proven to belong to this location, so every by-id
+    // operation inside this transaction (client, clientIdentityDocument,
+    // clientAddressLine) is safe without needing scopedDb's own scoping.
+    // Do not remove the getClient guard above as "redundant" — it is the
+    // only thing making this transaction location-safe.
+    // ast-grep-ignore: no-unscoped-location-model — Safe only because getClient(locationId, id) above already 404s on a cross-location id; id is proven to belong to this location by the time we get here.
     await tx.client.update({
       where: { id },
       data: { name: data.name, phone: data.phone, email: data.email, notes: data.notes },
@@ -156,11 +175,11 @@ export async function updateClient(id: string, data: UpdateClientInput): Promise
     }
   })
 
-  return getClient(id)
+  return getClient(locationId, id)
 }
 
-export async function deleteClient(id: string): Promise<void> {
-  await getClient(id)
+export async function deleteClient(locationId: string, id: string): Promise<void> {
+  await getClient(locationId, id)
   if (await hasHistory(id)) {
     throw new AppError(
       ErrorCodes.CANNOT_DELETE_WITH_HISTORY,
@@ -168,5 +187,5 @@ export async function deleteClient(id: string): Promise<void> {
       'Cannot delete a client with allocation history',
     )
   }
-  await prisma.client.delete({ where: { id } })
+  await scopedDb(locationId).client.delete({ where: { id } })
 }

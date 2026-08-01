@@ -25,10 +25,10 @@ export const productsRouter = Router()
 productsRouter.use(requireAuth)
 
 // Shared with the phone's token-authorized create route so both paths accept
-// exactly the same product; only the two fields the phone can't supply are
-// added here.
+// exactly the same product; only the field the phone can't supply is added
+// here. locationId is not part of this schema — it always comes from the
+// authenticated staff member below, never the request body.
 const createSchema = productCreateSchema.extend({
-  locationId: z.string().min(1),
   photos: z.array(z.string()).optional(),
 })
 
@@ -49,15 +49,15 @@ productsRouter.post('/', async (req, res) => {
   if (!parsed.success) {
     throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'Invalid product payload')
   }
-  res.status(201).json(await createProduct(parsed.data))
+  res.status(201).json(await createProduct({ ...parsed.data, locationId: req.staff!.locationId }))
 })
 
-productsRouter.get('/', async (_req, res) => {
-  res.json(await listProducts())
+productsRouter.get('/', async (req, res) => {
+  res.json(await listProducts(req.staff!.locationId))
 })
 
 productsRouter.get('/:id', async (req, res) => {
-  res.json(await getProduct(req.params.id))
+  res.json(await getProduct(req.staff!.locationId, req.params.id))
 })
 
 productsRouter.patch('/:id', async (req, res) => {
@@ -65,20 +65,19 @@ productsRouter.patch('/:id', async (req, res) => {
   if (!parsed.success) {
     throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'Invalid product payload')
   }
-  res.json(await updateProduct(req.params.id, parsed.data))
+  res.json(await updateProduct(req.staff!.locationId, req.params.id, parsed.data))
 })
 
 productsRouter.delete('/:id', async (req, res) => {
-  await deleteProduct(req.params.id)
+  await deleteProduct(req.staff!.locationId, req.params.id)
   res.status(204).send()
 })
 
 productsRouter.post('/photo-session', async (req, res) => {
   if (!req.staff) throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Unauthorized')
-  const staff = await prisma.staff.findUniqueOrThrow({ where: { id: req.staff.staffId } })
-  const { token, expiresAt } = await issueProductPhotoSession(staff.id, staff.locationId)
+  const { token, expiresAt } = await issueProductPhotoSession(req.staff.staffId, req.staff.locationId)
 
-  const location = await prisma.location.findUniqueOrThrow({ where: { id: staff.locationId } })
+  const location = await prisma.location.findUniqueOrThrow({ where: { id: req.staff.locationId } })
   if (location.connectivityMode === 'relay') {
     const credentials = await relayCredentialsFromEnv()
     if (credentials) {
@@ -111,8 +110,7 @@ productsRouter.post('/photo-session', async (req, res) => {
 
 productsRouter.post('/events/ticket', async (req, res) => {
   if (!req.staff) throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Unauthorized')
-  const staff = await prisma.staff.findUniqueOrThrow({ where: { id: req.staff.staffId } })
-  const { ticket, expiresAt } = mintSseTicket(staff.id, staff.locationId)
+  const { ticket, expiresAt } = mintSseTicket(req.staff.staffId, req.staff.locationId)
   res.status(201).json({ ticket, expiresAt })
 })
 
@@ -123,6 +121,15 @@ const PHOTO_FILENAME_PATTERN = /^[0-9a-f-]+\.jpg$/
 
 productsRouter.get('/:id/photos/:filename', async (req, res) => {
   if (!PHOTO_FILENAME_PATTERN.test(req.params.filename)) {
+    throw new AppError(ErrorCodes.NOT_FOUND, 404, 'Photo not found')
+  }
+  const product = await getProduct(req.staff!.locationId, req.params.id)
+  // `product.photos` stores full URL paths, not bare filenames -- see
+  // productPhotoTokenService.submitPhotos(), which pushes
+  // `/api/products/<productId>/photos/<filename>`. Compare against that exact
+  // shape; comparing against the bare filename never matches a real row.
+  const expectedEntry = `/api/products/${req.params.id}/photos/${req.params.filename}`
+  if (!product.photos.includes(expectedEntry)) {
     throw new AppError(ErrorCodes.NOT_FOUND, 404, 'Photo not found')
   }
   const dir = process.env.PRODUCT_PHOTOS_DIR ?? './product-photos'
