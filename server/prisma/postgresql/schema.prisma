@@ -32,6 +32,7 @@ model Location {
 
   staff                Staff[]
   products             Product[]
+  clients              Client[]
   contracts            Contract[]
   contractClauses      LocationContractClause[]
   productPhotoTokens   ProductPhotoToken[]
@@ -53,13 +54,15 @@ model Staff {
 }
 
 model Client {
-  id        String   @id @default(uuid())
-  name      String
-  phone     String
-  email     String
-  notes     String?
-  createdAt DateTime @default(now())
+  id         String   @id @default(uuid())
+  locationId String
+  name       String
+  phone      String
+  email      String
+  notes      String?
+  createdAt  DateTime @default(now())
 
+  location          Location                 @relation(fields: [locationId], references: [id])
   allocations       Allocation[]
   identityDocuments ClientIdentityDocument[]
   addressLines      ClientAddressLine[]
