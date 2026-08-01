@@ -15,35 +15,37 @@ export async function resumeRelayConnections(credentials: RelayCredentials | nul
   if (!credentials) return []
   const liveTokens = await prisma.productPhotoToken.findMany({
     where: { expiresAt: { gt: new Date() } },
-    select: { token: true, expiresAt: true },
+    select: { token: true, expiresAt: true, location: { select: { connectivityMode: true } } },
   })
-  return liveTokens.map((row) => {
-    const connection = openRelayConnection(row.token, credentials)
-    // Resumed sockets go into the same registry as freshly issued ones, so
-    // each one closes at its own expiry and all of them close at shutdown.
-    registerRelayConnection(row.token, connection, row.expiresAt)
-    return connection
-  })
+  // Each token's own location decides whether it gets resumed — a token
+  // issued at a LAN-mode location has no business getting a relay socket
+  // just because some other location on this install happens to be in relay
+  // mode.
+  return liveTokens
+    .filter((row) => row.location.connectivityMode === 'relay')
+    .map((row) => {
+      const connection = openRelayConnection(row.token, credentials)
+      // Resumed sockets go into the same registry as freshly issued ones, so
+      // each one closes at its own expiry and all of them close at shutdown.
+      registerRelayConnection(row.token, connection, row.expiresAt)
+      return connection
+    })
 }
 
 /**
- * Relay credentials only make sense once this install is actually configured
- * for relay mode (vs. LAN, the default) and Task 8's env wiring has forwarded
- * all three values into this process. Until Task 8 lands, GIROVEST_UPDATE_URL/
- * _KEY/_INSTALL_ID simply aren't present here, so this deliberately returns
- * null and boot-time resume is a no-op rather than opening connections with
- * partial credentials.
+ * Install-wide, location-independent: url/productKey/installId come only
+ * from env, with no Prisma or location lookup at all. The boot-time caller
+ * (server.ts) has no request context to derive a location from, and the two
+ * request-context callers (routes/products.ts, routes/contracts.ts) already
+ * resolve their own location and check its connectivityMode === 'relay'
+ * before ever calling this — so gating on a location here would be redundant
+ * at best and, for boot-time resume, wrong (that caller has many locations to
+ * consider, not one).
  */
 export async function relayCredentialsFromEnv(): Promise<RelayCredentials | null> {
   const url = process.env.GIROVEST_UPDATE_URL
   const productKey = process.env.GIROVEST_UPDATE_KEY
   const installId = process.env.GIROVEST_INSTALL_ID
   if (!url || !productKey || !installId) return null
-
-  // Single-location per install, matching resolveLocationId's existing
-  // assumption elsewhere in the codebase.
-  const location = await prisma.location.findFirst()
-  if (location?.connectivityMode !== 'relay') return null
-
   return { url, productKey, installId }
 }
