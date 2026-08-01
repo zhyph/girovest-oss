@@ -1,10 +1,25 @@
-# Lint rule: Flag bare prisma.client/product calls that should use scopedDb() for location safety.
-# Some violations are permanent-by-design and excluded:
-# - contractService.ts: Uses manual ownership check (product.locationId !== input.locationId).
-# - occupancyQuery.ts: maintenanceBufferForProduct() has no locationId input; caller verifies.
-# - productService.ts: createProduct() non-HTTP; listProductsForLocation() already filtered;
-#   availabilityByProductId() is batch lookup with caller-verified IDs.
-# Tasks 12-13 will migrate remaining violations (Client/Product CRUD methods).
+# Lint rule: deny-by-default. Every bare prisma.client/prisma.product call under
+# src/ is an error; location-bearing reads and writes must go through
+# scopedDb(locationId) (server/src/db/scopedClient.ts).
+#
+# The migration is complete — no known-unfixed violations remain. The remaining
+# exemptions are permanent by design, and each is suppressed INLINE with an
+# `// ast-grep-ignore: no-unscoped-location-model — <reason>` comment on the line
+# directly above the call, so that any NEW unscoped call added to the same file
+# is still caught. Current inline exemptions:
+# - contractService.ts: the client and product lookups in createContract() are
+#   deliberately unscoped and then ownership-checked by hand, so a
+#   cross-location row is reported identically to a missing one.
+# - occupancyQuery.ts: maintenanceBufferForProduct() takes no locationId by
+#   design — it reads the buffer of whichever location owns the product.
+# - productService.ts: createProduct() (non-HTTP photo-token flow, explicit
+#   locationId param), listProductsForLocation() (already filters by
+#   locationId), availabilityByProductId() (batch lookup, caller-verified IDs).
+#
+# The file-level `ignores:` below is only for files where scoping is meaningless:
+# scopedClient.ts itself (it IS the wrapper), tests (they seed fixtures across
+# locations on purpose), and generated code. Do NOT add a product-code file
+# there — use an inline suppression on the specific call site instead.
 # See docs/superpowers/specs/2026-07-31-location-scoping-design.md §4.
 
 id: no-unscoped-location-model
@@ -26,6 +41,3 @@ ignores:
   - "src/db/scopedClient.ts"
   - "src/**/*.test.ts"
   - "src/generated/**"
-  # Permanent-by-design violations (documented above); see sgconfig.yml for rationale.
-  - "src/services/contractService.ts"
-  - "src/services/occupancyQuery.ts"
