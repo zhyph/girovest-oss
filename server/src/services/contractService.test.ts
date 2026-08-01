@@ -190,7 +190,7 @@ describe('createContract', () => {
 
   it('CRITICAL: a product taken out early cannot be booked for the days between the real pickup and its planned checkout date', async () => {
     const contract = await createContract(baseInput())
-    await checkOutAllocation(contract.allocations[0].id, { allowEarly: true }, new Date('2026-09-25T09:00:00.000Z'))
+    await checkOutAllocation(locationId, contract.allocations[0].id, { allowEarly: true }, new Date('2026-09-25T09:00:00.000Z'))
 
     // The dress left the store on Sep 25 even though the contract said Oct 2 —
     // those days are physically taken and must not be bookable.
@@ -400,7 +400,7 @@ describe('booking a piece that is already out on an active contract', () => {
     )
     // The dress physically leaves the store, so the allocation is checked_out
     // and its planned return is still ahead.
-    await checkOutAllocation(first.allocations[0].id, {}, new Date('2026-10-02'))
+    await checkOutAllocation(locationId, first.allocations[0].id, {}, new Date('2026-10-02'))
 
     const second = await createContract(
       baseInput({
@@ -417,7 +417,7 @@ describe('booking a piece that is already out on an active contract', () => {
 
   it('still refuses a booking that overlaps the days the piece is out', async () => {
     const first = await createContract(baseInput())
-    await checkOutAllocation(first.allocations[0].id, {}, new Date('2026-10-02'))
+    await checkOutAllocation(locationId, first.allocations[0].id, {}, new Date('2026-10-02'))
 
     await expect(
       createContract(

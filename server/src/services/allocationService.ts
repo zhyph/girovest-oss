@@ -9,9 +9,13 @@ import {
   toWindow,
 } from './occupancyQuery.js'
 
-async function getAllocationOrThrow(id: string) {
-  const allocation = await prisma.allocation.findUnique({ where: { id } })
-  if (!allocation) {
+// Allocation has no locationId column of its own — location is reached via
+// the product relation. This is the one join scopedDb can't cover (it only
+// intercepts top-level delegate calls), so every function here checks
+// ownership explicitly, matching contractService.ts's existing pattern.
+async function getAllocationOrThrow(locationId: string, id: string) {
+  const allocation = await prisma.allocation.findUnique({ where: { id }, include: { product: true } })
+  if (!allocation || allocation.product.locationId !== locationId) {
     throw new AppError(ErrorCodes.NOT_FOUND, 404, `Allocation ${id} not found`)
   }
   return allocation
@@ -27,8 +31,13 @@ export interface CheckOutInput {
   allowEarly?: boolean
 }
 
-export async function checkOutAllocation(id: string, data: CheckOutInput, asOf: Date = new Date()) {
-  const allocation = await getAllocationOrThrow(id)
+export async function checkOutAllocation(
+  locationId: string,
+  id: string,
+  data: CheckOutInput,
+  asOf: Date = new Date(),
+) {
+  const allocation = await getAllocationOrThrow(locationId, id)
   if (allocation.status !== 'reserved') {
     throw new AppError(
       ErrorCodes.INVALID_ALLOCATION_TRANSITION,
@@ -93,8 +102,8 @@ export interface ReturnInput {
   actualReturnDate?: Date
 }
 
-export async function returnAllocation(id: string, data: ReturnInput) {
-  const allocation = await getAllocationOrThrow(id)
+export async function returnAllocation(locationId: string, id: string, data: ReturnInput) {
+  const allocation = await getAllocationOrThrow(locationId, id)
   if (allocation.status !== 'checked_out') {
     throw new AppError(
       ErrorCodes.INVALID_ALLOCATION_TRANSITION,
@@ -121,8 +130,8 @@ export async function returnAllocation(id: string, data: ReturnInput) {
   return prisma.allocation.findUniqueOrThrow({ where: { id } })
 }
 
-export async function cancelAllocation(id: string) {
-  const allocation = await getAllocationOrThrow(id)
+export async function cancelAllocation(locationId: string, id: string) {
+  const allocation = await getAllocationOrThrow(locationId, id)
   if (allocation.status !== 'reserved') {
     throw new AppError(
       ErrorCodes.INVALID_ALLOCATION_TRANSITION,
@@ -144,18 +153,38 @@ export async function cancelAllocation(id: string) {
   return prisma.allocation.findUniqueOrThrow({ where: { id } })
 }
 
-export async function getProductAvailability(productId: string, asOf: Date = new Date()) {
+// occupancyQuery.ts's helpers trust whatever productId they're handed with no
+// location check of their own by design — these two functions are the
+// callers responsible for verifying ownership first.
+async function assertProductInLocation(locationId: string, productId: string): Promise<void> {
+  const product = await prisma.product.findUnique({ where: { id: productId } })
+  if (!product || product.locationId !== locationId) {
+    throw new AppError(ErrorCodes.NOT_FOUND, 404, `Product ${productId} not found`)
+  }
+}
+
+export async function getProductAvailability(locationId: string, productId: string, asOf: Date = new Date()) {
+  await assertProductInLocation(locationId, productId)
   const maintenanceBufferDays = await maintenanceBufferForProduct(productId)
   const windows = await loadBlockingWindows([productId], maintenanceBufferDays, asOf)
   return derivedAvailability(windows, asOf, { maintenanceBufferDays })
 }
 
-export async function isProductAvailableForRange(productId: string, checkoutDate: Date, dueDate: Date) {
+export async function isProductAvailableForRange(
+  locationId: string,
+  productId: string,
+  checkoutDate: Date,
+  dueDate: Date,
+) {
+  await assertProductInLocation(locationId, productId)
   const maintenanceBufferDays = await maintenanceBufferForProduct(productId)
   const windows = await loadBlockingWindows([productId], maintenanceBufferDays, checkoutDate)
   return !isOccupiedForRange(windows, checkoutDate, dueDate, { maintenanceBufferDays })
 }
 
-export async function listAllocations() {
-  return prisma.allocation.findMany({ orderBy: { createdAt: 'desc' } })
+export async function listAllocations(locationId: string) {
+  return prisma.allocation.findMany({
+    where: { product: { locationId } },
+    orderBy: { createdAt: 'desc' },
+  })
 }
