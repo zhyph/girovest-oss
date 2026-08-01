@@ -124,7 +124,12 @@ productsRouter.get('/:id/photos/:filename', async (req, res) => {
     throw new AppError(ErrorCodes.NOT_FOUND, 404, 'Photo not found')
   }
   const product = await getProduct(req.staff!.locationId, req.params.id)
-  if (!product.photos.includes(req.params.filename)) {
+  // `product.photos` stores full URL paths, not bare filenames -- see
+  // productPhotoTokenService.submitPhotos(), which pushes
+  // `/api/products/<productId>/photos/<filename>`. Compare against that exact
+  // shape; comparing against the bare filename never matches a real row.
+  const expectedEntry = `/api/products/${req.params.id}/photos/${req.params.filename}`
+  if (!product.photos.includes(expectedEntry)) {
     throw new AppError(ErrorCodes.NOT_FOUND, 404, 'Photo not found')
   }
   const dir = process.env.PRODUCT_PHOTOS_DIR ?? './product-photos'

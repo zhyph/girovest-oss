@@ -4,6 +4,7 @@ import fs from 'fs'
 import os from 'os'
 import path from 'path'
 import { app } from '../app.js'
+import { signingApp } from '../signingApp.js'
 import { prisma } from '../db/client.js'
 import jwt from 'jsonwebtoken'
 import { SESSION_TTL_SECONDS, signStaffToken } from '../auth/jwt.js'
@@ -18,6 +19,10 @@ vi.mock('../network/relayClient.js', async (importOriginal) => {
 })
 
 const RELAY_ENV_KEYS = ['GIROVEST_UPDATE_URL', 'GIROVEST_UPDATE_KEY', 'GIROVEST_INSTALL_ID'] as const
+
+// Smallest valid JPEG data URL that submitPhotos() will accept.
+const TINY_JPEG =
+  'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACP/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AVN//2Q=='
 
 let locationId: string
 let staffToken: string
@@ -214,7 +219,8 @@ describe('GET /:id/photos/:filename', () => {
     fs.writeFileSync(path.join(photosDir, filename), Buffer.from([0xff, 0xd8, 0xff, 0xd9]))
     await prisma.product.update({
       where: { id: productId },
-      data: { photos: JSON.stringify([filename]) },
+      // Production shape: submitPhotos() stores full URL paths, never bare filenames.
+      data: { photos: JSON.stringify([`/api/products/${productId}/photos/${filename}`]) },
     })
 
     const response = await request(app)
@@ -223,6 +229,35 @@ describe('GET /:id/photos/:filename', () => {
 
     expect(response.status).toBe(200)
     expect(response.headers['content-type']).toContain('image/jpeg')
+  })
+
+  // The one test in this file that seeds nothing by hand: it mints a photo
+  // session over HTTP, submits a photo through the signing app exactly as the
+  // phone does, and then fetches whatever path the write path actually stored.
+  // Route tests and service tests that each seed their own `photos` fixtures
+  // can drift on the stored shape without either one failing -- that drift is
+  // precisely the bug this test exists to catch.
+  it('serves a photo captured through the real phone-photo submission flow', async () => {
+    const sessionRes = await request(app)
+      .post('/api/products/photo-session')
+      .set('Authorization', `Bearer ${staffToken}`)
+    expect(sessionRes.status).toBe(201)
+
+    const submitRes = await request(signingApp)
+      .post(`/product-photos/${sessionRes.body.token}/submit`)
+      .send({ productId, photos: [TINY_JPEG] })
+    expect(submitRes.status).toBe(200)
+
+    const productRes = await request(app)
+      .get(`/api/products/${productId}`)
+      .set('Authorization', `Bearer ${staffToken}`)
+    expect(productRes.status).toBe(200)
+    const storedPath = productRes.body.photos[0] as string
+    expect(storedPath).toMatch(new RegExp(`^/api/products/${productId}/photos/[0-9a-f-]+\\.jpg$`))
+
+    const photoRes = await request(app).get(storedPath).set('Authorization', `Bearer ${staffToken}`)
+    expect(photoRes.status).toBe(200)
+    expect(photoRes.headers['content-type']).toContain('image/jpeg')
   })
 
   it('returns 404 for a nonexistent filename', async () => {
@@ -271,7 +306,7 @@ describe('GET /:id/photos/:filename', () => {
 
       await prisma.product.update({
         where: { id: productId },
-        data: { photos: JSON.stringify([filename]) },
+        data: { photos: JSON.stringify([`/api/products/${productId}/photos/${filename}`]) },
       })
 
       const response = await request(app)
@@ -292,7 +327,7 @@ describe('GET /:id/photos/:filename', () => {
     const token = signStaffToken({ staffId: staffA.id, role: 'owner' })
     const photoBRow = await prisma.product.update({
       where: { id: productB.id },
-      data: { photos: JSON.stringify(['abc-123.jpg']) },
+      data: { photos: JSON.stringify([`/api/products/${productB.id}/photos/abc-123.jpg`]) },
     })
 
     const res = await request(app)
