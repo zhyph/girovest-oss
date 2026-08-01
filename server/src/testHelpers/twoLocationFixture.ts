@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto'
 import { expect } from 'vitest'
 import { prisma } from '../db/client.js'
+import { scopedDb } from '../db/scopedClient.js'
 import { hashPassword } from '../auth/passwords.js'
 import { AppError } from '../errors/AppError.js'
 
@@ -16,34 +17,36 @@ export async function seedTwoLocations() {
     data: { name: 'Staff B', login: `fixture-b-${randomUUID().slice(0, 8)}`, passwordHash, role: 'owner', locationId: locationB.id },
   })
 
-  const productA = await prisma.product.create({
+  // `as any` on `data`: scopedDb injects `locationId` into the write at
+  // runtime (see scopedClient.ts), but its extended client type still
+  // reflects Prisma's generated input type, which requires `locationId` —
+  // the same cast clientService.ts's own scopedDb(...).client.create uses.
+  const productA = await scopedDb(locationA.id).product.create({
     data: {
-      locationId: locationA.id,
       name: 'Product A',
       category: 'dress',
       size: 'M',
       color: 'red',
       rentalPrice: 100,
       depositAmount: 50,
-    },
+    } as any,
   })
-  const productB = await prisma.product.create({
+  const productB = await scopedDb(locationB.id).product.create({
     data: {
-      locationId: locationB.id,
       name: 'Product B',
       category: 'dress',
       size: 'M',
       color: 'blue',
       rentalPrice: 100,
       depositAmount: 50,
-    },
+    } as any,
   })
 
-  const clientA = await prisma.client.create({
-    data: { locationId: locationA.id, name: 'Client A', phone: '1', email: 'a@fixture.com' },
+  const clientA = await scopedDb(locationA.id).client.create({
+    data: { name: 'Client A', phone: '1', email: 'a@fixture.com' } as any,
   })
-  const clientB = await prisma.client.create({
-    data: { locationId: locationB.id, name: 'Client B', phone: '2', email: 'b@fixture.com' },
+  const clientB = await scopedDb(locationB.id).client.create({
+    data: { name: 'Client B', phone: '2', email: 'b@fixture.com' } as any,
   })
 
   return { locationA, locationB, staffA, staffB, productA, productB, clientA, clientB }

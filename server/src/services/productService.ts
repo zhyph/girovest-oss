@@ -1,4 +1,5 @@
 import { prisma } from '../db/client.js'
+import { scopedDb } from '../db/scopedClient.js'
 import { AppError } from '../errors/AppError.js'
 import { ErrorCodes } from '../errors/errorCodes.js'
 import { derivedAvailability, type AllocationWindow, type DerivedAvailability } from '../domain/occupancy.js'
@@ -94,13 +95,12 @@ async function availabilityByProductId(productIds: string[]): Promise<Map<string
     select: { id: true, location: { select: { maintenanceBufferDays: true } } },
   })
 
-  // The cleaning window is a per-shop setting and a listing is NOT guaranteed
-  // to be single-shop — GET /api/products lists every location. Collapsing the
-  // batch to one buffer would apply the longest window in the page to shops
-  // that never configured one, parking their pieces in "maintenance" for days.
-  // Grouped by buffer value rather than by location so the query count follows
-  // the number of distinct settings (one, in every real deployment) instead of
-  // the number of shops.
+  // The cleaning window is a per-shop setting. Both callers (listProducts and
+  // listProductsForLocation) now scope every call to a single location, but
+  // grouping by buffer value rather than by location keeps this correct
+  // without relying on that invariant, and keeps the query count following
+  // the number of distinct settings (one, in every real deployment) instead
+  // of the number of products.
   const idsByBuffer = new Map<number, string[]>()
   for (const product of products) {
     const buffer = product.location.maintenanceBufferDays
@@ -162,8 +162,8 @@ export async function createProduct(data: CreateProductInput): Promise<ProductDT
   return toDTO(row, 'available', false)
 }
 
-export async function listProducts(): Promise<ProductDTO[]> {
-  const rows = await prisma.product.findMany({ orderBy: { createdAt: 'desc' } })
+export async function listProducts(locationId: string): Promise<ProductDTO[]> {
+  const rows = await scopedDb(locationId).product.findMany({ orderBy: { createdAt: 'desc' } })
   const availability = await availabilityByProductId(rows.map((row) => row.id))
   const withHistory = await historyByProductId(rows.map((row) => row.id))
   return rows.map((row) =>
@@ -205,28 +205,28 @@ export async function listProductsForLocation(
   )
 }
 
-export async function getProduct(id: string): Promise<ProductDTO> {
-  const row = await prisma.product.findUnique({ where: { id } })
+export async function getProduct(locationId: string, id: string): Promise<ProductDTO> {
+  const row = await scopedDb(locationId).product.findUnique({ where: { id } })
   if (!row) {
     throw new AppError(ErrorCodes.NOT_FOUND, 404, `Product ${id} not found`)
   }
   return toDTO(row, await availabilityFor(id), await hasHistory(id))
 }
 
-export async function updateProduct(id: string, data: UpdateProductInput): Promise<ProductDTO> {
-  await getProduct(id)
-  const row = await prisma.product.update({
+export async function updateProduct(locationId: string, id: string, data: UpdateProductInput): Promise<ProductDTO> {
+  await getProduct(locationId, id)
+  const row = await scopedDb(locationId).product.update({
     where: { id },
     data: {
       ...data,
       photos: data.photos ? JSON.stringify(data.photos) : undefined,
-    },
+    } as any,
   })
   return toDTO(row, await availabilityFor(id), await hasHistory(id))
 }
 
-export async function deleteProduct(id: string): Promise<void> {
-  await getProduct(id)
+export async function deleteProduct(locationId: string, id: string): Promise<void> {
+  await getProduct(locationId, id)
   const allocationCount = await prisma.allocation.count({ where: { productId: id } })
   if (allocationCount > 0) {
     throw new AppError(
@@ -235,5 +235,5 @@ export async function deleteProduct(id: string): Promise<void> {
       'Cannot delete a product with allocation history',
     )
   }
-  await prisma.product.delete({ where: { id } })
+  await scopedDb(locationId).product.delete({ where: { id } })
 }

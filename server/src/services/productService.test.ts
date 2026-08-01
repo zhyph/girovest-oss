@@ -11,10 +11,13 @@ import {
 } from './productService.js'
 
 let locationId: string
+let otherLocationId: string
 
 beforeEach(async () => {
   const location = await prisma.location.create({ data: { name: 'L', address: 'A' } })
   locationId = location.id
+  const other = await prisma.location.create({ data: { name: 'L2', address: 'A2' } })
+  otherLocationId = other.id
 })
 
 afterEach(async () => {
@@ -41,7 +44,7 @@ describe.sequential('productService', () => {
     expect(created.photos).toEqual(['https://example.com/a.jpg', 'https://example.com/b.jpg'])
     expect(created.status).toBe('active')
 
-    const fetched = await getProduct(created.id)
+    const fetched = await getProduct(locationId, created.id)
     expect(fetched.photos).toEqual(['https://example.com/a.jpg', 'https://example.com/b.jpg'])
   })
 
@@ -65,34 +68,57 @@ describe.sequential('productService', () => {
     await createProduct({
       locationId, name: 'B', category: 'festa', size: 'M', color: 'azul', rentalPrice: 1, depositAmount: 1,
     })
-    expect(await listProducts()).toHaveLength(2)
+    expect(await listProducts(locationId)).toHaveLength(2)
   })
 
   it('throws NOT_FOUND for a missing product', async () => {
-    await expect(getProduct('missing')).rejects.toThrow(AppError)
+    await expect(getProduct(locationId, 'missing')).rejects.toThrow(AppError)
+  })
+
+  it('throws NOT_FOUND when fetching a product that belongs to another location', async () => {
+    const created = await createProduct({ locationId: otherLocationId, name: 'X', category: 'dress', size: 'M', color: 'red', rentalPrice: 10, depositAmount: 5 })
+    await expect(getProduct(locationId, created.id)).rejects.toThrow(AppError)
+  })
+
+  it('lists only products belonging to the given location', async () => {
+    await createProduct({ locationId, name: 'A', category: 'dress', size: 'M', color: 'red', rentalPrice: 10, depositAmount: 5 })
+    await createProduct({ locationId: otherLocationId, name: 'B', category: 'dress', size: 'M', color: 'blue', rentalPrice: 10, depositAmount: 5 })
+    const products = await listProducts(locationId)
+    expect(products).toHaveLength(1)
+    expect(products[0]!.name).toBe('A')
   })
 
   it('updates a product, including its photos', async () => {
     const created = await createProduct({
       locationId, name: 'A', category: 'festa', size: 'M', color: 'azul', rentalPrice: 1, depositAmount: 1,
     })
-    const updated = await updateProduct(created.id, { photos: ['https://example.com/new.jpg'] })
+    const updated = await updateProduct(locationId, created.id, { photos: ['https://example.com/new.jpg'] })
     expect(updated.photos).toEqual(['https://example.com/new.jpg'])
+  })
+
+  it('refuses to update a product belonging to another location', async () => {
+    const created = await createProduct({ locationId: otherLocationId, name: 'X', category: 'dress', size: 'M', color: 'red', rentalPrice: 10, depositAmount: 5 })
+    await expect(updateProduct(locationId, created.id, { color: 'green' })).rejects.toThrow(AppError)
   })
 
   it('deletes a product with no allocation history', async () => {
     const created = await createProduct({
       locationId, name: 'A', category: 'festa', size: 'M', color: 'azul', rentalPrice: 1, depositAmount: 1,
     })
-    await deleteProduct(created.id)
-    await expect(getProduct(created.id)).rejects.toThrow(AppError)
+    await deleteProduct(locationId, created.id)
+    await expect(getProduct(locationId, created.id)).rejects.toThrow(AppError)
+  })
+
+  it('refuses to delete a product belonging to another location', async () => {
+    const created = await createProduct({ locationId: otherLocationId, name: 'X', category: 'dress', size: 'M', color: 'red', rentalPrice: 10, depositAmount: 5 })
+    await expect(deleteProduct(locationId, created.id)).rejects.toThrow(AppError)
   })
 
   it('refuses to delete a product with allocation history', async () => {
     const staff = await prisma.staff.create({
       data: { name: 'S', login: 'staff-prod', passwordHash: 'x', role: 'staff', locationId },
     })
-    const client = await prisma.client.create({ data: { name: 'C', phone: '1', email: 'c@example.com' } })
+    const client = await prisma.client.create({ data: { locationId, name: 'C', phone: '1', email: 'c@example.com' } })
     const product = await createProduct({
       locationId, name: 'A', category: 'festa', size: 'M', color: 'azul', rentalPrice: 1, depositAmount: 1,
     })
@@ -108,14 +134,14 @@ describe.sequential('productService', () => {
       },
     })
 
-    await expect(deleteProduct(product.id)).rejects.toMatchObject({ code: 'CANNOT_DELETE_WITH_HISTORY' })
+    await expect(deleteProduct(locationId, product.id)).rejects.toMatchObject({ code: 'CANNOT_DELETE_WITH_HISTORY' })
   })
 
   it('reports availability derived from allocations, not the circulation status field', async () => {
     const staff = await prisma.staff.create({
       data: { name: 'S', login: 'staff-avail', passwordHash: 'x', role: 'staff', locationId },
     })
-    const client = await prisma.client.create({ data: { name: 'C', phone: '1', email: 'c@example.com' } })
+    const client = await prisma.client.create({ data: { locationId, name: 'C', phone: '1', email: 'c@example.com' } })
     const product = await createProduct({
       locationId, name: 'A', category: 'festa', size: 'M', color: 'azul', rentalPrice: 1, depositAmount: 1,
     })
@@ -137,11 +163,11 @@ describe.sequential('productService', () => {
     // The product's own circulation status never changes on checkout — this
     // is exactly the field the Products list used to badge, which is why it
     // always read "Disponível" no matter what.
-    const fetched = await getProduct(product.id)
+    const fetched = await getProduct(locationId, product.id)
     expect(fetched.status).toBe('active')
     expect(fetched.availability).toBe('rented')
 
-    const [listed] = await listProducts()
+    const [listed] = await listProducts(locationId)
     expect(listed.availability).toBe('rented')
   })
 
@@ -149,7 +175,7 @@ describe.sequential('productService', () => {
     const staff = await prisma.staff.create({
       data: { name: 'S', login: 'staff-early', passwordHash: 'x', role: 'staff', locationId },
     })
-    const client = await prisma.client.create({ data: { name: 'C', phone: '1', email: 'c3@example.com' } })
+    const client = await prisma.client.create({ data: { locationId, name: 'C', phone: '1', email: 'c3@example.com' } })
     const product = await createProduct({
       locationId, name: 'A', category: 'festa', size: 'M', color: 'azul', rentalPrice: 1, depositAmount: 1,
     })
@@ -170,8 +196,8 @@ describe.sequential('productService', () => {
       },
     })
 
-    expect((await getProduct(product.id)).availability).toBe('rented')
-    const [listed] = await listProducts()
+    expect((await getProduct(locationId, product.id)).availability).toBe('rented')
+    const [listed] = await listProducts(locationId)
     expect(listed.availability).toBe('rented')
   })
 
@@ -179,7 +205,7 @@ describe.sequential('productService', () => {
     const staff = await prisma.staff.create({
       data: { name: 'S', login: 'staff-dhist', passwordHash: 'x', role: 'staff', locationId },
     })
-    const client = await prisma.client.create({ data: { name: 'C', phone: '1', email: 'c2@example.com' } })
+    const client = await prisma.client.create({ data: { locationId, name: 'C', phone: '1', email: 'c2@example.com' } })
     const product = await createProduct({
       locationId, name: 'A', category: 'festa', size: 'M', color: 'azul', rentalPrice: 1, depositAmount: 1,
     })
@@ -194,12 +220,12 @@ describe.sequential('productService', () => {
       },
     })
 
-    const fetched = await getProduct(product.id)
+    const fetched = await getProduct(locationId, product.id)
     expect(fetched.hasAllocationHistory).toBe(true)
     // returned means it's no longer occupied — history and current availability are different axes
     expect(fetched.availability).toBe('available')
 
-    const [listed] = await listProducts()
+    const [listed] = await listProducts(locationId)
     expect(listed.hasAllocationHistory).toBe(true)
   })
 })
@@ -228,16 +254,18 @@ describe('listProductsForLocation', () => {
 
 describe.sequential('maintenance window across shops', () => {
   it("does not apply one shop's cleaning window to another shop's pieces", async () => {
-    // listProducts() lists every location at once, so a shop that configured a
-    // long cleaning window must not park a different shop's pieces in
-    // "maintenance" just by sharing a page with them.
+    // The maintenance buffer is a per-shop setting. availabilityByProductId
+    // groups its batch lookup by buffer value rather than by location (an
+    // optimization, not a location filter), so this exercises each shop's
+    // own listProducts() call to confirm a long cleaning window configured
+    // by one shop never leaks onto another shop's pieces.
     const slowShop = await prisma.location.create({
       data: { name: 'Higieniza devagar', address: 'B', maintenanceBufferDays: 10 },
     })
     const staff = await prisma.staff.create({
       data: { name: 'S', login: `s-${Date.now()}`, passwordHash: 'x', role: 'staff', locationId },
     })
-    const client = await prisma.client.create({ data: { name: 'C', phone: '1', email: 'c@example.com' } })
+    const client = await prisma.client.create({ data: { locationId, name: 'C', phone: '1', email: 'c@example.com' } })
 
     const makeReturnedProduct = async (ownerLocationId: string) => {
       const product = await prisma.product.create({
@@ -263,10 +291,12 @@ describe.sequential('maintenance window across shops', () => {
     const noBufferProductId = await makeReturnedProduct(locationId)
     const slowShopProductId = await makeReturnedProduct(slowShop.id)
 
-    const listed = await listProducts()
-    const availabilityOf = (id: string) => listed.find((product) => product.id === id)?.availability
+    const [noBufferListing] = await listProducts(locationId)
+    const [slowShopListing] = await listProducts(slowShop.id)
 
-    expect(availabilityOf(noBufferProductId)).toBe('available')
-    expect(availabilityOf(slowShopProductId)).toBe('maintenance')
+    expect(noBufferListing?.id).toBe(noBufferProductId)
+    expect(noBufferListing?.availability).toBe('available')
+    expect(slowShopListing?.id).toBe(slowShopProductId)
+    expect(slowShopListing?.availability).toBe('maintenance')
   })
 })

@@ -7,6 +7,7 @@ import { app } from '../app.js'
 import { prisma } from '../db/client.js'
 import jwt from 'jsonwebtoken'
 import { SESSION_TTL_SECONDS, signStaffToken } from '../auth/jwt.js'
+import { seedTwoLocations } from '../testHelpers/twoLocationFixture.js'
 
 // Real openRelayConnection() opens an actual outbound WebSocket to
 // credentials.url, which in relay-mode tests below is a fake host —
@@ -56,8 +57,50 @@ afterEach(async () => {
   await prisma.allocation.deleteMany()
   await prisma.product.deleteMany()
   await prisma.staff.deleteMany()
+  await prisma.client.deleteMany()
   await prisma.location.deleteMany()
   for (const key of RELAY_ENV_KEYS) delete process.env[key]
+})
+
+describe('GET/PATCH/DELETE /api/products/:id cross-location isolation', () => {
+  it("404s when staff at location A requests location B's product", async () => {
+    const { staffA, productB } = await seedTwoLocations()
+    const token = signStaffToken({ staffId: staffA.id, role: 'owner' })
+
+    const getRes = await request(app).get(`/api/products/${productB.id}`).set('Authorization', `Bearer ${token}`)
+    expect(getRes.status).toBe(404)
+
+    const patchRes = await request(app)
+      .patch(`/api/products/${productB.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ color: 'green' })
+    expect(patchRes.status).toBe(404)
+
+    const deleteRes = await request(app).delete(`/api/products/${productB.id}`).set('Authorization', `Bearer ${token}`)
+    expect(deleteRes.status).toBe(404)
+  })
+
+  it("does not include location B's products in location A's list", async () => {
+    const { staffA, productA } = await seedTwoLocations()
+    const token = signStaffToken({ staffId: staffA.id, role: 'owner' })
+
+    const res = await request(app).get('/api/products').set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(200)
+    expect(res.body.map((p: { id: string }) => p.id)).toEqual([productA.id])
+  })
+
+  it('ignores a client-supplied locationId and uses the authenticated staff\'s own', async () => {
+    const { staffA, locationA, locationB } = await seedTwoLocations()
+    const token = signStaffToken({ staffId: staffA.id, role: 'owner' })
+
+    const res = await request(app)
+      .post('/api/products')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ locationId: locationB.id, name: 'X', category: 'dress', size: 'M', color: 'red', rentalPrice: 10, depositAmount: 5 })
+    expect(res.status).toBe(201)
+    expect(res.body.locationId).toBe(locationA.id)
+    expect(res.body.locationId).not.toBe(locationB.id)
+  })
 })
 
 describe('POST /api/products/photo-session', () => {

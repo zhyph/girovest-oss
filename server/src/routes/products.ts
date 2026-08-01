@@ -25,10 +25,10 @@ export const productsRouter = Router()
 productsRouter.use(requireAuth)
 
 // Shared with the phone's token-authorized create route so both paths accept
-// exactly the same product; only the two fields the phone can't supply are
-// added here.
+// exactly the same product; only the field the phone can't supply is added
+// here. locationId is not part of this schema — it always comes from the
+// authenticated staff member below, never the request body.
 const createSchema = productCreateSchema.extend({
-  locationId: z.string().min(1),
   photos: z.array(z.string()).optional(),
 })
 
@@ -49,15 +49,15 @@ productsRouter.post('/', async (req, res) => {
   if (!parsed.success) {
     throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'Invalid product payload')
   }
-  res.status(201).json(await createProduct(parsed.data))
+  res.status(201).json(await createProduct({ ...parsed.data, locationId: req.staff!.locationId }))
 })
 
-productsRouter.get('/', async (_req, res) => {
-  res.json(await listProducts())
+productsRouter.get('/', async (req, res) => {
+  res.json(await listProducts(req.staff!.locationId))
 })
 
 productsRouter.get('/:id', async (req, res) => {
-  res.json(await getProduct(req.params.id))
+  res.json(await getProduct(req.staff!.locationId, req.params.id))
 })
 
 productsRouter.patch('/:id', async (req, res) => {
@@ -65,11 +65,11 @@ productsRouter.patch('/:id', async (req, res) => {
   if (!parsed.success) {
     throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'Invalid product payload')
   }
-  res.json(await updateProduct(req.params.id, parsed.data))
+  res.json(await updateProduct(req.staff!.locationId, req.params.id, parsed.data))
 })
 
 productsRouter.delete('/:id', async (req, res) => {
-  await deleteProduct(req.params.id)
+  await deleteProduct(req.staff!.locationId, req.params.id)
   res.status(204).send()
 })
 
