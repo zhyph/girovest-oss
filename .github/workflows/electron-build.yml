@@ -17,7 +17,33 @@ permissions:
   contents: read
 
 jobs:
+  test:
+    # Single OS is enough here: these are Vitest unit/component suites
+    # exercising business logic, not native-module packaging, so there is
+    # nothing Windows-specific for them to catch that ubuntu-latest wouldn't.
+    # better-sqlite3 still gets natively rebuilt against the host Node ABI by
+    # `npm ci`, since server tests hit a real (self-contained, sqlite) DB via
+    # the committed server/.env.test.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install workspace dependencies
+        run: npm ci
+
+      - name: Run server tests
+        run: npm test --workspace=server
+
+      - name: Run client tests
+        run: npm test --workspace=client
+
   build:
+    needs: test
     strategy:
       matrix:
         os: [windows-latest, ubuntu-latest]
