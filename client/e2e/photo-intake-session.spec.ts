@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { skipOnboardingTour } from './skipOnboardingTour.ts'
 
 // The product drawer is a fixed-height sidebar with no internal scroll, so
 // with a photo thumbnail row present its Cancelar/Salvar buttons can sit
@@ -20,6 +21,7 @@ const TINY_JPEG_BASE64 =
   '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/2wBDAQMDAwQDBAgEBAgQCwkLEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBD/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAj/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k='
 
 async function login(page: import('@playwright/test').Page) {
+  await skipOnboardingTour(page)
   await page.goto('/login')
   await page.getByLabel('Usuário').fill('e2e-staff')
   await page.getByLabel('Senha').fill('e2e-password12')
@@ -34,6 +36,10 @@ async function createProduct(page: import('@playwright/test').Page, name: string
   await form.getByLabel('Categoria').fill(category)
   await form.getByLabel('Tamanho').fill(size)
   await form.getByLabel('Cor').fill(color)
+  // rentalPrice defaults to 0, which fails the schema's .positive() check and
+  // silently blocks submission (no request, no visible toast) if left unset.
+  await form.getByLabel('Preço do aluguel').fill('100')
+  await form.getByLabel('Caução').fill('50')
   await page.getByRole('button', { name: 'Salvar', exact: true }).click()
   await expect(page.getByText(name)).toBeVisible()
 }

@@ -38,6 +38,7 @@ const client = await prisma.client.upsert({
   update: {},
   create: {
     id: 'e2e-calendar-load-client',
+    locationId: staff.locationId,
     name: 'Cliente Carga E2E',
     phone: '11999990020',
     email: 'calendar-load-e2e@example.com',

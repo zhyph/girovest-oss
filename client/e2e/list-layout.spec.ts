@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { skipOnboardingTour } from './skipOnboardingTour.ts'
 
 // Precondition: server/ is running against a database seeded, in order, via:
 //   npx tsx seed-e2e.ts
@@ -7,6 +8,7 @@ import { test, expect, type Page } from '@playwright/test'
 // See server/README.md.
 
 async function login(page: Page) {
+  await skipOnboardingTour(page)
   await page.goto('/login')
   await page.getByLabel('Usuário').fill('e2e-staff')
   await page.getByLabel('Senha').fill('e2e-password12')
@@ -94,6 +96,11 @@ test('Products and Clients column header stays pinned while scrolling a long lis
 
 test('ProductDrawer keeps Salvar within the viewport when the product has several photos', async ({ page }) => {
   await login(page)
+  // The drawer is a fixed-height sidebar with no internal scroll, so with a
+  // photo thumbnail row present its footer can sit below a default 720px-tall
+  // viewport — see the same accommodation in photo-intake-session.spec.ts.
+  // A taller viewport isolates the assertion below to layout, not viewport size.
+  await page.setViewportSize({ width: 1280, height: 2000 })
   await page.goto('/produtos')
 
   await page.getByText('Vestido Fotos Layout E2E').click()

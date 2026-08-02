@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test'
+import { skipOnboardingTour } from './skipOnboardingTour.ts'
 
 async function login(page: import('@playwright/test').Page) {
+  await skipOnboardingTour(page)
   await page.goto('/login')
   await page.getByLabel('Usuário').fill('e2e-staff')
   await page.getByLabel('Senha').fill('e2e-password12')
@@ -25,6 +27,10 @@ test('save and add another keeps the drawer open and prefills the next product',
   await form.getByLabel('Categoria').fill('festa')
   await form.getByLabel('Tamanho').fill('M')
   await form.getByLabel('Cor').fill('azul')
+  // rentalPrice defaults to 0, which fails the schema's .positive() check and
+  // silently blocks submission (no request, no visible toast) if left unset.
+  await form.getByLabel('Preço do aluguel').fill('100')
+  await form.getByLabel('Caução').fill('50')
   await form.getByLabel('Salvar e adicionar outro').check()
   await page.getByRole('button', { name: 'Salvar', exact: true }).click()
 

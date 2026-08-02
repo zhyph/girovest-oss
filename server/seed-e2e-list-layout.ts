@@ -44,6 +44,7 @@ for (let i = 1; i <= CLIENT_COUNT; i += 1) {
     update: {},
     create: {
       id: `e2e-list-layout-client-${i}`,
+      locationId: staff.locationId,
       name: `Cliente Layout E2E ${i}`,
       phone: `1199999${String(1000 + i).slice(-4)}`,
       email: `list-layout-e2e-${i}@example.com`,

@@ -3,6 +3,7 @@ import { execSync } from 'node:child_process'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { skipOnboardingTour } from './skipOnboardingTour.ts'
 
 // Precondition: server/ is running against a database seeded, in order, via:
 //   npx tsx seed-e2e.ts
@@ -10,6 +11,7 @@ import { join } from 'node:path'
 // See server/README.md.
 
 async function login(page: Page) {
+  await skipOnboardingTour(page)
   await page.goto('/login')
   await page.getByLabel('Usuário').fill('e2e-staff')
   await page.getByLabel('Senha').fill('e2e-password12')
