@@ -15,15 +15,26 @@ function mockHooks() {
   vi.spyOn(useClientsModule, 'useClients').mockReturnValue({ data: [], isLoading: false } as never)
 }
 
+// CalendarPage anchors MonthView on `new Date()` with no way to inject a
+// fixed "today" from the test, and MonthView only renders events that fall
+// within the visible month. Hardcoding a calendar month (e.g. July 2026)
+// works only until the real clock moves past it, then the event silently
+// falls outside the default view and these assertions time out looking for
+// text that's still there — just off-screen. Anchoring to the current month
+// instead keeps the fixture valid regardless of when the suite runs.
+const now = new Date()
+const currentMonthDay = (day: number) =>
+  `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}T00:00:00.000Z`
+
 function makeAllocation(overrides: Partial<Allocation> = {}): Allocation {
   return {
     id: 'alloc-1',
     productId: 'product-1',
     clientId: 'client-1',
     staffId: 'staff-1',
-    checkoutDate: '2026-07-01T00:00:00.000Z',
+    checkoutDate: currentMonthDay(1),
     actualCheckoutDate: null,
-    dueDate: '2026-07-10T00:00:00.000Z',
+    dueDate: currentMonthDay(10),
     actualReturnDate: null,
     status: 'checked_out',
     priceCharged: 100,
@@ -31,7 +42,7 @@ function makeAllocation(overrides: Partial<Allocation> = {}): Allocation {
     depositReturned: null,
     conditionNotesOut: null,
     conditionNotesIn: null,
-    createdAt: '2026-07-01T00:00:00.000Z',
+    createdAt: currentMonthDay(1),
     ...overrides,
   }
 }
@@ -92,7 +103,7 @@ describe('CalendarPage', () => {
     45000,
   )
 
-  it('renders the product name looked up from useProducts when the productId matches', () => {
+  it('renders the product name looked up from useProducts when the productId matches', async () => {
     vi.spyOn(useCalendarModule, 'useCalendarTab').mockReturnValue({
       data: [makeAllocation({ productId: 'product-1' })],
       isLoading: false,
@@ -105,11 +116,15 @@ describe('CalendarPage', () => {
 
     render(<CalendarPage />)
 
-    expect(screen.getByText('Vestido Azul')).toBeInTheDocument()
+    // MonthView (the default view) is lazy-loaded behind a Suspense boundary,
+    // so its content — where the product name actually renders — is not in
+    // the DOM on the synchronous first render. findByText waits for the
+    // chunk's Suspense fallback to resolve instead of asserting too early.
+    expect(await screen.findByText('Vestido Azul', {}, { timeout: 30000 })).toBeInTheDocument()
     expect(screen.queryByText('product-1')).not.toBeInTheDocument()
-  })
+  }, 45000)
 
-  it('falls back to the raw productId when no matching product is found', () => {
+  it('falls back to the raw productId when no matching product is found', async () => {
     vi.spyOn(useCalendarModule, 'useCalendarTab').mockReturnValue({
       data: [makeAllocation({ productId: 'unknown-product-id' })],
       isLoading: false,
@@ -122,7 +137,7 @@ describe('CalendarPage', () => {
 
     render(<CalendarPage />)
 
-    expect(screen.getByText('unknown-product-id')).toBeInTheDocument()
+    expect(await screen.findByText('unknown-product-id', {}, { timeout: 30000 })).toBeInTheDocument()
     expect(screen.queryByText('Vestido Azul')).not.toBeInTheDocument()
-  })
+  }, 45000)
 })
