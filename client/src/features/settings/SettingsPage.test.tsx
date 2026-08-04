@@ -22,6 +22,13 @@ const settings: LocationSettings = {
   ],
 }
 
+// Settings is five navigable sections now, and inactive ones are `hidden`,
+// which takes them out of the accessibility tree. Tests therefore have to
+// reach a section the way a user does before querying inside it.
+async function goToSection(name: 'Loja' | 'Contrato' | 'Backup' | 'Aparência' | 'Suporte') {
+  await userEvent.click(screen.getByRole('button', { name: new RegExp(`^${name}`) }))
+}
+
 function renderWithToast(ui: React.ReactElement) {
   return render(<>{ui}<Toaster /></>, { wrapper: MemoryRouter })
 }
@@ -45,9 +52,10 @@ afterEach(() => {
 })
 
 describe('SettingsPage', () => {
-  it('renders the three appearance options with the current selection pressed', () => {
+  it('renders the three appearance options with the current selection pressed', async () => {
     mockSettingsHooks()
     renderWithToast(<SettingsPage />)
+    await goToSection('Aparência')
 
     const group = screen.getByRole('group', { name: 'Aparência' })
     const systemButton = within(group).getByRole('button', { name: 'Sistema' })
@@ -62,6 +70,7 @@ describe('SettingsPage', () => {
   it('applies the root class, persists the choice, and moves aria-pressed on selection', async () => {
     mockSettingsHooks()
     renderWithToast(<SettingsPage />)
+    await goToSection('Aparência')
 
     await userEvent.click(screen.getByRole('button', { name: 'Escuro' }))
 
@@ -82,6 +91,7 @@ describe('SettingsPage', () => {
   it('lets staff add a clause row', async () => {
     mockSettingsHooks()
     renderWithToast(<SettingsPage />)
+    await goToSection('Contrato')
     await userEvent.click(screen.getByRole('button', { name: /adicionar cláusula/i }))
     expect(screen.getAllByLabelText('Texto da cláusula')).toHaveLength(3)
   })
@@ -89,6 +99,7 @@ describe('SettingsPage', () => {
   it('lets staff remove a clause row', async () => {
     mockSettingsHooks()
     renderWithToast(<SettingsPage />)
+    await goToSection('Contrato')
     const removeButtons = screen.getAllByRole('button', { name: /remover cláusula/i })
     await userEvent.click(removeButtons[0])
     expect(screen.queryByDisplayValue('Primeira cláusula')).not.toBeInTheDocument()
@@ -99,6 +110,15 @@ describe('SettingsPage', () => {
     const updateImpl = vi.fn().mockResolvedValue(settings)
     mockSettingsHooks(updateImpl)
     renderWithToast(<SettingsPage />)
+    await goToSection('Contrato')
+
+    // The save bar only appears once something has actually changed, so an
+    // edit is what makes saving reachable at all. Editing the first clause
+    // also keeps this test's real point: the clauses submit in the order
+    // they are shown, which is the order they print.
+    const firstClause = screen.getAllByLabelText('Texto da cláusula')[0]
+    await userEvent.clear(firstClause)
+    await userEvent.type(firstClause, 'Cláusula editada')
 
     await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
 
@@ -106,7 +126,7 @@ describe('SettingsPage', () => {
       phone: '11987654321',
       maintenanceBufferDays: 0,
       connectivityMode: 'lan',
-      clauses: [{ text: 'Primeira cláusula' }, { text: 'Segunda cláusula' }],
+      clauses: [{ text: 'Cláusula editada' }, { text: 'Segunda cláusula' }],
     })
   })
 
@@ -114,6 +134,7 @@ describe('SettingsPage', () => {
     const updateImpl = vi.fn().mockResolvedValue(settings)
     mockSettingsHooks(updateImpl)
     renderWithToast(<SettingsPage />)
+    await goToSection('Aparência')
 
     const group = screen.getByRole('group', { name: 'Conectividade' })
     await userEvent.click(within(group).getByRole('radio', { name: 'Internet' }))
@@ -124,9 +145,10 @@ describe('SettingsPage', () => {
 })
 
 describe('tours guiados', () => {
-  it('lista um botão Rever para cada seção coberta', () => {
+  it('lista um botão Rever para cada seção coberta', async () => {
     mockSettingsHooks()
     renderWithToast(<SettingsPage />)
+    await goToSection('Suporte')
 
     expect(screen.getByRole('button', { name: 'Rever tour de Painel' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Rever tour de Clientes' })).toBeInTheDocument()
@@ -138,6 +160,7 @@ describe('tours guiados', () => {
     const requestTourReplaySpy = vi.spyOn(tourReplayModule, 'requestTourReplay')
     mockSettingsHooks()
     renderWithToast(<SettingsPage />)
+    await goToSection('Suporte')
 
     await userEvent.click(screen.getByRole('button', { name: 'Rever tour de Clientes' }))
 
@@ -156,6 +179,7 @@ describe('identificador da instalação', () => {
   it('não mostra a seção no build web, onde não há ponte', async () => {
     mockSettingsHooks()
     renderWithToast(<SettingsPage />)
+    await goToSection('Suporte')
     await screen.findByText('Configurações')
     expect(screen.queryByText('Identificador desta instalação')).not.toBeInTheDocument()
   })
@@ -166,7 +190,62 @@ describe('identificador da instalação', () => {
     }
     mockSettingsHooks()
     renderWithToast(<SettingsPage />)
+    await goToSection('Suporte')
     expect(await screen.findByText(INSTALL)).toBeInTheDocument()
     expect(screen.getByText('Identificador desta instalação')).toBeInTheDocument()
+  })
+})
+
+describe('SettingsPage sections', () => {
+  it('splits the single column into five navigable sections, showing one at a time', async () => {
+    mockSettingsHooks()
+    renderWithToast(<SettingsPage />)
+
+    for (const name of ['Loja', 'Contrato', 'Backup', 'Aparência', 'Suporte']) {
+      expect(screen.getByRole('button', { name: new RegExp(`^${name}`) })).toBeInTheDocument()
+    }
+
+    // Loja is the landing section: its field is reachable, the clause
+    // editor in another section is not. Asserted with toBeVisible rather
+    // than presence — inactive panels are `hidden`, which label queries
+    // still walk right past even though role queries and the browser do not.
+    expect(screen.getByLabelText('Telefone')).toBeVisible()
+    expect(screen.queryByRole('button', { name: /adicionar cláusula/i })).not.toBeInTheDocument()
+
+    await goToSection('Contrato')
+    expect(screen.getByRole('button', { name: /adicionar cláusula/i })).toBeVisible()
+    expect(screen.getByLabelText('Telefone')).not.toBeVisible()
+  })
+
+  it('offers saving only once something has changed, and can discard back', async () => {
+    mockSettingsHooks()
+    renderWithToast(<SettingsPage />)
+
+    // Nothing to save yet: the bar would otherwise sit there permanently
+    // inviting a no-op write.
+    expect(screen.queryByRole('button', { name: 'Salvar' })).not.toBeInTheDocument()
+
+    await userEvent.type(screen.getByLabelText('Dias de higienização entre aluguéis'), '3')
+
+    expect(screen.getByText('Alterações não salvas.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Salvar' })).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Descartar' }))
+
+    expect(screen.queryByRole('button', { name: 'Salvar' })).not.toBeInTheDocument()
+  })
+
+  it('keeps edits made in one section when another is visited', async () => {
+    mockSettingsHooks()
+    renderWithToast(<SettingsPage />)
+
+    await userEvent.type(screen.getByLabelText('Dias de higienização entre aluguéis'), '3')
+    await goToSection('Contrato')
+    await goToSection('Loja')
+
+    // Sections are hidden rather than unmounted precisely so that three
+    // panels of one form cannot lose state to mount order.
+    expect(screen.getByLabelText('Dias de higienização entre aluguéis')).toHaveValue(3)
+    expect(screen.getByRole('button', { name: 'Salvar' })).toBeInTheDocument()
   })
 })

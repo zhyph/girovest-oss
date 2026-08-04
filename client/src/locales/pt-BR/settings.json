@@ -70,5 +70,19 @@
       "message": "A pasta \"{{path}}\" já guarda um backup de outra instalação do Girovest — por exemplo, o pendrive de um backup restaurado em um computador novo. Se essa outra instalação ainda estiver em uso, ela perderá o controle desta pasta e seus backups mais antigos poderão ser apagados com o tempo. Usar esta pasta mesmo assim?",
       "confirmAction": "Usar esta pasta mesmo assim"
     }
-  }
+  },
+  "sections": {
+    "shop": "Loja",
+    "shopHint": "Contato e higienização",
+    "contract": "Contrato",
+    "contractHint": "{{count}} cláusulas",
+    "backup": "Backup",
+    "backupHint": "Cópia dos dados",
+    "appearance": "Aparência",
+    "appearanceHint": "Tema e conectividade",
+    "support": "Suporte",
+    "supportHint": "Tours e versão"
+  },
+  "unsaved": "Alterações não salvas.",
+  "discard": "Descartar"
 }
