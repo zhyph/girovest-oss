@@ -122,6 +122,7 @@
     "outstanding": "Em aberto",
     "markPaid": "Marcar como pago",
     "markUnpaid": "Desmarcar",
+    "payableFrom": "Só é possível marcar como pago a partir de {{date}}",
     "paidOn": "pago em {{date}}",
     "settled": "Contrato quitado.",
     "none": "Nenhuma parcela cadastrada neste contrato.",

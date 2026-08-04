@@ -16,7 +16,7 @@ import { StatusBadge, type EntityState } from '../../components/ui/status-badge.
 import { AuthenticatedPhoto } from '../../components/ui/authenticated-photo.tsx'
 import { formatCurrency, getLocaleConfig } from '../../lib/locale.ts'
 import { ConfirmDialog } from '../../components/ui/confirm-dialog.tsx'
-import { parseDateOnly, formatDate } from '../../lib/date.ts'
+import { parseDateOnly, formatDate, overdueAsOf } from '../../lib/date.ts'
 import { useLocale } from '../../lib/LocaleContext.tsx'
 import { showErrorToast } from '../../lib/toast.ts'
 import { useUnsavedChangesGuard } from '../../lib/useUnsavedChangesGuard.ts'
@@ -320,6 +320,23 @@ export function AllocationActions({ allocation }: { allocation: Allocation }) {
 
 const SHORT_DATE: Intl.DateTimeFormatOptions = { day: '2-digit', month: '2-digit', year: 'numeric' }
 
+/**
+ * An instalment can be settled from its due date onwards, never before it.
+ *
+ * The shop's own rule, and a real safeguard: "Marcar como pago" sits one row
+ * away from the instalment above it, and marking February's instead of
+ * January's makes the contract look settled money that has not arrived. The
+ * reverse direction is deliberately NOT gated — undoing a mistake must never
+ * be harder than making it, and a wrongly-marked future instalment is exactly
+ * the thing you need to be able to unmark.
+ *
+ * Uses the same start-of-today instant every overdue question in the app is
+ * asked as of, so an instalment due today is payable today.
+ */
+export function canMarkInstallmentPaid(dueDate: string, today = overdueAsOf()): boolean {
+  return parseDateOnly(dueDate) <= today
+}
+
 function ContractPayments({ contract }: { contract: Contract }) {
   const { t } = useTranslation('contracts')
   const { locale } = useLocale()
@@ -415,7 +432,12 @@ function ContractPayments({ contract }: { contract: Contract }) {
       ) : (
         isExpanded && (
         <ul id={listId} className="flex flex-col gap-1">
-          {contract.installments.map((installment) => (
+          {contract.installments.map((installment) => {
+            const payable = installment.paid || canMarkInstallmentPaid(installment.dueDate)
+            const blockedReason = t('payments.payableFrom', {
+              date: formatDate(parseDateOnly(installment.dueDate), locale, SHORT_DATE),
+            })
+            return (
             <li key={installment.id} className="flex items-center justify-between gap-3 text-xs">
               <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
                 <span>{formatDate(parseDateOnly(installment.dueDate), locale, SHORT_DATE)}</span>
@@ -428,17 +450,29 @@ function ContractPayments({ contract }: { contract: Contract }) {
                   </span>
                 )}
               </span>
-              <Button
-                type="button"
-                size="sm"
-                variant={installment.paid ? 'ghost' : 'secondary'}
-                disabled={setPaid.isPending}
-                onClick={() => toggle(installment.id, !installment.paid)}
-              >
-                {installment.paid ? t('payments.markUnpaid') : t('payments.markPaid')}
-              </Button>
+              {/*
+                Disabled and still on screen, with the reason on the wrapper
+                rather than on the button: a disabled control is exempt from
+                pointer events in several browsers, so its own `title` never
+                surfaces. Hiding the action instead would leave the staff
+                member looking for a button that is simply absent, with
+                nothing to explain why.
+              */}
+              <span title={payable ? undefined : blockedReason}>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={installment.paid ? 'ghost' : 'secondary'}
+                  disabled={setPaid.isPending || !payable}
+                  aria-label={payable ? undefined : blockedReason}
+                  onClick={() => toggle(installment.id, !installment.paid)}
+                >
+                  {installment.paid ? t('payments.markUnpaid') : t('payments.markPaid')}
+                </Button>
+              </span>
             </li>
-          ))}
+            )
+          })}
         </ul>
         )
       )}

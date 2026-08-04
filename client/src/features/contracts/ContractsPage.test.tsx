@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router'
 import '../../i18n.ts'
-import { ContractsPage } from './ContractsPage.tsx'
+import { ContractsPage, canMarkInstallmentPaid } from './ContractsPage.tsx'
 import * as useContractsModule from './useContracts.ts'
 import * as useProductsModule from '../products/useProducts.ts'
 import * as useClientsModule from '../clients/useClients.ts'
@@ -45,7 +45,11 @@ const contract: Contract = {
       conditionNotesOut: null, conditionNotesIn: null, createdAt: '2026-09-01',
     },
   ],
-  installments: [{ id: 'i1', contractId: 'ct1', dueDate: '2026-09-20', amount: 380, paid: false, paidAt: null }],
+  // Deliberately a date already past: an instalment can only be settled from
+  // its due date onwards, so a future-dated fixture would describe a row whose
+  // "Marcar como pago" is correctly unavailable — not the ordinary case these
+  // tests are about.
+  installments: [{ id: 'i1', contractId: 'ct1', dueDate: '2026-01-20', amount: 380, paid: false, paidAt: null }],
 }
 
 const client = {
@@ -549,7 +553,7 @@ describe('payments summary', () => {
       contracts: [
         {
           ...contract,
-          installments: [{ id: 'i1', contractId: 'ct1', dueDate: '2026-09-20', amount: 380, paid: false, paidAt: null }],
+          installments: [{ id: 'i1', contractId: 'ct1', dueDate: '2026-01-20', amount: 380, paid: false, paidAt: null }],
         },
       ],
     })
@@ -559,6 +563,85 @@ describe('payments summary', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Marcar como pago' }))
 
     expect(setPaidImpl).toHaveBeenCalledWith({ contractId: 'ct1', installmentId: 'i1', paid: true })
+  })
+
+  /*
+    Money that has not been agreed to arrive yet cannot be marked as arrived.
+    The rows sit one under the other in a collapsed list, and the mis-click
+    this prevents — settling March's instalment while looking at February's —
+    leaves the contract reporting a balance the shop never collected. The
+    control stays visible and says why, because a button that vanishes reads
+    as a bug rather than as a rule.
+  */
+  it('CRITICAL: refuses to settle an instalment before its due date has arrived', async () => {
+    const { setPaidImpl } = mockHooks({
+      contracts: [
+        {
+          ...contract,
+          installments: [
+            { id: 'i1', contractId: 'ct1', dueDate: '2099-12-01', amount: 380, paid: false, paidAt: null },
+          ],
+        },
+      ],
+    })
+    await renderAndSelect(<ContractsPage />)
+    await userEvent.click(screen.getByRole('button', { name: /Pagamentos/ }))
+
+    const action = screen.getByRole('button', { name: /Só é possível marcar como pago a partir de 01\/12\/2099/ })
+    expect(action).toBeDisabled()
+    await userEvent.click(action)
+    expect(setPaidImpl).not.toHaveBeenCalled()
+  })
+
+  it('settles an instalment due today, not only one already overdue', async () => {
+    const today = new Date()
+    const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+    const { setPaidImpl } = mockHooks({
+      contracts: [
+        {
+          ...contract,
+          installments: [{ id: 'i1', contractId: 'ct1', dueDate: iso, amount: 380, paid: false, paidAt: null }],
+        },
+      ],
+    })
+    await renderAndSelect(<ContractsPage />)
+    await userEvent.click(screen.getByRole('button', { name: /Pagamentos/ }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Marcar como pago' }))
+
+    expect(setPaidImpl).toHaveBeenCalledWith({ contractId: 'ct1', installmentId: 'i1', paid: true })
+  })
+
+  it('leaves undoing unrestricted, so a wrongly-settled future instalment can be taken back', async () => {
+    const { setPaidImpl } = mockHooks({
+      contracts: [
+        {
+          ...contract,
+          installments: [
+            { id: 'i1', contractId: 'ct1', dueDate: '2099-12-01', amount: 380, paid: true, paidAt: '2026-01-01' },
+          ],
+        },
+      ],
+    })
+    await renderAndSelect(<ContractsPage />)
+    await userEvent.click(screen.getByRole('button', { name: /Pagamentos/ }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Desmarcar' }))
+
+    expect(setPaidImpl).toHaveBeenCalledWith({ contractId: 'ct1', installmentId: 'i1', paid: false })
+  })
+})
+
+describe('canMarkInstallmentPaid', () => {
+  const today = new Date(2026, 7, 4)
+
+  it('allows the due day itself and every day after it', () => {
+    expect(canMarkInstallmentPaid('2026-08-04', today)).toBe(true)
+    expect(canMarkInstallmentPaid('2026-08-03', today)).toBe(true)
+  })
+
+  it('refuses tomorrow', () => {
+    expect(canMarkInstallmentPaid('2026-08-05', today)).toBe(false)
   })
 })
 
