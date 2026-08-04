@@ -51,6 +51,12 @@ export function ClientsPage() {
   const { data: products } = useProducts()
   const contracts = useAllContracts()
   const summaries = useClientRentalSummaries(contracts)
+  // "Some contract has arrived" — the same signal ClientDetailPanel reads
+  // before it will print a contract count. Deliberately not a separate
+  // isLoading flag: a shop with genuinely no contracts and a shop whose
+  // contracts have not landed yet are indistinguishable here, and in both
+  // cases the honest answer is "nothing to show", never "zero".
+  const hasContractHistory = contracts.length > 0
   const deleteClient = useDeleteClient()
   const [editing, setEditing] = useState<Client | null | undefined>(undefined)
   const [deleting, setDeleting] = useState<Client | null>(null)
@@ -137,6 +143,14 @@ export function ClientsPage() {
         header: t('columns.lastRental'),
         width: '1.4fr',
         cell: (client) => {
+          // Same rule ClientDetailPanel already follows: with no contract
+          // loaded at all, the list cannot yet stand behind "Nunca alugou" —
+          // that is a fact about the client, and while the contracts query is
+          // in flight it is only a fact about the network. A dash says "not
+          // known yet" without asserting anything.
+          if (!hasContractHistory) {
+            return <span className="text-[13px] text-foreground-subtle" aria-hidden>—</span>
+          }
           const summary = summaries.get(client.id) ?? emptyRentalSummary()
           if (!summary.lastRentalProductId) {
             return <span className="text-[13px] text-foreground-subtle">{t('columns.neverRented')}</span>
@@ -159,7 +173,7 @@ export function ClientsPage() {
         align: 'right',
         cell: (client) => (
           <span className="tabular text-[13px] text-muted-foreground">
-            {(summaries.get(client.id) ?? emptyRentalSummary()).contractCount}
+            {hasContractHistory ? (summaries.get(client.id) ?? emptyRentalSummary()).contractCount : '—'}
           </span>
         ),
       },
@@ -175,7 +189,7 @@ export function ClientsPage() {
         ),
       },
     ],
-    [t, summaries, productsById],
+    [t, summaries, productsById, hasContractHistory],
   )
 
   if (isLoading) return <div>{t('title')}</div>

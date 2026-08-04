@@ -233,6 +233,25 @@ describe('ClientsPage', () => {
     expect(within(beatriz).getByText('0')).toBeInTheDocument()
   })
 
+  it('CRITICAL: does not claim "Nunca alugou" or 0 while the contracts are still loading', () => {
+    vi.spyOn(useClientsModule, 'useClients').mockReturnValue({
+      data: [{ id: '1', name: 'Maria Silva', phone: '119', email: 'm@x.com', notes: '', createdAt: '2026-01-01' }],
+      isLoading: false,
+    } as never)
+    vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [] } as never)
+    // Clients have landed, contracts have not — the ordinary first paint,
+    // since the two are separate queries. Both facts in this row come from
+    // the contracts one, so neither can be stated yet. Same guard
+    // ClientDetailPanel already applies to its own contract count.
+    vi.spyOn(useContractsModule, 'useContractsList').mockReturnValue({ data: undefined } as never)
+
+    renderWithQueryClient(<ClientsPage />)
+
+    const maria = screen.getByText('Maria Silva').closest('.border-hairline') as HTMLElement
+    expect(within(maria).queryByText('Nunca alugou')).not.toBeInTheDocument()
+    expect(within(maria).queryByText('0')).not.toBeInTheDocument()
+  })
+
   it('adds the contract count to the detail panel subtitle, pluralised', async () => {
     vi.spyOn(useClientsModule, 'useClients').mockReturnValue({
       data: [
