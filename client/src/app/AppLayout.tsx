@@ -54,8 +54,16 @@ export function AppLayout() {
   return (
     <div className="flex h-screen flex-col lg:flex-row">
       <Sidebar />
-      <main className="min-h-0 flex-1">
-        <div className="mx-auto flex h-full max-w-4xl flex-col p-6">
+      {/*
+        The screen occupies the window. This used to be capped at
+        `max-w-4xl` (896px) inside a 1600px Electron window, so anything
+        that could have sat side by side was stacked into scroll instead —
+        the main reason the app read as scattered. The work area also sits
+        one surface step lighter than the nav rail, which is what separates
+        "where I navigate" from "where I work".
+      */}
+      <main className="min-h-0 flex-1 bg-surface">
+        <div className="flex h-full flex-col p-6">
           <Suspense fallback={<RouteFallback />}>
             <Outlet />
           </Suspense>
