@@ -134,6 +134,24 @@
     "value": "Valor"
   },
   "detail": {
-    "pickContract": "Selecione um contrato na lista para ver as peças e os pagamentos."
+    "pickContract": "Selecione um contrato na lista para ver as peças e os pagamentos.",
+    "moreActions": "Mais ações",
+    "client": {
+      "title": "Cliente",
+      "documents": "Documentos",
+      "address": "Endereço",
+      "none": "Não informado"
+    }
+  },
+  "filters": {
+    "active": "Ativos",
+    "overdue": "Atrasados",
+    "unsigned": "Não assinados",
+    "all": "Todos"
+  },
+  "groups": {
+    "thisWeek": "Esta semana",
+    "upcoming": "Próximas semanas",
+    "past": "Semanas anteriores"
   }
 }

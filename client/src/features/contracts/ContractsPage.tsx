@@ -3,12 +3,14 @@ import { useTranslation } from 'react-i18next'
 import { ChevronRight } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router'
+import { startOfWeek, endOfWeek } from 'date-fns'
 import { Button } from '../../components/ui/button.tsx'
 import { cn } from '../../lib/cn.ts'
 import { Input } from '../../components/ui/input.tsx'
 import { CurrencyInput } from '../../components/ui/currency-input.tsx'
 import { Dialog, DialogContent, DialogTitle } from '../../components/ui/dialog.tsx'
-import { Toolbar, ToolbarSearch, ScreenTitle, SectionLabel } from '../../components/ui/toolbar.tsx'
+import { Toolbar, ToolbarSearch, ScreenTitle, SectionLabel, FilterChip } from '../../components/ui/toolbar.tsx'
+import { RowActions, DropdownMenuItem } from '../../components/ui/dropdown-menu.tsx'
 import { DataList, DataListEmpty, type DataListColumn } from '../../components/ui/data-list.tsx'
 import { StatusBadge, type EntityState } from '../../components/ui/status-badge.tsx'
 import { AuthenticatedPhoto } from '../../components/ui/authenticated-photo.tsx'
@@ -20,6 +22,7 @@ import { showErrorToast } from '../../lib/toast.ts'
 import { useUnsavedChangesGuard } from '../../lib/useUnsavedChangesGuard.ts'
 import { useSectionTour } from '../onboarding/useSectionTour.ts'
 import { useClients } from '../clients/useClients.ts'
+import type { Client } from '../clients/clientSchemas.ts'
 import { useProducts } from '../products/useProducts.ts'
 import type { Product } from '../products/productSchemas.ts'
 import {
@@ -50,6 +53,40 @@ export function contractState(contract: Contract, today = new Date()): EntitySta
   return 'reserved'
 }
 
+export type ContractFilter = 'active' | 'overdue' | 'unsigned' | 'all'
+
+/**
+ * Deliberately overlapping views, not a partition: an overdue contract is
+ * still an active one, and it is still unsigned if nobody signed it. The
+ * chips answer "show me the ones I have to do something about", and a
+ * contract can qualify on more than one count.
+ */
+const FILTER_MATCHES: Record<ContractFilter, (contract: Contract, today: Date) => boolean> = {
+  active: (contract, today) => {
+    const state = contractState(contract, today)
+    return state === 'reserved' || state === 'checked_out' || state === 'overdue'
+  },
+  overdue: (contract, today) => contractState(contract, today) === 'overdue',
+  unsigned: (contract) => contract.signatureStatus !== 'signed',
+  all: () => true,
+}
+
+export type ContractWeekGroup = 'thisWeek' | 'upcoming' | 'past'
+
+/**
+ * Grouped by the EVENT date, not by when the contract was written: the shop
+ * plans around the day the dress is needed, and a contract sold in March for
+ * a December wedding belongs with December.
+ */
+export function contractWeekGroup(contract: Contract, today: Date): ContractWeekGroup {
+  const event = parseDateOnly(contract.eventDate)
+  if (event < startOfWeek(today, { weekStartsOn: 0 })) return 'past'
+  if (event > endOfWeek(today, { weekStartsOn: 0 })) return 'upcoming'
+  return 'thisWeek'
+}
+
+const WEEK_GROUP_ORDER: ContractWeekGroup[] = ['thisWeek', 'upcoming', 'past']
+
 function contractTotal(contract: Contract): number {
   return contract.allocations
     .filter((allocation) => allocation.status !== 'cancelled')
@@ -60,7 +97,7 @@ function resolveErrorCode(error: unknown): string {
   return (error as { code?: string })?.code ?? 'UNKNOWN'
 }
 
-export function RowActions({ allocation }: { allocation: Allocation }) {
+export function AllocationActions({ allocation }: { allocation: Allocation }) {
   const { t } = useTranslation('allocations')
   const checkOut = useCheckOutAllocation()
   const returnAllocation = useReturnAllocation()
@@ -151,14 +188,19 @@ export function RowActions({ allocation }: { allocation: Allocation }) {
   if (allocation.status === 'reserved') {
     return (
       <div className="flex flex-col items-end gap-1">
-        <div className="flex gap-2">
-          <Button size="sm" onClick={() => setShowCheckOutDialog(true)} disabled={checkOut.isPending}>
+        {/*
+          The dialogs stay siblings of the menu rather than children of it:
+          Radix unmounts the menu content on select, which would tear down any
+          dialog rendered inside it before it ever painted.
+        */}
+        <RowActions label={t('actions.more')}>
+          <DropdownMenuItem disabled={checkOut.isPending} onSelect={() => setShowCheckOutDialog(true)}>
             {t('actions.checkOut')}
-          </Button>
-          <Button size="sm" variant="secondary" onClick={() => setShowCancelConfirm(true)} disabled={cancel.isPending}>
+          </DropdownMenuItem>
+          <DropdownMenuItem destructive disabled={cancel.isPending} onSelect={() => setShowCancelConfirm(true)}>
             {t('actions.cancel')}
-          </Button>
-        </div>
+          </DropdownMenuItem>
+        </RowActions>
         <Dialog
           open={showCheckOutDialog}
           onOpenChange={(nextOpen) => !nextOpen && checkOutGuard.requestClose()}
@@ -233,9 +275,11 @@ export function RowActions({ allocation }: { allocation: Allocation }) {
   if (allocation.status === 'checked_out') {
     return (
       <div className="flex flex-col items-end gap-1">
-        <Button size="sm" onClick={() => setShowReturnDialog(true)} disabled={returnAllocation.isPending}>
-          {t('actions.return')}
-        </Button>
+        <RowActions label={t('actions.more')}>
+          <DropdownMenuItem disabled={returnAllocation.isPending} onSelect={() => setShowReturnDialog(true)}>
+            {t('actions.return')}
+          </DropdownMenuItem>
+        </RowActions>
         <Dialog open={showReturnDialog} onOpenChange={(nextOpen) => !nextOpen && returnGuard.requestClose()}>
           <DialogContent showCloseButton={false} className="max-w-sm gap-0 p-5">
             <DialogTitle className="mb-3 text-heading">{t('returnDialog.title')}</DialogTitle>
@@ -310,34 +354,62 @@ function ContractPayments({ contract }: { contract: Contract }) {
   }
 
   return (
-    <div className="mt-2 flex flex-col gap-1 border-t border-border pt-2">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-        {contract.installments.length > 0 ? (
-          <button
-            type="button"
-            aria-expanded={isExpanded}
-            aria-controls={listId}
-            onClick={() => setIsExpanded((open) => !open)}
-            className="-ml-1 inline-flex items-center gap-1 rounded px-1 py-0.5 font-medium text-foreground transition-colors hover:bg-secondary"
+    <div className="flex flex-col gap-2.5">
+      {contract.installments.length > 0 ? (
+        <button
+          type="button"
+          aria-expanded={isExpanded}
+          aria-controls={listId}
+          onClick={() => setIsExpanded((open) => !open)}
+          className="-ml-1 inline-flex w-fit items-center gap-1 rounded px-1 py-0.5 text-label text-foreground-subtle uppercase transition-colors hover:bg-secondary"
+        >
+          <ChevronRight size={12} className={cn('transition-transform', isExpanded && 'rotate-90')} />
+          {t('payments.title')}
+          <span className="tabular normal-case">
+            {t('payments.paidCount', { paid: paidCount, total: contract.installments.length })}
+          </span>
+        </button>
+      ) : (
+        <SectionLabel>{t('payments.title')}</SectionLabel>
+      )}
+      {/*
+        Three cells rather than one run-on line. The money is the question
+        this panel is opened to answer, and "Total: X Pago: Y Em aberto: Z"
+        wrapped as prose gave the outstanding balance no more weight than the
+        word next to it. Same tile anatomy as the Painel's counters, so a
+        figure reads the same way wherever it appears.
+      */}
+      <div className="grid grid-cols-3 gap-2">
+        {[
+          { key: 'total', label: t('payments.total'), value: total, urgent: false },
+          { key: 'paid', label: t('payments.paid'), value: paid, urgent: false },
+          { key: 'outstanding', label: t('payments.outstanding'), value: outstanding, urgent: outstanding > 0 },
+        ].map((cell) => (
+          <div
+            key={cell.key}
+            className={cn(
+              'flex flex-col gap-1 rounded-panel border px-3 py-2.5',
+              cell.urgent ? 'border-warning-border bg-warning' : 'border-border bg-card',
+            )}
           >
-            <ChevronRight size={12} className={cn('transition-transform', isExpanded && 'rotate-90')} />
-            {t('payments.title')}
-            <span className="font-normal text-muted-foreground">
-              {t('payments.paidCount', { paid: paidCount, total: contract.installments.length })}
+            <span
+              className={cn(
+                'text-label uppercase',
+                cell.urgent ? 'text-warning-foreground' : 'text-foreground-subtle',
+              )}
+            >
+              {cell.label}
             </span>
-          </button>
-        ) : (
-          <span className="font-medium">{t('payments.title')}</span>
-        )}
-        <span className="text-muted-foreground">
-          {t('payments.total')}: {formatCurrency(total, locale, currency)}
-        </span>
-        <span className="text-muted-foreground">
-          {t('payments.paid')}: {formatCurrency(paid, locale, currency)}
-        </span>
-        <span className={outstanding > 0 ? 'font-medium text-warning-foreground' : 'text-muted-foreground'}>
-          {t('payments.outstanding')}: {formatCurrency(outstanding, locale, currency)}
-        </span>
+            <span
+              className={cn(
+                'tabular text-body font-semibold',
+                cell.urgent ? 'text-warning-foreground' : 'text-foreground',
+              )}
+            >
+              {formatCurrency(cell.value, locale, currency)}
+            </span>
+          </div>
+        ))}
       </div>
       {contract.installments.length === 0 ? (
         <span className="text-xs text-muted-foreground">{t('payments.none')}</span>
@@ -375,70 +447,133 @@ function ContractPayments({ contract }: { contract: Contract }) {
   )
 }
 
-function ContractCancelAction({ contract }: { contract: Contract }) {
+/**
+ * Imprimir stays a visible button; the other two hide behind the overflow.
+ * Printing is what this panel is opened for several times a day, while
+ * signing happens once per contract and cancelling ideally never — three
+ * equal-weight buttons made the rare destructive one as easy to hit as the
+ * routine one.
+ */
+function ContractHeaderActions({ contract }: { contract: Contract }) {
   const { t } = useTranslation('contracts')
+  const queryClient = useQueryClient()
   const cancelContract = useCancelContract()
-  const [showConfirm, setShowConfirm] = useState(false)
+  const [showSignModal, setShowSignModal] = useState(false)
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false)
 
-  const hasReservedAllocation = contract.allocations.some((allocation) => allocation.status === 'reserved')
-  if (!hasReservedAllocation) return null
+  const canSign = contract.signatureStatus !== 'signed'
+  const canCancel = contract.allocations.some((allocation) => allocation.status === 'reserved')
 
   async function handleCancel() {
     try {
       await cancelContract.mutateAsync(contract.id)
-      setShowConfirm(false)
+      setShowCancelConfirm(false)
     } catch (error) {
-      showErrorToast(t(`errors.${resolveErrorCode(error)}`, { defaultValue: t('common:errors.UNKNOWN', { ns: 'common' }) }))
+      showErrorToast(
+        t(`errors.${resolveErrorCode(error)}`, { defaultValue: t('common:errors.UNKNOWN', { ns: 'common' }) }),
+      )
     }
   }
 
   return (
-    <>
-      <Button
-        size="sm"
-        variant="secondary"
-        onClick={() => setShowConfirm(true)}
-        disabled={cancelContract.isPending}
+    <div className="flex flex-wrap items-center gap-1.5">
+      <Link
+        to={`/contratos/${contract.id}/imprimir`}
+        className="inline-flex h-7.5 items-center justify-center rounded-control border border-border-strong bg-surface px-3 text-[13px] font-medium text-foreground hover:bg-surface-sunken"
       >
-        {t('cancelContract.action')}
-      </Button>
+        {t('print.action')}
+      </Link>
+      {/*
+        A signed contract with nothing left reserved has neither action, and
+        an empty menu is worse than no menu.
+      */}
+      {(canSign || canCancel) && (
+        <RowActions label={t('detail.moreActions')}>
+          {canSign && (
+            <DropdownMenuItem onSelect={() => setShowSignModal(true)}>{t('sign.action')}</DropdownMenuItem>
+          )}
+          {canCancel && (
+            <DropdownMenuItem
+              destructive
+              disabled={cancelContract.isPending}
+              onSelect={() => setShowCancelConfirm(true)}
+            >
+              {t('cancelContract.action')}
+            </DropdownMenuItem>
+          )}
+        </RowActions>
+      )}
+      <SignRemotelyModal
+        contractId={contract.id}
+        open={showSignModal}
+        onClose={() => {
+          setShowSignModal(false)
+          // Tail case: a signature completed moments before closing, before
+          // the modal's own poll-triggered invalidation would have fired.
+          void queryClient.invalidateQueries({ queryKey: CONTRACTS_KEY })
+        }}
+      />
       <ConfirmDialog
-        open={showConfirm}
+        open={showCancelConfirm}
         title={t('cancelContract.confirmTitle')}
         message={t('cancelContract.confirmMessage')}
         confirmLabel={t('cancelContract.confirm')}
         cancelLabel={t('common:actions.cancel', { ns: 'common' })}
         confirmDisabled={cancelContract.isPending}
         onConfirm={handleCancel}
-        onCancel={() => setShowConfirm(false)}
+        onCancel={() => setShowCancelConfirm(false)}
       />
-    </>
+    </div>
   )
 }
 
-function ContractSignAction({ contract }: { contract: Contract }) {
+/**
+ * Who the contract is with, in the detail panel rather than only on the
+ * printed sheet. The documents and address are exactly what staff are asked
+ * for on the phone ("qual o CPF dela?"), and reaching them meant leaving for
+ * the Clientes screen and finding the person again.
+ */
+function ContractClientSection({ client }: { client: Client | undefined }) {
   const { t } = useTranslation('contracts')
-  const queryClient = useQueryClient()
-  const [showModal, setShowModal] = useState(false)
+  if (!client) return null
 
-  if (contract.signatureStatus === 'signed') return null
+  const documents = client.identityDocuments.filter((document) => document.value.trim() !== '')
+  const addressLines = [...client.addressLines]
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .filter((line) => line.value.trim() !== '')
 
   return (
-    <>
-      <Button size="sm" variant="secondary" onClick={() => setShowModal(true)}>
-        {t('sign.action')}
-      </Button>
-      <SignRemotelyModal
-        contractId={contract.id}
-        open={showModal}
-        onClose={() => {
-          setShowModal(false)
-          // Tail case: a signature completed moments before closing, before
-          // the modal's own poll-triggered invalidation would have fired.
-          void queryClient.invalidateQueries({ queryKey: CONTRACTS_KEY })
-        }}
-      />
-    </>
+    <div className="flex flex-col gap-2.5 border-b border-border px-5 py-4">
+      <SectionLabel>{t('detail.client.title')}</SectionLabel>
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5">
+        <div className="flex min-w-0 flex-col gap-1">
+          <dt className="text-meta text-muted-foreground">{t('detail.client.documents')}</dt>
+          {documents.length === 0 ? (
+            <dd className="text-meta text-foreground-subtle">{t('detail.client.none')}</dd>
+          ) : (
+            documents.map((document) => (
+              <dd key={document.id} className="flex min-w-0 items-baseline gap-1.5 text-[13px]">
+                <span className="flex-shrink-0 text-foreground-subtle">{document.label}</span>
+                <span className="truncate">{document.value}</span>
+              </dd>
+            ))
+          )}
+        </div>
+        <div className="flex min-w-0 flex-col gap-1">
+          <dt className="text-meta text-muted-foreground">{t('detail.client.address')}</dt>
+          {addressLines.length === 0 ? (
+            <dd className="text-meta text-foreground-subtle">{t('detail.client.none')}</dd>
+          ) : (
+            addressLines.map((line) => (
+              <dd key={line.id} className="flex min-w-0 items-baseline gap-1.5 text-[13px]">
+                <span className="flex-shrink-0 text-foreground-subtle">{line.label}</span>
+                <span className="truncate">{line.value}</span>
+              </dd>
+            ))
+          )}
+        </div>
+      </dl>
+    </div>
   )
 }
 
@@ -452,11 +587,13 @@ function ContractSignAction({ contract }: { contract: Contract }) {
  */
 function ContractDetailPanel({
   contract,
+  client,
   clientName,
   productNames,
   products,
 }: {
   contract: Contract | null
+  client: Client | undefined
   clientName: string
   productNames: Map<string, string>
   products: Map<string, Product>
@@ -497,17 +634,10 @@ function ContractDetailPanel({
             })}
           </span>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <Link
-            to={`/contratos/${contract.id}/imprimir`}
-            className="inline-flex h-7.5 items-center justify-center rounded-control border border-border-strong bg-surface px-3 text-[13px] font-medium text-foreground hover:bg-surface-sunken"
-          >
-            {t('print.action')}
-          </Link>
-          <ContractSignAction contract={contract} />
-          <ContractCancelAction contract={contract} />
-        </div>
+        <ContractHeaderActions contract={contract} />
       </div>
+
+      <ContractClientSection client={client} />
 
       <div className="flex flex-col gap-2.5 border-b border-border px-5 py-4">
         <SectionLabel>{t('items.title')}</SectionLabel>
@@ -543,7 +673,7 @@ function ContractDetailPanel({
                 <span className="tabular text-right text-[13.5px]">
                   {formatCurrency(allocation.priceCharged, locale, currency)}
                 </span>
-                <RowActions allocation={allocation} />
+                <AllocationActions allocation={allocation} />
               </div>
             )
           })}
@@ -568,6 +698,7 @@ export function ContractsPage() {
   const { locale } = useLocale()
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
+  const [filter, setFilter] = useState<ContractFilter>('all')
   const { data, isLoading } = useContractsList({ page, search })
   const { data: products } = useProducts()
   const { data: clients } = useClients()
@@ -598,6 +729,7 @@ export function ContractsPage() {
     () => new Map((clients ?? []).map((client) => [client.id, client.name])),
     [clients],
   )
+  const clientsById = useMemo(() => new Map((clients ?? []).map((client) => [client.id, client])), [clients])
   const productsById = useMemo(
     () => new Map((products ?? []).map((product) => [product.id, product])),
     [products],
@@ -606,6 +738,26 @@ export function ContractsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const contracts = data?.contracts
+  // The server paginates and searches; the chips and the week grouping work
+  // over the page that came back, so their counts describe what is on screen
+  // rather than the whole archive. Filtering server-side would need a new
+  // query param on GET /api/contracts, which this pass deliberately does not
+  // touch.
+  const today = new Date()
+  const counts: Record<ContractFilter, number> = {
+    active: (contracts ?? []).filter((contract) => FILTER_MATCHES.active(contract, today)).length,
+    overdue: (contracts ?? []).filter((contract) => FILTER_MATCHES.overdue(contract, today)).length,
+    unsigned: (contracts ?? []).filter((contract) => FILTER_MATCHES.unsigned(contract, today)).length,
+    all: (contracts ?? []).length,
+  }
+  const visible = (contracts ?? []).filter((contract) => FILTER_MATCHES[filter](contract, today))
+  const weekGroups = WEEK_GROUP_ORDER.map((key) => ({
+    key,
+    label: t(`groups.${key}`),
+    rows: visible.filter((contract) => contractWeekGroup(contract, today) === key),
+  }))
+    .filter((group) => group.rows.length > 0)
+    .map((group) => ({ ...group, meta: group.rows.length }))
   const pageSize = data?.pageSize ?? 20
   const currentPage = data?.page ?? page
   const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / pageSize))
@@ -712,6 +864,11 @@ export function ContractsPage() {
             dataTour="contracts.search"
           />
         }
+        filters={(['active', 'overdue', 'unsigned', 'all'] as const).map((key) => (
+          <FilterChip key={key} active={filter === key} onClick={() => setFilter(key)} count={counts[key]}>
+            {t(`filters.${key}`)}
+          </FilterChip>
+        ))}
         actions={
           <Button onClick={() => setShowForm(true)} data-tour="contracts.create">
             {t('newContract')}
@@ -722,7 +879,7 @@ export function ContractsPage() {
       <div className="flex min-h-0 flex-1 border-t border-border-strong" data-tour="contracts.card">
         <DataList
           columns={columns}
-          groups={[{ key: 'all', label: undefined, rows: contracts ?? [] }]}
+          groups={weekGroups}
           rowKey={(contract) => contract.id}
           onSelectRow={(contract) => setSelectedId(contract.id)}
           selectedKey={selectedId}
@@ -744,6 +901,7 @@ export function ContractsPage() {
         <aside className="min-h-0 w-130 flex-shrink-0 overflow-y-auto border-l border-border-strong">
           <ContractDetailPanel
             contract={selected}
+            client={selected ? clientsById.get(selected.clientId) : undefined}
             clientName={selected ? (clientNames.get(selected.clientId) ?? selected.clientId) : ''}
             productNames={productNames}
             products={productsById}

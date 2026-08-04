@@ -47,6 +47,33 @@ const contract: Contract = {
   installments: [{ id: 'i1', contractId: 'ct1', dueDate: '2026-09-20', amount: 380, paid: false, paidAt: null }],
 }
 
+const client = {
+  id: 'c1',
+  name: 'Maria',
+  phone: '11987654321',
+  email: 'maria@example.com',
+  identityDocuments: [
+    { id: 'd1', label: 'CPF', value: '123.456.789-00' },
+    { id: 'd2', label: 'RG', value: '12.345.678-9' },
+  ],
+  addressLines: [
+    { id: 'l1', label: 'Rua', value: 'Rua das Flores, 120', sortOrder: 0 },
+    { id: 'l2', label: 'Cidade', value: 'São Paulo', sortOrder: 1 },
+  ],
+  hasAllocationHistory: false,
+  createdAt: '2026-01-01',
+}
+
+// Per-piece and per-contract actions now live behind overflow menus, so a
+// test reaches them the way a user does: open the menu, then pick the item.
+async function openPieceActions() {
+  await userEvent.click(screen.getByRole('button', { name: 'Ações da peça' }))
+}
+
+async function openHeaderActions() {
+  await userEvent.click(screen.getByRole('button', { name: 'Mais ações' }))
+}
+
 function mockHooks(
   overrides: {
     contracts?: Contract[]
@@ -61,7 +88,7 @@ function mockHooks(
     isLoading: false,
   } as never)
   vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [{ id: 'p1', name: 'Vestido Azul' }] } as never)
-  vi.spyOn(useClientsModule, 'useClients').mockReturnValue({ data: [{ id: 'c1', name: 'Maria' }] } as never)
+  vi.spyOn(useClientsModule, 'useClients').mockReturnValue({ data: [client] } as never)
   vi.spyOn(useContractsModule, 'useCancelContract').mockReturnValue({
     mutateAsync: overrides.cancelImpl ?? vi.fn(),
     isPending: false,
@@ -86,8 +113,18 @@ function mockHooks(
   return { checkOutImpl, setPaidImpl }
 }
 
+async function openCheckOutDialog() {
+  await openPieceActions()
+  await userEvent.click(screen.getByRole('menuitem', { name: 'Check-out' }))
+}
+
+async function openReturnDialog() {
+  await openPieceActions()
+  await userEvent.click(screen.getByRole('menuitem', { name: 'Devolver' }))
+}
+
 async function openCheckOutAndConfirm() {
-  await userEvent.click(screen.getByRole('button', { name: 'Check-out' }))
+  await openCheckOutDialog()
   await userEvent.click(screen.getByRole('button', { name: 'Confirmar check-out' }))
 }
 
@@ -123,7 +160,8 @@ describe('ContractsPage', () => {
   it('shows the reserved item\'s check-out action', async () => {
     mockHooks()
     await renderAndSelect(<ContractsPage />)
-    expect(screen.getByRole('button', { name: 'Check-out' })).toBeInTheDocument()
+    await openPieceActions()
+    expect(screen.getByRole('menuitem', { name: 'Check-out' })).toBeInTheDocument()
   })
 
   it('checks out on the first confirmation when the date is not early', async () => {
@@ -215,7 +253,8 @@ describe('ContractsPage', () => {
     mockHooks({ cancelImpl })
     await renderAndSelect(<ContractsPage />)
 
-    await userEvent.click(screen.getByRole('button', { name: 'Cancelar contrato' }))
+    await openHeaderActions()
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Cancelar contrato' }))
     const dialog = screen.getByRole('dialog')
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar contrato' }))
 
@@ -229,20 +268,23 @@ describe('ContractsPage', () => {
     }
     mockHooks({ contracts: [returnedContract] })
     await renderAndSelect(<ContractsPage />)
-    expect(screen.queryByRole('button', { name: 'Cancelar contrato' })).not.toBeInTheDocument()
+    await openHeaderActions()
+    expect(screen.queryByRole('menuitem', { name: 'Cancelar contrato' })).not.toBeInTheDocument()
   })
 
   it('shows a sign-remotely action for an unsigned contract', async () => {
     mockHooks()
     await renderAndSelect(<ContractsPage />)
-    expect(screen.getByRole('button', { name: 'Assinar remotamente' })).toBeInTheDocument()
+    await openHeaderActions()
+    expect(screen.getByRole('menuitem', { name: 'Assinar remotamente' })).toBeInTheDocument()
   })
 
   it('hides the sign-remotely action once the contract is signed', async () => {
     const signedContract: Contract = { ...contract, signatureStatus: 'signed' }
     mockHooks({ contracts: [signedContract] })
     await renderAndSelect(<ContractsPage />)
-    expect(screen.queryByRole('button', { name: 'Assinar remotamente' })).not.toBeInTheDocument()
+    await openHeaderActions()
+    expect(screen.queryByRole('menuitem', { name: 'Assinar remotamente' })).not.toBeInTheDocument()
   })
 
   it('shows pagination controls and a search box, and searching resets to page 1', async () => {
@@ -251,7 +293,7 @@ describe('ContractsPage', () => {
       isLoading: false,
     } as never)
     vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [{ id: 'p1', name: 'Vestido Azul' }] } as never)
-    vi.spyOn(useClientsModule, 'useClients').mockReturnValue({ data: [{ id: 'c1', name: 'Maria' }] } as never)
+    vi.spyOn(useClientsModule, 'useClients').mockReturnValue({ data: [client] } as never)
     vi.spyOn(useContractsModule, 'useCancelContract').mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
     vi.spyOn(useContractsModule, 'useIssueSigningToken').mockReturnValue({
       mutateAsync: vi.fn().mockResolvedValue({ token: 't', expiresAt: new Date().toISOString(), port: 3000, candidates: [] }),
@@ -307,7 +349,7 @@ describe('ContractsPage allocation dialogs', () => {
     mockAllocationHooks()
     await renderAndSelect(<ContractsPage />)
 
-    await userEvent.click(screen.getByRole('button', { name: 'Check-out' }))
+    await openCheckOutDialog()
     await userEvent.type(screen.getByLabelText('Estado do produto na saída'), 'pequeno rasgo')
     await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
 
@@ -320,7 +362,7 @@ describe('ContractsPage allocation dialogs', () => {
     mockAllocationHooks()
     await renderAndSelect(<ContractsPage />)
 
-    await userEvent.click(screen.getByRole('button', { name: 'Check-out' }))
+    await openCheckOutDialog()
     await userEvent.type(screen.getByLabelText('Estado do produto na saída'), 'pequeno rasgo')
     await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
     await userEvent.click(screen.getByRole('button', { name: 'Continuar editando' }))
@@ -334,14 +376,14 @@ describe('ContractsPage allocation dialogs', () => {
     mockAllocationHooks()
     await renderAndSelect(<ContractsPage />)
 
-    await userEvent.click(screen.getByRole('button', { name: 'Check-out' }))
+    await openCheckOutDialog()
     await userEvent.type(screen.getByLabelText('Estado do produto na saída'), 'pequeno rasgo')
     await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
     await userEvent.click(screen.getByRole('button', { name: 'Descartar' }))
 
     expect(screen.queryByLabelText('Estado do produto na saída')).not.toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Check-out' }))
+    await openCheckOutDialog()
 
     expect(screen.getByLabelText('Estado do produto na saída')).toHaveValue('')
     expect(currencyValue('Caução recebida')).toBe('R$ 0,00')
@@ -352,7 +394,7 @@ describe('ContractsPage allocation dialogs', () => {
     mockAllocationHooks()
     await renderAndSelect(<ContractsPage />)
 
-    await userEvent.click(screen.getByRole('button', { name: 'Check-out' }))
+    await openCheckOutDialog()
     await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
 
     expect(screen.queryByText('Descartar alterações?')).not.toBeInTheDocument()
@@ -365,13 +407,13 @@ describe('ContractsPage allocation dialogs', () => {
     mockAllocationHooks({ checkOutImpl })
     await renderAndSelect(<ContractsPage />)
 
-    await userEvent.click(screen.getByRole('button', { name: 'Check-out' }))
+    await openCheckOutDialog()
     await userEvent.type(screen.getByLabelText('Estado do produto na saída'), 'pequeno rasgo')
     await userEvent.click(screen.getByRole('button', { name: 'Confirmar check-out' }))
 
     expect(checkOutImpl).toHaveBeenCalledOnce()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Check-out' }))
+    await openCheckOutDialog()
     expect(screen.getByLabelText('Estado do produto na saída')).toHaveValue('')
   })
 
@@ -380,14 +422,14 @@ describe('ContractsPage allocation dialogs', () => {
     mockAllocationHooks()
     await renderAndSelect(<ContractsPage />)
 
-    await userEvent.click(screen.getByRole('button', { name: 'Devolver' }))
+    await openReturnDialog()
     await userEvent.type(screen.getByLabelText('Estado do produto na devolução'), 'tudo certo')
     await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
 
     expect(screen.getByText('Descartar alterações?')).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: 'Descartar' }))
-    await userEvent.click(screen.getByRole('button', { name: 'Devolver' }))
+    await openReturnDialog()
 
     expect(screen.getByLabelText('Estado do produto na devolução')).toHaveValue('')
     expect(currencyValue('Caução devolvida')).toBe('R$ 0,00')
@@ -399,8 +441,8 @@ describe('ContractsPage allocation dialogs', () => {
     mockAllocationHooks({ cancelAllocationImpl })
     await renderAndSelect(<ContractsPage />)
 
-    const rowCancel = screen.getAllByRole('button', { name: 'Cancelar' })[0]
-    await userEvent.click(rowCancel)
+    await openPieceActions()
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Cancelar' }))
     const dialog = screen.getByRole('dialog')
     await userEvent.click(within(dialog).getByRole('button', { name: 'Sim, cancelar' }))
 
@@ -414,8 +456,14 @@ describe('payments summary', () => {
     mockHooks()
     await renderAndSelect(<ContractsPage />)
 
-    expect(screen.getByText(/Total:/)).toBeInTheDocument()
-    expect(screen.getByText(/Em aberto:/)).toBeInTheDocument()
+    const panel = document.querySelector('aside') as HTMLElement
+    // Three cells, each with its own label and figure — the assertion that
+    // used to match "Total: R$ ..." as one string would still pass against a
+    // single condensed line, which is exactly what this replaced.
+    expect(within(panel).getByText('Total')).toBeInTheDocument()
+    expect(within(panel).getByText('Pago')).toBeInTheDocument()
+    expect(within(panel).getByText('Em aberto')).toBeInTheDocument()
+    expect(within(panel).getAllByText(/R\$/).length).toBeGreaterThanOrEqual(3)
     expect(screen.getByText('0 de 1 pagas')).toBeInTheDocument()
   })
 
@@ -494,5 +542,113 @@ describe('ContractsPage split view', () => {
     // to open a card and read its allocations to know where it stood.
     const list = screen.getByRole('row').parentElement as HTMLElement
     expect(within(list).getByText('Reservado')).toBeInTheDocument()
+  })
+})
+
+describe('status filter chips', () => {
+  const overdueContract: Contract = {
+    ...contract,
+    id: 'ct-late', number: 9, eventDate: '2020-01-05',
+    allocations: [{ ...contract.allocations[0], id: 'a-late', status: 'checked_out', dueDate: '2020-01-06' }],
+  }
+  const signedReturned: Contract = {
+    ...contract,
+    id: 'ct-done', number: 10, eventDate: '2020-01-05', signatureStatus: 'signed',
+    allocations: [{ ...contract.allocations[0], id: 'a-done', status: 'returned' }],
+  }
+
+  it('counts each view over the contracts on screen', async () => {
+    mockHooks({ contracts: [contract, overdueContract, signedReturned] })
+    renderWithProviders(<ContractsPage />)
+
+    // contract: reserved + unsigned. overdueContract: overdue + unsigned.
+    // signedReturned: neither active nor unsigned.
+    expect(await screen.findByRole('button', { name: /^Ativos\s*2$/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Atrasados\s*1$/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Não assinados\s*2$/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Todos\s*3$/ })).toBeInTheDocument()
+  })
+
+  it('narrows the list to the picked view and marks it pressed', async () => {
+    mockHooks({ contracts: [contract, overdueContract, signedReturned] })
+    renderWithProviders(<ContractsPage />)
+
+    await userEvent.click(await screen.findByRole('button', { name: /^Atrasados/ }))
+
+    expect(screen.getByRole('button', { name: /^Atrasados/ })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: /#9/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /#3/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /#10/ })).not.toBeInTheDocument()
+  })
+
+  it('shows every contract by default', async () => {
+    mockHooks({ contracts: [contract, overdueContract, signedReturned] })
+    renderWithProviders(<ContractsPage />)
+
+    expect(await screen.findByRole('button', { name: /^Todos\s*3$/ })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getAllByRole('button', { name: /#\d/ })).toHaveLength(3)
+  })
+})
+
+describe('week grouping', () => {
+  function isoDaysFromNow(days: number) {
+    const date = new Date()
+    date.setDate(date.getDate() + days)
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+  }
+
+  it('splits the list into this week, later weeks and earlier ones, with a count each', async () => {
+    // Grouping is relative to "now", so these dates are computed rather than
+    // hardcoded — a fixed date would land in a different bucket depending on
+    // the day the suite runs. 40 days out clears the current week whatever
+    // weekday it is; 40 days back likewise.
+    const thisWeek: Contract = { ...contract, id: 'ct-now', number: 1, eventDate: isoDaysFromNow(0) }
+    const later: Contract = { ...contract, id: 'ct-later', number: 2, eventDate: isoDaysFromNow(40) }
+    const earlier: Contract = { ...contract, id: 'ct-earlier', number: 4, eventDate: isoDaysFromNow(-40) }
+    mockHooks({ contracts: [thisWeek, later, earlier] })
+    renderWithProviders(<ContractsPage />)
+
+    expect(await screen.findByText('Esta semana')).toBeInTheDocument()
+    expect(screen.getByText('Próximas semanas')).toBeInTheDocument()
+    expect(screen.getByText('Semanas anteriores')).toBeInTheDocument()
+  })
+
+  it('leaves out a week bucket that has no contracts', async () => {
+    const later: Contract = { ...contract, id: 'ct-later', number: 2, eventDate: isoDaysFromNow(40) }
+    mockHooks({ contracts: [later] })
+    renderWithProviders(<ContractsPage />)
+
+    expect(await screen.findByText('Próximas semanas')).toBeInTheDocument()
+    expect(screen.queryByText('Esta semana')).not.toBeInTheDocument()
+    expect(screen.queryByText('Semanas anteriores')).not.toBeInTheDocument()
+  })
+})
+
+describe('client section in the detail panel', () => {
+  it('shows the documents and address already on the client record', async () => {
+    mockHooks()
+    await renderAndSelect(<ContractsPage />)
+    const panel = document.querySelector('aside') as HTMLElement
+
+    expect(within(panel).getByText('Documentos')).toBeInTheDocument()
+    expect(within(panel).getByText('CPF')).toBeInTheDocument()
+    expect(within(panel).getByText('123.456.789-00')).toBeInTheDocument()
+    expect(within(panel).getByText('RG')).toBeInTheDocument()
+    expect(within(panel).getByText('Endereço')).toBeInTheDocument()
+    expect(within(panel).getByText('Rua das Flores, 120')).toBeInTheDocument()
+  })
+
+  it('says so plainly when the client has neither on file', async () => {
+    vi.spyOn(useClientsModule, 'useClients').mockReturnValue({
+      data: [{ ...client, identityDocuments: [], addressLines: [] }],
+    } as never)
+    mockHooks()
+    vi.spyOn(useClientsModule, 'useClients').mockReturnValue({
+      data: [{ ...client, identityDocuments: [], addressLines: [] }],
+    } as never)
+    await renderAndSelect(<ContractsPage />)
+    const panel = document.querySelector('aside') as HTMLElement
+
+    expect(within(panel).getAllByText('Não informado')).toHaveLength(2)
   })
 })
