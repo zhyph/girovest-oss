@@ -3,22 +3,40 @@ import { useTranslation } from 'react-i18next'
 import { useQueryClient } from '@tanstack/react-query'
 import { Shirt } from 'lucide-react'
 import { Button } from '../../components/ui/button.tsx'
-import { Input } from '../../components/ui/input.tsx'
-import { Badge } from '../../components/ui/badge.tsx'
+import { Toolbar, ToolbarSearch, ScreenTitle, FilterChip } from '../../components/ui/toolbar.tsx'
+import { DataList, DataListEmpty, type DataListColumn } from '../../components/ui/data-list.tsx'
+import { RowActions, DropdownMenuItem } from '../../components/ui/dropdown-menu.tsx'
+import { StatusBadge, type EntityState } from '../../components/ui/status-badge.tsx'
 import { AuthenticatedPhoto } from '../../components/ui/authenticated-photo.tsx'
 import { cn } from '../../lib/cn.ts'
+import { formatCurrency, getLocaleConfig } from '../../lib/locale.ts'
+import { useLocale } from '../../lib/LocaleContext.tsx'
 import { useSectionTour } from '../onboarding/useSectionTour.ts'
 import { useProducts, PRODUCTS_KEY } from './useProducts.ts'
 import { ProductDrawer } from './ProductDrawer.tsx'
 import { AddPhotosSessionModal } from './AddPhotosSessionModal.tsx'
-import type { Product, ProductAvailability, ProductFormValues, ProductStatus } from './productSchemas.ts'
+import type { Product, ProductFormValues } from './productSchemas.ts'
 
-function ProductThumbnail({ product }: { product: Product }) {
+/**
+ * A product's visible state. `availability` only means anything while the
+ * piece is in the catalogue at all, so the lifecycle status wins when it is
+ * not active — otherwise a retired piece would read as "Disponível".
+ */
+export function productState(product: Product): EntityState {
+  return product.status === 'active' ? product.availability : product.status
+}
+
+function ProductThumbnail({ product, className }: { product: Product; className?: string }) {
   const firstPhoto = product.photos?.[0]
   if (!firstPhoto) {
     return (
-      <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md bg-secondary text-muted-foreground">
-        <Shirt size={18} />
+      <span
+        className={cn(
+          'flex flex-shrink-0 items-center justify-center rounded-badge bg-surface-sunken text-foreground-subtle',
+          className,
+        )}
+      >
+        <Shirt size={16} />
       </span>
     )
   }
@@ -26,39 +44,39 @@ function ProductThumbnail({ product }: { product: Product }) {
     <AuthenticatedPhoto
       url={firstPhoto}
       alt=""
-      className="h-9 w-9 flex-shrink-0 rounded-md object-cover"
+      className={cn('flex-shrink-0 rounded-badge border border-border object-cover', className)}
     />
   )
 }
 
-const AVAILABILITY_TONE: Record<ProductAvailability, 'neutral' | 'success' | 'warning' | 'danger'> = {
-  available: 'success',
-  reserved: 'neutral',
-  rented: 'warning',
-  maintenance: 'neutral',
-}
+type AvailabilityFilter = 'all' | 'available' | 'rented' | 'maintenance'
 
-const STATUS_TONE: Record<ProductStatus, 'neutral' | 'success' | 'warning' | 'danger'> = {
-  active: 'success',
-  maintenance: 'warning',
-  retired: 'neutral',
+const FILTER_MATCHES: Record<AvailabilityFilter, (product: Product) => boolean> = {
+  all: () => true,
+  available: (product) => productState(product) === 'available',
+  rented: (product) => productState(product) === 'rented',
+  maintenance: (product) => productState(product) === 'maintenance',
 }
 
 export function ProductsPage() {
   const { t } = useTranslation(['products', 'common'])
+  const { locale } = useLocale()
+  const currency = getLocaleConfig(locale).currency
   const queryClient = useQueryClient()
   const [editing, setEditing] = useState<Product | null | undefined>(undefined)
   const [search, setSearch] = useState('')
+  const [filter, setFilter] = useState<AvailabilityFilter>('all')
+  const [view, setView] = useState<'grid' | 'list'>('grid')
   const [addingPhotosRemotely, setAddingPhotosRemotely] = useState(false)
   const { data: products, isLoading } = useProducts()
   // In-memory only, never persisted: cleared on page reload, updated only by a successful create.
   const [lastCreatedDefaults, setLastCreatedDefaults] = useState<Partial<ProductFormValues> | null>(null)
   useSectionTour('products', !isLoading)
 
-  const filteredProducts = useMemo(() => {
+  const searched = useMemo(() => {
     const query = search.trim().toLowerCase()
-    if (!query) return products
-    return products?.filter(
+    if (!query) return products ?? []
+    return (products ?? []).filter(
       (product) =>
         product.name.toLowerCase().includes(query) ||
         product.category.toLowerCase().includes(query) ||
@@ -66,75 +84,181 @@ export function ProductsPage() {
     )
   }, [products, search])
 
+  // Counts come from the searched set, not the filtered one, so a chip
+  // always says how many the current search would give you — a chip
+  // reading its own filtered total would always show its own count.
+  const counts = useMemo(
+    () => ({
+      all: searched.length,
+      available: searched.filter(FILTER_MATCHES.available).length,
+      rented: searched.filter(FILTER_MATCHES.rented).length,
+      maintenance: searched.filter(FILTER_MATCHES.maintenance).length,
+    }),
+    [searched],
+  )
+
+  const visible = useMemo(() => searched.filter(FILTER_MATCHES[filter]), [searched, filter])
+
+  const columns: DataListColumn<Product>[] = useMemo(
+    () => [
+      {
+        key: 'photo',
+        width: '40px',
+        cell: (product) => <ProductThumbnail product={product} className="size-8" />,
+      },
+      {
+        key: 'name',
+        header: t('fields.name'),
+        width: '1.6fr',
+        cell: (product) => <span className="truncate text-body font-semibold">{product.name}</span>,
+      },
+      {
+        key: 'size',
+        header: t('columns.size'),
+        width: '74px',
+        cell: (product) => <span className="text-[13px] text-muted-foreground">{product.size}</span>,
+      },
+      {
+        key: 'state',
+        header: t('fields.status'),
+        width: '1fr',
+        cell: (product) => <StatusBadge state={productState(product)} />,
+      },
+      {
+        key: 'price',
+        header: t('columns.rentalPrice'),
+        width: '108px',
+        align: 'right',
+        cell: (product) => (
+          <span className="tabular text-body">{formatCurrency(product.rentalPrice, locale, currency)}</span>
+        ),
+      },
+      {
+        key: 'actions',
+        width: '34px',
+        cell: (product) => (
+          <RowActions label={t('common:actions.edit')}>
+            <DropdownMenuItem onSelect={() => setEditing(product)}>
+              {t('common:actions.edit')}
+            </DropdownMenuItem>
+          </RowActions>
+        ),
+      },
+    ],
+    [t, locale, currency],
+  )
+
   if (isLoading) return <div>{t('title')}</div>
+
+  const emptyState = (
+    <DataListEmpty
+      title={products && products.length === 0 ? t('empty') : t('noResults')}
+      action={
+        <Button variant="secondary" onClick={() => setEditing(null)}>
+          {t('common:actions.create')}
+        </Button>
+      }
+    />
+  )
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="mb-4 flex flex-shrink-0 items-center justify-between">
-        <h1 className="text-xl font-semibold">{t('title')}</h1>
-        <div className="flex gap-2">
-          <Button variant="secondary" onClick={() => setAddingPhotosRemotely(true)} data-tour="products.photoSession">
-            {t('photoIntake.sessionAction')}
-          </Button>
-          <Button onClick={() => setEditing(null)} data-tour="products.create">
-            {t('common:actions.create')}
-          </Button>
-        </div>
-      </div>
-      {products && products.length > 0 && (
-        <Input
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder={t('searchPlaceholder')}
-          className="mb-3 flex-shrink-0"
-          aria-label={t('searchPlaceholder')}
-          data-tour="products.search"
-        />
-      )}
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {products && products.length === 0 && <p className="text-muted-foreground">{t('empty')}</p>}
-        {products && products.length > 0 && filteredProducts?.length === 0 && (
-          <p className="text-muted-foreground">{t('noResults')}</p>
-        )}
-        {filteredProducts && filteredProducts.length > 0 && (
-          <div className="rounded-md border border-border" data-tour="products.table">
-            <div className="sticky top-0 z-10 flex justify-between bg-muted px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              <span>{t('fields.name')}</span>
-              <span className="flex gap-4">
-                <span>{t('fields.size')}</span>
-                <span>{t('fields.status')}</span>
-              </span>
-            </div>
-            <div className="flex flex-col">
-              {filteredProducts.map((product, index) => (
+      <ScreenTitle>{t('title')}</ScreenTitle>
+      <Toolbar
+        search={
+          <ToolbarSearch
+            value={search}
+            onChange={setSearch}
+            placeholder={t('searchPlaceholder')}
+            label={t('searchPlaceholder')}
+            dataTour="products.search"
+          />
+        }
+        filters={(['all', 'available', 'rented', 'maintenance'] as const).map((key) => (
+          <FilterChip key={key} active={filter === key} onClick={() => setFilter(key)} count={counts[key]}>
+            {t(`filters.${key}`)}
+          </FilterChip>
+        ))}
+        actions={
+          <>
+            {/*
+              Photographing remotely is a variant of creating a piece, not a
+              sibling action, so it must not carry the same weight as the one
+              primary this screen is allowed.
+            */}
+            <Button variant="ghost" onClick={() => setAddingPhotosRemotely(true)} data-tour="products.photoSession">
+              {t('photoIntake.sessionAction')}
+            </Button>
+            <div className="flex rounded-control border border-border-strong bg-surface-sunken p-0.5">
+              {(['grid', 'list'] as const).map((key) => (
                 <button
-                  key={product.id}
-                  onClick={() => setEditing(product)}
+                  key={key}
+                  type="button"
+                  onClick={() => setView(key)}
+                  aria-pressed={view === key}
                   className={cn(
-                    'flex items-center justify-between p-2 text-left text-sm hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-                    index % 2 === 1 && 'bg-muted/50',
+                    'h-6.5 rounded-[4px] px-2.5 text-meta font-medium',
+                    view === key
+                      ? 'bg-surface text-foreground shadow-panel'
+                      : 'text-muted-foreground hover:text-foreground',
                   )}
                 >
-                  <span className="flex min-w-0 items-center gap-3">
-                    <ProductThumbnail product={product} />
-                    <span className="truncate">{product.name}</span>
-                  </span>
-                  <span className="flex items-center gap-4 text-muted-foreground">
-                    <span>{product.size}</span>
-                    {product.status === 'active' ? (
-                      <Badge tone={AVAILABILITY_TONE[product.availability]}>
-                        {t(`availability.${product.availability}`)}
-                      </Badge>
-                    ) : (
-                      <Badge tone={STATUS_TONE[product.status]}>{t(`status.${product.status}`)}</Badge>
-                    )}
-                  </span>
+                  {t(`views.${key}`)}
                 </button>
               ))}
             </div>
+            <Button onClick={() => setEditing(null)} data-tour="products.create">
+              {t('common:actions.create')}
+            </Button>
+          </>
+        }
+      />
+
+      <div className="flex min-h-0 flex-1 flex-col border-t border-border-strong" data-tour="products.table">
+        {visible.length === 0 ? (
+          <div className="min-h-0 flex-1 overflow-y-auto">{emptyState}</div>
+        ) : view === 'grid' ? (
+          // A catalogue of this size is browsed by eye before it is browsed
+          // by name, so the photo is the row.
+          <div className="grid min-h-0 flex-1 auto-rows-max content-start gap-3.5 overflow-y-auto p-5 [grid-template-columns:repeat(auto-fill,minmax(180px,1fr))]">
+            {visible.map((product) => (
+              <button
+                key={product.id}
+                type="button"
+                onClick={() => setEditing(product)}
+                className="flex flex-col overflow-hidden rounded-panel border border-border bg-card text-left transition-shadow hover:border-input hover:shadow-panel"
+              >
+                <span className="relative block h-46 bg-surface-sunken">
+                  <ProductThumbnail product={product} className="size-full rounded-none border-0" />
+                  <span className="absolute top-1.5 left-1.5">
+                    <StatusBadge state={productState(product)} />
+                  </span>
+                </span>
+                <span className="flex min-w-0 flex-col gap-0.5 px-2.5 pt-2 pb-2.5">
+                  <span className="truncate text-[13px] font-semibold">{product.name}</span>
+                  <span className="flex items-baseline justify-between gap-2">
+                    <span className="min-w-0 truncate text-xs text-muted-foreground">
+                      {product.size} · {product.color}
+                    </span>
+                    <span className="tabular flex-shrink-0 text-meta font-semibold">
+                      {formatCurrency(product.rentalPrice, locale, currency)}
+                    </span>
+                  </span>
+                </span>
+              </button>
+            ))}
           </div>
+        ) : (
+          <DataList
+            columns={columns}
+            groups={[{ key: 'all', label: undefined, rows: visible }]}
+            rowKey={(product) => product.id}
+            onSelectRow={(product) => setEditing(product)}
+            empty={emptyState}
+          />
         )}
       </div>
+
       {editing !== undefined && (
         <ProductDrawer
           key={editing?.id ?? 'new'}

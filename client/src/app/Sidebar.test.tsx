@@ -130,8 +130,17 @@ describe('Sidebar', () => {
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Abrir menu' }))
-    expect(screen.getByRole('dialog', { name: 'Loja Teste' })).toBeInTheDocument()
-  })
+    // findBy, not getBy: the drawer is a Radix portal, so it is not
+    // guaranteed to be in the document on the tick the click resolves. A
+    // synchronous assertion here passes on an idle machine and fails
+    // intermittently once enough test files run in parallel.
+    expect(await screen.findByRole('dialog', { name: 'Loja Teste' })).toBeInTheDocument()
+    // Raised from the 5s default: opening a Radix portal through
+    // userEvent's pointer simulation costs far more wall-clock when the
+    // whole suite is competing for CPU than it does on an idle machine,
+    // and this test began timing out (not failing an assertion) once the
+    // file count grew. Same reasoning as the budgets in CalendarPage.test.
+  }, 20000)
 
   it('closes the mobile drawer when the viewport crosses into the desktop breakpoint while it is open', async () => {
     mockLoadedStaff()

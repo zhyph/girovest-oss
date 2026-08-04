@@ -50,6 +50,7 @@
     "reserved": "Reservado",
     "rented": "Alugado",
     "maintenance": "Em higienização",
+    "retired": "Aposentado",
     "checked_out": "Alugado",
     "returned": "Devolvido",
     "cancelled": "Cancelado",

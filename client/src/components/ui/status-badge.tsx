@@ -21,6 +21,7 @@ export type EntityState =
   | 'reserved'
   | 'rented'
   | 'maintenance'
+  | 'retired'
   | 'checked_out'
   | 'returned'
   | 'cancelled'
@@ -34,6 +35,8 @@ const STATE_TONE: Record<EntityState, BadgeTone> = {
   reserved: 'neutral',
   rented: 'warning',
   maintenance: 'neutral',
+  // A retired piece is out of the catalogue for good, not merely busy.
+  retired: 'neutral',
   checked_out: 'warning',
   returned: 'success',
   cancelled: 'neutral',

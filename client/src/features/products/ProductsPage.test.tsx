@@ -24,6 +24,13 @@ function renderWithQueryClient(ui: React.ReactElement) {
   )
 }
 
+function mockStaff() {
+  vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+    staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' },
+    isLoadingStaff: false, isErrorStaff: false, refetchStaff: vi.fn(), login: vi.fn(), logout: vi.fn(), isLoggedIn: true,
+  } as never)
+}
+
 describe('ProductsPage', () => {
   it('lists products with their status', () => {
     vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [product], isLoading: false } as never)
@@ -236,5 +243,54 @@ describe('ProductsPage', () => {
     // No products exist at all, yet the trigger is present and works.
     await userEvent.click(screen.getByRole('button', { name: 'Adicionar fotos remotamente' }))
     expect(await screen.findByText('Fotos remotas')).toBeInTheDocument()
+  })
+
+  it('switches between the photo grid and the dense list without changing the result set', async () => {
+    const rented = { ...product, id: 'p2', name: 'Terno Grafite', availability: 'rented' as const }
+    vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [product, rented], isLoading: false } as never)
+    mockStaff()
+
+    renderWithQueryClient(<ProductsPage />)
+
+    // Grade is the default: a catalogue is browsed by eye before by name.
+    expect(screen.getByRole('button', { name: 'Grade' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByRole('row')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Lista' }))
+
+    expect(screen.getByRole('button', { name: 'Lista' })).toHaveAttribute('aria-pressed', 'true')
+    // The dense list brings real columns, which the grid has no use for.
+    expect(screen.getByRole('row')).toBeInTheDocument()
+    expect(screen.getByText('Vestido Azul')).toBeInTheDocument()
+    expect(screen.getByText('Terno Grafite')).toBeInTheDocument()
+  })
+
+  it('filters by availability from the chips, with counts that follow the search', async () => {
+    const rented = { ...product, id: 'p2', name: 'Terno Grafite', availability: 'rented' as const }
+    vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [product, rented], isLoading: false } as never)
+    mockStaff()
+
+    renderWithQueryClient(<ProductsPage />)
+
+    expect(screen.getByRole('button', { name: /Todos/ })).toHaveTextContent('2')
+    expect(screen.getByRole('button', { name: /Disponíveis/ })).toHaveTextContent('1')
+
+    await userEvent.click(screen.getByRole('button', { name: /Alugados/ }))
+
+    expect(screen.getByText('Terno Grafite')).toBeInTheDocument()
+    expect(screen.queryByText('Vestido Azul')).not.toBeInTheDocument()
+  })
+
+  it('does not give a retired piece an availability badge that says it is Disponível', () => {
+    // `availability` is only meaningful while the piece is in the catalogue,
+    // so the lifecycle status has to win when it is not active.
+    const retired = { ...product, id: 'p3', name: 'Vestido Aposentado', status: 'retired' as const }
+    vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [retired], isLoading: false } as never)
+    mockStaff()
+
+    renderWithQueryClient(<ProductsPage />)
+
+    expect(screen.getByText('Aposentado')).toBeInTheDocument()
+    expect(screen.queryByText('Disponível')).not.toBeInTheDocument()
   })
 })

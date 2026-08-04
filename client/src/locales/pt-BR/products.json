@@ -57,5 +57,19 @@
     "close": "Fechar",
     "generating": "Gerando código...",
     "issueFailed": "Não foi possível gerar o código. Tente novamente."
+  },
+  "filters": {
+    "all": "Todos",
+    "available": "Disponíveis",
+    "rented": "Alugados",
+    "maintenance": "Manutenção"
+  },
+  "views": {
+    "grid": "Grade",
+    "list": "Lista"
+  },
+  "columns": {
+    "rentalPrice": "Aluguel",
+    "size": "Tam."
   }
 }
