@@ -1,9 +1,19 @@
 {
   "title": "Calendário",
   "tabs": {
+    "all": "Tudo",
     "goingOut": "Saindo",
     "dueBack": "Voltando",
     "overdue": "Atrasados"
+  },
+  "dayCell": {
+    "goingOut_one": "• {{count}} saindo",
+    "goingOut_other": "• {{count}} saindo",
+    "dueBack_one": "• {{count}} voltando",
+    "dueBack_other": "• {{count}} voltando",
+    "overdue_one": "• {{count}} atrasado",
+    "overdue_other": "• {{count}} atrasados",
+    "more": "+{{hidden}}"
   },
   "viewMonth": "Ver mês",
   "viewAgenda": "Ver agenda",
@@ -24,7 +34,21 @@
     "today": "Hoje",
     "previous": "Anterior",
     "next": "Próximo",
-    "month": "Mês",
-    "showMore": "+{{count}} mais"
+    "month": "Mês"
+  },
+  "controls": {
+    "previousMonth": "Mês anterior",
+    "nextMonth": "Próximo mês",
+    "today": "Hoje"
+  },
+  "views": {
+    "grid": "Grade",
+    "agenda": "Agenda"
+  },
+  "dayPanel": {
+    "pickDay": "Selecione um dia no calendário para ver o que sai e o que volta.",
+    "empty": "Nada programado para este dia.",
+    "summary_one": "{{count}} peça",
+    "summary_other": "{{count}} peças"
   }
 }

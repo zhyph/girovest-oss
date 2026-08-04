@@ -6,7 +6,9 @@
     "products": "Produtos",
     "contracts": "Contratos",
     "calendar": "Calendário",
-    "settings": "Configurações"
+    "settings": "Configurações",
+    "shortcuts": "Atalhos",
+    "newAllocation": "Nova alocação"
   },
   "actions": {
     "save": "Salvar",
@@ -42,5 +44,24 @@
     "message": "As alterações que você fez não foram salvas e serão perdidas.",
     "confirm": "Descartar",
     "cancel": "Continuar editando"
+  },
+  "states": {
+    "available": "Disponível",
+    "reserved": "Reservado",
+    "rented": "Alugado",
+    "maintenance": "Em higienização",
+    "retired": "Aposentado",
+    "checked_out": "Alugado",
+    "returned": "Devolvido",
+    "cancelled": "Cancelado",
+    "overdue": "Atrasado",
+    "paid": "Quitado",
+    "open": "Em aberto",
+    "signed": "Assinado"
+  },
+  "pagination": {
+    "previous": "Anterior",
+    "next": "Próximo",
+    "range": "{{from}}–{{to}} de {{total}}"
   }
 }

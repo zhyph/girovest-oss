@@ -32,7 +32,8 @@
   "actions": {
     "checkOut": "Check-out",
     "return": "Devolver",
-    "cancel": "Cancelar"
+    "cancel": "Cancelar",
+    "more": "Ações da peça"
   },
   "unavailableProduct": "Não disponível no período escolhido",
   "validation": {

@@ -59,7 +59,10 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border bg-background p-6 shadow-lg duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg",
+          // Radius 14 and elevation 2 — the overlay step. A dialog used to
+          // share the field's radius, so it carried no more weight than the
+          // inputs inside it.
+          "fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-dialog border border-border bg-card p-6 text-card-foreground shadow-overlay duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg",
           className
         )}
         {...props}
@@ -123,7 +126,37 @@ function DialogTitle({
   return (
     <DialogPrimitive.Title
       data-slot="dialog-title"
-      className={cn("text-lg leading-none font-semibold", className)}
+      className={cn("text-heading", className)}
+      {...props}
+    />
+  )
+}
+
+/**
+ * The overlay anatomy, shared by the dialog and the drawer: a header with a
+ * title and a line of context, a body, and a footer on its own surface with
+ * the primary action at the right. Only two overlays exist in the app —
+ * dialog to decide, drawer to enter data — and they differ in placement,
+ * not in shape.
+ */
+function DialogBody({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="dialog-body"
+      className={cn("min-h-0 flex-1 overflow-y-auto", className)}
+      {...props}
+    />
+  )
+}
+
+function DialogActions({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="dialog-actions"
+      className={cn(
+        "flex flex-shrink-0 items-center justify-end gap-2 border-t border-hairline bg-surface px-5 py-3.5",
+        className
+      )}
       {...props}
     />
   )
@@ -144,6 +177,8 @@ function DialogDescription({
 
 export {
   Dialog,
+  DialogActions,
+  DialogBody,
   DialogClose,
   DialogContent,
   DialogDescription,

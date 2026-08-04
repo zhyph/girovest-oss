@@ -21,7 +21,27 @@ app.disable('x-powered-by')
 // to JS unless it is named here, and X-Renewed-Token is how sliding session
 // renewal reaches the client (see auth/authMiddleware.ts).
 app.use(cors({ exposedHeaders: [RENEWED_TOKEN_HEADER] }))
-app.use(express.json())
+
+/**
+ * One route carries images and needs a much higher body limit than every
+ * other route's default 100 kB — but that route also sits behind
+ * `requireAuth`. Parsing (and therefore buffering) a large body BEFORE
+ * authentication would let an unauthenticated request force the server to
+ * buffer and JSON-parse up to the raised limit on every attempt, a large
+ * amplification over the default ceiling every other pre-auth path enforces.
+ * So this route's own higher-limit parser is mounted directly on it in
+ * routes/products.ts, AFTER `productsRouter.use(requireAuth)` — this
+ * middleware only keeps the DEFAULT parser below from running (and 413-ing)
+ * on that route ahead of time; it does no parsing of its own.
+ */
+const PHOTO_UPLOAD_PATH = /^\/api\/products\/[^/]+\/photos\/?$/
+const defaultJson = express.json()
+app.use((req, res, next) => {
+  if (req.method === 'POST' && PHOTO_UPLOAD_PATH.test(req.path)) {
+    return next()
+  }
+  return defaultJson(req, res, next)
+})
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok' })

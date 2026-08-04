@@ -128,22 +128,68 @@ export function derivedAvailability(
   asOf: Date,
   { maintenanceBufferDays = 0 }: Pick<OccupancyOptions, 'maintenanceBufferDays'> = {},
 ): DerivedAvailability {
-  const today = allocations.map((allocation) => ({
+  // Every window bound here is a UTC-midnight calendar day (occupancyOf builds
+  // them all through addDays/startOfUtcDay), so `asOf` has to be reduced to the
+  // same unit before it can be compared against them. Without this, a caller
+  // passing a real instant — which is every production caller, since `asOf`
+  // defaults to `new Date()` — makes a window whose LAST day is today read as
+  // already over: `14:32 today <= today 00:00` is false. The symptom was a
+  // dress reading "Disponível" for the whole final day of its cleaning window,
+  // and a dress due back today reading as not rented from midnight onwards.
+  // Whole UTC days is the unit the rest of this module already works in (see
+  // the header comment and occupancyOf's own overdue check); the window
+  // therefore closes at the next UTC midnight, not at some clock time.
+  const today = startOfUtcDay(asOf)
+
+  const occupancies = allocations.map((allocation) => ({
     status: allocation.status,
-    occupancy: occupancyOf(allocation, asOf, maintenanceBufferDays),
+    occupancy: occupancyOf(allocation, today, maintenanceBufferDays),
   }))
 
   // Worst news wins: a piece that is out today reads as "rented" even if some
   // other allocation would only call it reserved or in cleaning.
-  const heldByCustomer = today.filter(
-    ({ occupancy }) => occupancy.rental && rangesOverlap(occupancy.rental.start, occupancy.rental.end, asOf, asOf),
+  const heldByCustomer = occupancies.filter(
+    ({ occupancy }) => occupancy.rental && rangesOverlap(occupancy.rental.start, occupancy.rental.end, today, today),
   )
   if (heldByCustomer.some(({ status }) => status === 'checked_out')) return 'rented'
   if (heldByCustomer.length > 0) return 'reserved'
 
-  const beingCleaned = today.some(
+  const beingCleaned = occupancies.some(
     ({ occupancy }) =>
-      occupancy.maintenance && rangesOverlap(occupancy.maintenance.start, occupancy.maintenance.end, asOf, asOf),
+      occupancy.maintenance && rangesOverlap(occupancy.maintenance.start, occupancy.maintenance.end, today, today),
   )
   return beingCleaned ? 'maintenance' : 'available'
+}
+
+/**
+ * The last day a piece stays held for cleaning, for a piece that is in its
+ * cleaning window on `asOf` — `null` for anything else, including a piece a
+ * customer is holding today (a rental outranks cleaning in
+ * `derivedAvailability`, and a dress that is out of the shop is not "coming
+ * out of cleaning" no matter what an older allocation's buffer says).
+ *
+ * The latest end among the windows covering today wins: two returns close
+ * together each open their own cleaning window, and the piece is only free
+ * once the last one closes.
+ */
+export function maintenanceEndsOn(
+  allocations: AllocationWindow[],
+  asOf: Date,
+  { maintenanceBufferDays = 0 }: Pick<OccupancyOptions, 'maintenanceBufferDays'> = {},
+): Date | null {
+  if (derivedAvailability(allocations, asOf, { maintenanceBufferDays }) !== 'maintenance') return null
+
+  // Same whole-UTC-day reduction as derivedAvailability — see the comment there.
+  const today = startOfUtcDay(asOf)
+  const endsCoveringToday = allocations
+    .map((allocation) => occupancyOf(allocation, today, maintenanceBufferDays).maintenance)
+    .filter((window) => window !== null && rangesOverlap(window.start, window.end, today, today))
+    .map((window) => window!.end.getTime())
+
+  return endsCoveringToday.length === 0 ? null : new Date(Math.max(...endsCoveringToday))
+}
+
+/** UTC-day arithmetic, exported so callers can compare against a maintenance end. */
+export function addUtcDays(date: Date, days: number): Date {
+  return addDays(date, days)
 }

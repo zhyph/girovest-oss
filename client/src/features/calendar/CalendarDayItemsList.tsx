@@ -2,48 +2,55 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../../components/ui/button.tsx'
 import { AuthenticatedPhoto } from '../../components/ui/authenticated-photo.tsx'
-import { ProductDetailModal } from '../products/ProductDetailModal.tsx'
-import { parseDateOnly, formatDate } from '../../lib/date.ts'
+import { useProductZoom } from '../products/ProductZoomDialog.tsx'
+import { cn } from '../../lib/cn.ts'
+import { formatDate } from '../../lib/date.ts'
 import { useLocale } from '../../lib/LocaleContext.tsx'
-import type { Allocation } from '../allocations/allocationSchemas.ts'
+import { FILTER_LABEL_KEY, KIND_TONE, TONE_TEXT, type CalendarEntry } from './calendarEntries.ts'
 import type { Product } from '../products/productSchemas.ts'
 
 export function CalendarDayItemsList({
-  allocations,
+  entries,
   products,
   clientNames,
-  dateField,
+  showKind = false,
   pageSize = 20,
 }: {
-  allocations: Allocation[]
+  entries: CalendarEntry[]
   products: Map<string, Product>
   clientNames: Map<string, string>
-  dateField: 'checkoutDate' | 'dueDate'
+  /**
+   * Tags each row with what it is. Only worth the ink where a list mixes
+   * states — under "Tudo" a row is otherwise indistinguishable from the row
+   * above it. The day panel's sections are single-state and say so in their
+   * own header, so they leave this off.
+   */
+  showKind?: boolean
   pageSize?: number
 }) {
   const { t } = useTranslation('calendarScreen')
   const { locale } = useLocale()
   const [page, setPage] = useState(0)
-  const [detailProduct, setDetailProduct] = useState<Product | null>(null)
+  const { openZoom, zoomDialog } = useProductZoom()
 
-  const totalPages = Math.max(1, Math.ceil(allocations.length / pageSize))
+  const totalPages = Math.max(1, Math.ceil(entries.length / pageSize))
   const currentPage = Math.min(page, Math.max(0, totalPages - 1))
   const pageItems = useMemo(
-    () => allocations.slice(currentPage * pageSize, currentPage * pageSize + pageSize),
-    [allocations, currentPage, pageSize],
+    () => entries.slice(currentPage * pageSize, currentPage * pageSize + pageSize),
+    [entries, currentPage, pageSize],
   )
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
-        {pageItems.map((allocation) => {
-          const product = products.get(allocation.productId)
+        {pageItems.map((entry) => {
+          const product = products.get(entry.allocation.productId)
           const photo = product?.photos?.[0]
           return (
             <button
-              key={allocation.id}
+              key={entry.key}
               type="button"
-              onClick={() => product && setDetailProduct(product)}
+              onClick={() => product && openZoom(product)}
               className="flex items-center justify-between gap-2 rounded-md border border-border p-2 text-left text-sm hover:bg-secondary"
             >
               <div className="flex items-center gap-2">
@@ -51,15 +58,22 @@ export function CalendarDayItemsList({
                   <AuthenticatedPhoto url={photo} alt={product?.name ?? ''} className="h-8 w-8 rounded object-cover" />
                 )}
                 <div className="flex flex-col">
-                  <span>{product?.name ?? allocation.productId}</span>
+                  <span>{product?.name ?? entry.allocation.productId}</span>
                   <span className="text-xs text-muted-foreground">
-                    {clientNames.get(allocation.clientId) ?? allocation.clientId}
+                    {clientNames.get(entry.allocation.clientId) ?? entry.allocation.clientId}
                   </span>
                 </div>
               </div>
-              <span className="text-muted-foreground">
-                {formatDate(parseDateOnly(allocation[dateField]), locale, { day: '2-digit', month: '2-digit' })}
-              </span>
+              <div className="flex flex-shrink-0 items-center gap-2">
+                {showKind && (
+                  <span className={cn('text-label uppercase', TONE_TEXT[KIND_TONE[entry.kind]])}>
+                    {t(FILTER_LABEL_KEY[entry.kind])}
+                  </span>
+                )}
+                <span className="tabular text-muted-foreground">
+                  {formatDate(entry.date, locale, { day: '2-digit', month: '2-digit' })}
+                </span>
+              </div>
             </button>
           )
         })}
@@ -89,7 +103,7 @@ export function CalendarDayItemsList({
           </Button>
         </div>
       )}
-      <ProductDetailModal product={detailProduct} open={detailProduct !== null} onClose={() => setDetailProduct(null)} />
+      {zoomDialog}
     </div>
   )
 }

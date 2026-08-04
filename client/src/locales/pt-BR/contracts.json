@@ -24,12 +24,19 @@
     "title": "Peças",
     "add": "Adicionar peça",
     "remove": "Remover peça",
-    "total": "Total das peças"
+    "total": "Total das peças",
+    "countOne": "{{count}} peça",
+    "countOther": "{{count}} peças"
   },
   "installments": {
     "title": "Parcelas",
     "add": "Adicionar parcela",
-    "remove": "Remover parcela"
+    "remove": "Remover parcela",
+    "countOne": "{{count}} parcela",
+    "countOther": "{{count}} parcelas",
+    "summary": "em {{count}}× de {{amount}}",
+    "summaryMixed": "em {{count}}× · {{amount}} no total",
+    "noneDefined": "sem parcelas definidas"
   },
   "clientReadiness": {
     "missing": "Faltam campos obrigatórios: {{fields}}",
@@ -115,9 +122,43 @@
     "outstanding": "Em aberto",
     "markPaid": "Marcar como pago",
     "markUnpaid": "Desmarcar",
+    "payableFrom": "Só é possível marcar como pago a partir de {{date}}",
     "paidOn": "pago em {{date}}",
     "settled": "Contrato quitado.",
     "none": "Nenhuma parcela cadastrada neste contrato.",
     "paidCount": "{{paid}} de {{total}} pagas"
+  },
+  "newContractSubtitle": "Cliente, evento e peças em uma tela só.",
+  "saveContract": "Salvar contrato",
+  "sections": {
+    "clientAndEvent": "Cliente e evento"
+  },
+  "columns": {
+    "number": "Nº",
+    "pieces": "Peças",
+    "client": "Cliente",
+    "state": "Situação",
+    "value": "Valor"
+  },
+  "detail": {
+    "pickContract": "Selecione um contrato na lista para ver as peças e os pagamentos.",
+    "moreActions": "Mais ações",
+    "client": {
+      "title": "Cliente",
+      "documents": "Documentos",
+      "address": "Endereço",
+      "none": "Não informado"
+    }
+  },
+  "filters": {
+    "active": "Ativos",
+    "overdue": "Atrasados",
+    "unsigned": "Não assinados",
+    "all": "Todos"
+  },
+  "groups": {
+    "thisWeek": "Esta semana",
+    "upcoming": "Próximas semanas",
+    "past": "Semanas anteriores"
   }
 }

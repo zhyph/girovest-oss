@@ -8,7 +8,10 @@ interface AuthenticatedPhotoProps {
 
 // `/api/products/:id/photos/:filename` requires a Bearer token a plain
 // `<img src>` can't attach — those paths must go through useAuthenticatedImageUrl
-// (fetch -> blob -> object URL). Staff-pasted external URLs don't need this.
+// (fetch -> blob -> object URL). Every product photo is one of these paths
+// now that the picker replaced the old URL text field; the `isRemotePath`
+// branch below only still matters for a `data:` URL held locally in
+// ProductDrawer before it's been uploaded.
 export function AuthenticatedPhoto({ url, alt, className }: AuthenticatedPhotoProps) {
   const isRemotePath = url.startsWith('/api/')
   const authenticatedUrl = useAuthenticatedImageUrl(isRemotePath ? url : null)

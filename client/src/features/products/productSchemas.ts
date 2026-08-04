@@ -24,6 +24,12 @@ export type ProductAvailability = 'available' | 'reserved' | 'rented' | 'mainten
 
 export interface Product extends ProductFormValues {
   id: string
+  /**
+   * Sequential per-shop reference, assigned by the server exactly like a
+   * contract number. Null only on a piece that predates the field and has
+   * not been through the startup backfill yet.
+   */
+  code: number | null
   status: ProductStatus
   availability: ProductAvailability
   hasAllocationHistory: boolean

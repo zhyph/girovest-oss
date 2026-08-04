@@ -1,19 +1,41 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { apiFetch, BACKGROUND_REQUEST_INIT } from '../../lib/api.ts'
+import { overdueAsOf } from '../../lib/date.ts'
 import type { Contract, ContractDetail, NewContractFormValues, SigningTokenResponse } from './contractSchemas.ts'
 
 export const CONTRACTS_KEY = ['contracts']
+
+export const CONTRACT_STATUS_FILTERS = ['all', 'active', 'overdue', 'unsigned'] as const
+export type ContractStatusFilter = (typeof CONTRACT_STATUS_FILTERS)[number]
+
+export interface ContractStatusCounts {
+  all: number
+  active: number
+  overdue: number
+  unsigned: number
+}
+
+export interface ContractsPage {
+  contracts: Contract[]
+  total: number
+  page: number
+  pageSize: number
+  counts: ContractStatusCounts
+}
 
 export function useContractsList({
   page = 1,
   pageSize = 20,
   search = '',
-}: { page?: number; pageSize?: number; search?: string } = {}) {
+  status = 'all',
+}: { page?: number; pageSize?: number; search?: string; status?: ContractStatusFilter } = {}) {
+  const asOf = overdueAsOf().toISOString()
   return useQuery({
-    queryKey: [...CONTRACTS_KEY, page, pageSize, search],
+    queryKey: [...CONTRACTS_KEY, page, pageSize, search, status, asOf],
     queryFn: () =>
-      apiFetch<{ contracts: Contract[]; total: number; page: number; pageSize: number }>(
-        `/api/contracts?page=${page}&pageSize=${pageSize}&search=${encodeURIComponent(search)}`,
+      apiFetch<ContractsPage>(
+        `/api/contracts?page=${page}&pageSize=${pageSize}&search=${encodeURIComponent(search)}` +
+          `&status=${status}&asOf=${encodeURIComponent(asOf)}`,
       ),
     placeholderData: keepPreviousData,
   })

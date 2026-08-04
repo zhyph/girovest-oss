@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { NavLink } from 'react-router'
+import { NavLink, useNavigate } from 'react-router'
 import { useTranslation } from 'react-i18next'
-import { LayoutDashboard, Users, Shirt, ClipboardList, Calendar, Settings, Menu, X, LogOut } from 'lucide-react'
+import { LayoutDashboard, Users, Shirt, ClipboardList, Calendar, Settings, Menu, X, LogOut, FilePlus } from 'lucide-react'
 import { useAuth } from '../lib/useAuth.ts'
 import { cn } from '../lib/cn.ts'
 import { Button } from '../components/ui/button.tsx'
@@ -38,18 +38,58 @@ function NavLinks({ alwaysShowLabels, onNavigate }: { alwaysShowLabels?: boolean
           onFocus={() => preloadPage(page)}
           className={({ isActive }) =>
             cn(
-              'flex items-center gap-2 rounded-md px-2 py-2 text-sm whitespace-nowrap',
-              isActive ? 'bg-secondary text-secondary-foreground' : 'text-foreground hover:bg-secondary',
+              'flex h-8 items-center gap-2.5 rounded-control px-2 text-[13.5px] font-medium whitespace-nowrap',
+              // The rail carries the only filled accent on screen, so the
+              // active item is the accent itself rather than the pale tint
+              // it used to be — at rail scale that tint read as "hovered",
+              // not "you are here".
+              isActive
+                ? 'bg-primary font-semibold text-primary-foreground'
+                : 'text-foreground hover:bg-surface-sunken',
             )
           }
         >
-          <Icon size={18} className="shrink-0" />
+          <Icon size={16} className="shrink-0" />
           <span className={alwaysShowLabels ? undefined : 'hidden group-hover:inline group-focus-within:inline lg:inline'}>
             {t(labelKey)}
           </span>
         </NavLink>
       ))}
     </>
+  )
+}
+
+// The one action reached from anywhere, because it is the thing the shop
+// does many times a day. Deep-links rather than lifting the dialog's state
+// out of the contracts feature, which also makes it a shareable URL.
+const NEW_CONTRACT_PATH = '/contratos?novo=1'
+
+function ShortcutSection({ alwaysShowLabels, onNavigate }: { alwaysShowLabels?: boolean; onNavigate?: () => void }) {
+  const { t } = useTranslation('common')
+  const navigate = useNavigate()
+  const hideWhenCollapsed = alwaysShowLabels
+    ? undefined
+    : 'hidden group-hover:inline group-focus-within:inline lg:inline'
+
+  return (
+    <div data-tour="dashboard.shortcut" className="mt-4 flex flex-col gap-px border-t border-border px-0 pt-3">
+      <span className={cn('px-2 pb-1.5 text-label text-foreground-subtle uppercase', hideWhenCollapsed)}>
+        {t('nav.shortcuts')}
+      </span>
+      <button
+        type="button"
+        onClick={() => {
+          onNavigate?.()
+          navigate(NEW_CONTRACT_PATH)
+        }}
+        onMouseEnter={() => preloadPage('contracts')}
+        onFocus={() => preloadPage('contracts')}
+        className="flex h-8 items-center gap-2.5 rounded-control px-2 text-[13.5px] font-medium whitespace-nowrap text-foreground hover:bg-surface-sunken"
+      >
+        <FilePlus size={16} className="shrink-0" />
+        <span className={hideWhenCollapsed}>{t('nav.newAllocation')}</span>
+      </button>
+    </div>
   )
 }
 
@@ -66,6 +106,7 @@ export function Sidebar() {
   const { staff, logout } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
   const shopName = staff?.locationName ?? t('appName')
+  const subtitle = shopName === t('appName') ? undefined : t('appName')
 
   useEffect(() => {
     const mediaQuery = window.matchMedia(DESKTOP_BREAKPOINT_QUERY)
@@ -86,26 +127,52 @@ export function Sidebar() {
         <span className="w-10" aria-hidden="true" />
       </div>
 
+      {/*
+        The rail sits on the canvas and the work area one surface step
+        lighter, so the two read as "where I navigate" and "where I work".
+        It used to be the other way round: the rail was the lightest thing
+        on screen and competed with the content.
+      */}
       <nav
+        data-tour="dashboard.rail"
         className={cn(
-          'group hidden w-16 shrink-0 flex-col gap-1 overflow-hidden border-r border-border bg-card p-3',
-          'transition-[width] duration-150 hover:w-48 focus-within:w-48 lg:flex lg:w-48',
+          'group hidden w-16 shrink-0 flex-col overflow-hidden border-r border-border-strong bg-background px-2.5 pt-4 pb-3',
+          'transition-[width] duration-150 hover:w-50 focus-within:w-50 lg:flex lg:w-50',
         )}
       >
-        <div className="mb-3 truncate px-2 text-lg font-semibold whitespace-nowrap text-primary">
-          <span className="hidden group-hover:inline group-focus-within:inline lg:inline">{shopName}</span>
+        <div className="flex flex-col gap-0.5 px-2 pb-4">
+          <span className="truncate font-serif text-heading leading-tight font-normal whitespace-nowrap text-foreground">
+            <span className="hidden group-hover:inline group-focus-within:inline lg:inline">{shopName}</span>
+          </span>
+          {/*
+            The brand line already falls back to the location name, so the
+            second line is only worth drawing when it says something the
+            first one doesn't — otherwise the rail renders the same string
+            twice, which reads as a bug rather than a hierarchy.
+          */}
+          {subtitle && (
+            <span className="truncate text-[11.5px] whitespace-nowrap text-foreground-subtle">
+              <span className="hidden group-hover:inline group-focus-within:inline lg:inline">{subtitle}</span>
+            </span>
+          )}
         </div>
-        <NavLinks />
+        <div className="flex flex-col gap-px">
+          <NavLinks />
+        </div>
+        <ShortcutSection />
         {staff && (
-          <div className="mt-auto flex flex-col gap-2 border-t border-border px-2 pt-3">
+          <div className="mt-auto flex items-center justify-between gap-2 border-t border-border px-2 pt-3">
             <div className="truncate text-xs whitespace-nowrap text-muted-foreground">
               <span className="hidden group-hover:inline group-focus-within:inline lg:inline">{staff.name}</span>
             </div>
-            <Button variant="ghost" size="sm" className="justify-start gap-2 whitespace-nowrap px-0" onClick={logout}>
-              <LogOut size={16} className="shrink-0" />
-              <span className="hidden group-hover:inline group-focus-within:inline lg:inline">
-                {t('actions.logout')}
-              </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-6.5 shrink-0 text-foreground-subtle"
+              onClick={logout}
+              aria-label={t('actions.logout')}
+            >
+              <LogOut size={14} className="shrink-0" />
             </Button>
           </div>
         )}
@@ -120,8 +187,9 @@ export function Sidebar() {
               <X size={18} />
             </SheetClose>
           </SheetHeader>
-          <SheetBody className="flex flex-col gap-1">
+          <SheetBody className="flex flex-col gap-px">
             <NavLinks alwaysShowLabels onNavigate={() => setMobileOpen(false)} />
+            <ShortcutSection alwaysShowLabels onNavigate={() => setMobileOpen(false)} />
             {staff && (
               <div className="mt-auto flex flex-col gap-2 border-t border-border pt-3">
                 <div className="truncate text-xs text-muted-foreground">{staff.name}</div>

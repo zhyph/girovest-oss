@@ -1,20 +1,26 @@
 import fs from 'fs'
 import path from 'path'
-import { Router } from 'express'
+import express, { Router } from 'express'
 import { z } from 'zod'
 import { requireAuth } from '../auth/authMiddleware.js'
 import { AppError } from '../errors/AppError.js'
 import { ErrorCodes } from '../errors/errorCodes.js'
 import { prisma } from '../db/client.js'
 import { productCreateSchema } from '../lib/productValidation.js'
+import { uploadPhotosSchema } from '../lib/signingValidation.js'
 import {
   createProduct,
   listProducts,
   getProduct,
   updateProduct,
   deleteProduct,
+  listLeavingMaintenance,
 } from '../services/productService.js'
-import { issueProductPhotoSession } from '../services/productPhotoTokenService.js'
+import {
+  appendProductPhotos,
+  issueProductPhotoSession,
+  PHOTO_FILENAME_PATTERN,
+} from '../services/productPhotoTokenService.js'
 import { mintSseTicket } from '../services/sseTicketService.js'
 import { reachableSigningCandidates } from './contracts.js'
 import { openRelayConnection } from '../network/relayClient.js'
@@ -24,12 +30,19 @@ import { registerRelayConnection } from '../network/relayRegistry.js'
 export const productsRouter = Router()
 productsRouter.use(requireAuth)
 
+// Every photo path a product ever legitimately carries is server-generated
+// by productPhotoTokenService (see PHOTO_FILENAME_PATTERN there) and served
+// through this router's own /:id/photos/:filename route — never anything
+// else. Constraining create/update to that shape closes the last route by
+// which a non-`/api/` string (or any other value) could reach `<img src>`.
+const STORED_PHOTO_PATH_PATTERN = /^\/api\/products\/[0-9a-f-]+\/photos\/[0-9a-f-]+\.jpg$/
+
 // Shared with the phone's token-authorized create route so both paths accept
 // exactly the same product; only the field the phone can't supply is added
 // here. locationId is not part of this schema — it always comes from the
 // authenticated staff member below, never the request body.
 const createSchema = productCreateSchema.extend({
-  photos: z.array(z.string()).optional(),
+  photos: z.array(z.string().regex(STORED_PHOTO_PATH_PATTERN)).optional(),
 })
 
 const updateSchema = z.object({
@@ -40,7 +53,7 @@ const updateSchema = z.object({
   color: z.string().min(1).optional(),
   rentalPrice: z.number().positive().optional(),
   depositAmount: z.number().nonnegative().optional(),
-  photos: z.array(z.string()).optional(),
+  photos: z.array(z.string().regex(STORED_PHOTO_PATH_PATTERN)).optional(),
   status: z.enum(['active', 'maintenance', 'retired']).optional(),
 })
 
@@ -54,6 +67,13 @@ productsRouter.post('/', async (req, res) => {
 
 productsRouter.get('/', async (req, res) => {
   res.json(await listProducts(req.staff!.locationId))
+})
+
+// MUST stay above `/:id` — it is a single path segment, so declaring it after
+// would have Express resolve it as a product lookup for the id
+// "leaving-maintenance" and answer 404 forever.
+productsRouter.get('/leaving-maintenance', async (req, res) => {
+  res.json(await listLeavingMaintenance(req.staff!.locationId))
 })
 
 productsRouter.get('/:id', async (req, res) => {
@@ -114,11 +134,37 @@ productsRouter.post('/events/ticket', async (req, res) => {
   res.status(201).json({ ticket, expiresAt })
 })
 
-// Filenames are always crypto.randomUUID() + '.jpg', generated only by
-// productPhotoTokenService — this pattern rejects anything else (including
-// path traversal) before it ever reaches the filesystem.
-const PHOTO_FILENAME_PATTERN = /^[0-9a-f-]+\.jpg$/
+/**
+ * The desktop and web UI's own photo intake, beside the phone's.
+ *
+ * Deliberately the same JSON-of-data-URLs shape the phone page already posts,
+ * rather than multipart/form-data: it lets both paths share one writer
+ * (appendProductPhotos), needs no upload-parser dependency in a server that
+ * is also packaged inside Electron, and works identically in the packaged
+ * desktop build and the hosted web build — the browser downscales to JPEG
+ * before sending either way, so a phone photo does not travel at full size.
+ * The schema is shared with the phone's submitPhotosSchema (see
+ * lib/signingValidation.ts) so the two intake paths can't validate the same
+ * payload shape differently.
+ *
+ * The higher body-size parser below is mounted directly on this route,
+ * AFTER `productsRouter.use(requireAuth)` above — not at app level — so an
+ * unauthenticated request against this path is rejected before any body
+ * larger than the app-wide default limit is ever buffered. See app.ts's own
+ * comment for the full reasoning.
+ */
+productsRouter.post('/:id/photos', express.json({ limit: '12mb' }), async (req, res) => {
+  const parsed = uploadPhotosSchema.safeParse(req.body)
+  if (!parsed.success) {
+    throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'Invalid photo payload')
+  }
+  res.status(201).json(await appendProductPhotos(req.staff!.locationId, req.params.id, parsed.data.photos))
+})
 
+// Filenames are always crypto.randomUUID() + '.jpg', generated only by
+// productPhotoTokenService (which also owns PHOTO_FILENAME_PATTERN) — this
+// pattern rejects anything else (including path traversal) before it ever
+// reaches the filesystem.
 productsRouter.get('/:id/photos/:filename', async (req, res) => {
   if (!PHOTO_FILENAME_PATTERN.test(req.params.filename)) {
     throw new AppError(ErrorCodes.NOT_FOUND, 404, 'Photo not found')
@@ -139,6 +185,10 @@ productsRouter.get('/:id/photos/:filename', async (req, res) => {
     throw new AppError(ErrorCodes.NOT_FOUND, 404, 'Photo not found')
   }
   res.set('Content-Type', 'image/jpeg')
+  // The stored bytes are only checked for a JPEG signature, not fully
+  // decoded and re-encoded — nosniff stops a browser from ever reinterpreting
+  // a malformed upload as something other than what Content-Type declares.
+  res.set('X-Content-Type-Options', 'nosniff')
   // Must pass `root` explicitly: without it, the `send` library (which
   // res.sendFile delegates to) dotfile-checks every segment of the *absolute*
   // path, including ancestor directories that have nothing to do with the

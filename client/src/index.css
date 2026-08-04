@@ -18,10 +18,80 @@
   --color-muted-text: #8c7a72;
   --color-border-soft: #e9dcd3;
 
+  /*
+   * Type families. Self-hosted via @fontsource-variable (imported in
+   * main.tsx) rather than a Google Fonts <link>: this ships as an offline
+   * Electron app, so a CDN stylesheet would silently fall back to the
+   * generic stack on a shop machine with no internet.
+   *
+   *   serif — screen titles and the printed contract letterhead only. The
+   *           one place the app is allowed to look like a boutique.
+   *   sans  — everything else. Chosen for dense UI: tall x-height,
+   *           distinguishable 1/l/I, native tabular figures for money.
+   *   mono  — identifiers only (contract number, product code). Never
+   *           running text.
+   */
+  --font-sans: 'IBM Plex Sans Variable', system-ui, -apple-system, sans-serif;
+  --font-serif: 'Source Serif 4 Variable', Georgia, serif;
+  --font-mono: 'Azeret Mono Variable', ui-monospace, monospace;
+
+  /*
+   * Seven type steps, and no more. `display` and `metric` appear at most
+   * once per screen; `label` names every group of fields or rows and is
+   * the step the app previously lacked, which is why nothing read as
+   * grouped. Sizes carry their own line-height/weight so a step is a
+   * single class, not a stack of three.
+   */
+  --text-display: 1.625rem; /* 26px */
+  --text-display--line-height: 1.875rem; /* 30px */
+  --text-display--font-weight: 400;
+
+  --text-metric: 1.875rem; /* 30px */
+  --text-metric--line-height: 1.875rem; /* 30px */
+  --text-metric--font-weight: 600;
+
+  --text-heading: 1.0625rem; /* 17px */
+  --text-heading--line-height: 1.375rem; /* 22px */
+  --text-heading--font-weight: 600;
+
+  --text-body: 0.875rem; /* 14px */
+  --text-body--line-height: 1.25rem; /* 20px */
+
+  --text-meta: 0.78125rem; /* 12.5px */
+  --text-meta--line-height: 1.0625rem; /* 17px */
+
+  --text-label: 0.6875rem; /* 11px */
+  --text-label--line-height: 1rem;
+  --text-label--font-weight: 600;
+  --text-label--letter-spacing: 0.08em;
+
+  /*
+   * Four radii, each with one job. Previously only 8 and 16 existed, which
+   * is why a dialog carried the same visual weight as a field inside it.
+   */
+  --radius-badge: 4px;
+  --radius-control: 6px;
+  --radius-panel: 10px;
+  --radius-dialog: 14px;
   --radius-md: 0.5rem;
   --radius-lg: 1rem;
 
+  /*
+   * Three elevations: 0 is a hairline alone (no shadow token), 1 is a
+   * floating panel, 2 is an overlay. Neutral ink shadow — the previous
+   * rose-tinted shadow muddied the linen surfaces it fell on.
+   */
+  --shadow-panel: 0 1px 2px rgb(46 35 32 / 0.04), 0 6px 16px -10px rgb(46 35 32 / 0.14);
+  --shadow-overlay: 0 18px 40px -18px rgb(46 35 32 / 0.32), 0 2px 6px rgb(46 35 32 / 0.08);
   --shadow-soft: 0 1px 2px 0 rgb(54 42 40 / 0.05), 0 10px 25px -10px rgb(122 47 64 / 0.18);
+
+  /*
+   * Density. One row height, one control height, one compact height —
+   * every list, field and button lands on one of them.
+   */
+  --spacing-row: 38px;
+  --spacing-control: 34px;
+  --spacing-control-sm: 28px;
 }
 
 /*
@@ -57,7 +127,11 @@
  * Contrast: every foreground/background pairing below (background,
  * card, popover, primary, secondary, muted, accent, destructive,
  * destructive-subtle, success, warning) is verified at >= 4.5:1 (WCAG AA
- * for text) in both themes. `input`, `input-hover` and `ring` are non-text
+ * for text) in both themes — and now measured, not merely asserted here:
+ * src/paletteContrast.test.ts reads these literals back out of this file and
+ * fails the build if any of them slips. It was added because
+ * `--foreground-subtle` had been sitting at 3.36–4.12:1 under this very
+ * paragraph. `input`, `input-hover` and `ring` are non-text
  * UI-component boundaries and are verified at >= 3:1 against `background`
  * in both themes. `border` is a decorative divider (card/dialog edges) with
  * no contrast requirement under WCAG 1.4.11 and is intentionally subtle;
@@ -83,6 +157,24 @@
    */
   --palette-dark-background: #241c1b;
   --palette-dark-foreground: #f3e9e2;
+  /*
+   * Surface layering, dark. Same four-step ordering as light — sunken is
+   * the recessed step (table headers, hover), then canvas, then the work
+   * area, then the raised overlay step — expressed as increasing
+   * lightness instead of decreasing, so "raised" still reads as nearer.
+   */
+  --palette-dark-surface: #2a2220;
+  --palette-dark-surface-sunken: #1e1817;
+  /*
+   * ink-3, dark. Unlike its light twin this one always cleared AA on the
+   * surfaces it lands on (4.91 on `secondary`, 5.39 on `card`, 5.56 on
+   * `surface`, 5.97 on `background`, 6.26 on `surface-sunken`), so it is
+   * left where the design file put it. Guarded alongside the light value in
+   * src/paletteContrast.test.ts.
+   */
+  --palette-dark-foreground-subtle: #a89791;
+  --palette-dark-hairline: #3a2e2b;
+  --palette-dark-border-strong: #5c4844;
   --palette-dark-card: #2e2422;
   --palette-dark-card-foreground: #f3e9e2;
   --palette-dark-popover: #2e2422;
@@ -91,7 +183,13 @@
   --palette-dark-primary-foreground: #241c1b;
   --palette-dark-secondary: #3a2830;
   --palette-dark-secondary-foreground: #f3d9de;
-  --palette-dark-muted: #332725;
+  /*
+   * Lifted from #332725, which sat at 1.05:1 against --card and so made a
+   * neutral badge ("Reservado", "Cancelado") read as bare text with no pill
+   * behind it. Now 1.33:1 against card, matching light mode's 1.22:1 step,
+   * with --muted-foreground still 5.93:1 on top of it.
+   */
+  --palette-dark-muted: #453734;
   --palette-dark-muted-foreground: #c9b8b0;
   --palette-dark-accent: #3a2830;
   --palette-dark-accent-foreground: #f3d9de;
@@ -115,18 +213,51 @@
 html.light {
   color-scheme: light;
 
-  --background: #faf6f0; /* cream */
-  --foreground: #362a28; /* ink */
+  /*
+   * Surface layering: three visible steps plus a recessed one, instead of
+   * the previous two. `background` is the app chrome (nav rail, page);
+   * `surface` is the work area one step lighter, which is what separates
+   * "where I navigate" from "where I work"; `card`/`popover` is the raised
+   * step for dialogs, drawers and rows inside a panel; `surface-sunken` is
+   * the recessed step for table headers and hover.
+   */
+  --background: #f2ebe3; /* canvas — chrome, rail, page */
+  --surface: #fdfbf8; /* work area, panels */
+  --surface-sunken: #efe7de; /* table header, hover */
+  --foreground: #2e2320; /* ink */
   --card: #ffffff;
-  --card-foreground: #362a28;
+  --card-foreground: #2e2320;
   --popover: #ffffff;
-  --popover-foreground: #362a28;
-  --primary: #b6586b; /* brand-500, darkened ~1% lightness for AA on white text */
-  --primary-foreground: #ffffff;
+  --popover-foreground: #2e2320;
+  --primary: #9c4356; /* brand-600 — the accent the mockup uses for action, focus and brand */
+  --primary-foreground: #fdfbf8;
   --secondary: #fbeef1; /* brand-50 */
   --secondary-foreground: #7a2f40; /* brand-700 */
-  --muted: #f4ece4;
-  --muted-foreground: #776861; /* darkened from brand muted-text for AA */
+  --muted: #efe7de;
+  --muted-foreground: #6d5c54; /* ink-2 — secondary body, description, meta */
+  /*
+   * ink-3. Section labels, placeholders, contract numbers.
+   *
+   * The design file offers two near-identical greys for this role, #97867d
+   * and #8a7a71, and this token started at the darker of the two on a 3:1
+   * "large text only" argument. That argument does not survive contact with
+   * where the token actually landed: its 33 usages are 11–13px labels and
+   * uppercase section headings, none of which is large text under WCAG, so
+   * the applicable floor is 4.5:1 and #8a7a71 cleared it nowhere (3.36 on
+   * `surface-sunken`, which is DataList's own sticky group header, up to
+   * 4.12 on `card`).
+   *
+   * #73655e is the same hue scaled down until the WORST real pairing —
+   * ink-3 on `surface-sunken`/`muted` — clears AA with room to spare:
+   * 4.57 sunken / 4.74 background / 5.42 surface / 5.60 card / 4.96
+   * secondary. Below roughly #74665f nothing clears 4.5 on sunken at all,
+   * which is why this sits close to `--muted-foreground` (#6d5c54): at AA
+   * there is barely a luminance window left between ink-2 and ink-3 on this
+   * warm a canvas. The step between them is carried by size, weight and
+   * case, not by a colour gap that WCAG has no room for.
+   * Guarded by src/paletteContrast.test.ts.
+   */
+  --foreground-subtle: #73655e;
   --accent: #fbeef1; /* brand-50 */
   --accent-foreground: #7a2f40; /* brand-700 */
   --destructive: #b3261e;
@@ -138,7 +269,16 @@ html.light {
   --warning: #fbedd0;
   --warning-foreground: #7a4b06;
   --warning-border: #e7c27b; /* one step heavier than the warning fill — decorative edge */
-  --border: #e9dcd3; /* border-soft — decorative, not a UI-component boundary */
+  /*
+   * Two hairline weights, because one was doing two different jobs:
+   * separating rows *inside* a panel, and delimiting the panel itself.
+   * Splitting them is what lets a dense list stay readable without zebra
+   * striping (which otherwise steals the only signal left for hover and
+   * selection). Both are decorative under WCAG 1.4.11.
+   */
+  --hairline: #efe7de; /* divider between list rows */
+  --border: #e4d8cd; /* panel and card edge */
+  --border-strong: #d3c3b5; /* outer panel edge, header rule */
   --overlay: rgb(54 42 40 / 0.4); /* ink at 40% — shared dialog/sheet scrim */
   --input: #b85c6e; /* brand-500 — resting form-control border, 3:1+ on background */
   --input-hover: #9c4356; /* brand-600 — hovered form-control border, one step heavier than --input */
@@ -150,7 +290,10 @@ html.dark {
   color-scheme: dark;
 
   --background: var(--palette-dark-background);
+  --surface: var(--palette-dark-surface);
+  --surface-sunken: var(--palette-dark-surface-sunken);
   --foreground: var(--palette-dark-foreground);
+  --foreground-subtle: var(--palette-dark-foreground-subtle);
   --card: var(--palette-dark-card);
   --card-foreground: var(--palette-dark-card-foreground);
   --popover: var(--palette-dark-popover);
@@ -172,7 +315,9 @@ html.dark {
   --warning: var(--palette-dark-warning);
   --warning-foreground: var(--palette-dark-warning-foreground);
   --warning-border: var(--palette-dark-warning-border);
+  --hairline: var(--palette-dark-hairline);
   --border: var(--palette-dark-border);
+  --border-strong: var(--palette-dark-border-strong);
   --overlay: var(--palette-dark-overlay);
   --input: var(--palette-dark-input);
   --input-hover: var(--palette-dark-input-hover);
@@ -184,7 +329,10 @@ html.dark {
     color-scheme: dark;
 
     --background: var(--palette-dark-background);
+    --surface: var(--palette-dark-surface);
+    --surface-sunken: var(--palette-dark-surface-sunken);
     --foreground: var(--palette-dark-foreground);
+    --foreground-subtle: var(--palette-dark-foreground-subtle);
     --card: var(--palette-dark-card);
     --card-foreground: var(--palette-dark-card-foreground);
     --popover: var(--palette-dark-popover);
@@ -206,7 +354,9 @@ html.dark {
     --warning: var(--palette-dark-warning);
     --warning-foreground: var(--palette-dark-warning-foreground);
     --warning-border: var(--palette-dark-warning-border);
+    --hairline: var(--palette-dark-hairline);
     --border: var(--palette-dark-border);
+    --border-strong: var(--palette-dark-border-strong);
     --overlay: var(--palette-dark-overlay);
     --input: var(--palette-dark-input);
     --input-hover: var(--palette-dark-input-hover);
@@ -216,7 +366,10 @@ html.dark {
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-sunken: var(--surface-sunken);
   --color-foreground: var(--foreground);
+  --color-foreground-subtle: var(--foreground-subtle);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
@@ -238,7 +391,9 @@ html.dark {
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
   --color-warning-border: var(--warning-border);
+  --color-hairline: var(--hairline);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-overlay: var(--overlay);
   --color-input: var(--input);
   --color-input-hover: var(--input-hover);
@@ -247,9 +402,21 @@ html.dark {
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+  line-height: var(--text-body--line-height);
   background-color: var(--color-background);
   color: var(--color-foreground);
+  -webkit-font-smoothing: antialiased;
+  text-wrap: pretty;
+}
+
+/*
+ * Money and dates line up in columns everywhere, so the figures have to be
+ * fixed-width wherever they appear — column, field, or summary.
+ */
+.tabular {
+  font-variant-numeric: tabular-nums;
 }
 
 @page {

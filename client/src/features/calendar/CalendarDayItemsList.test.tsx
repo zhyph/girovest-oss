@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router'
 import '../../i18n.ts'
 import { CalendarDayItemsList } from './CalendarDayItemsList.tsx'
+import { buildEntries, type CalendarEntry } from './calendarEntries.ts'
 import type { Allocation } from '../allocations/allocationSchemas.ts'
 import type { Product } from '../products/productSchemas.ts'
 
@@ -21,10 +23,16 @@ function makeProduct(overrides: Partial<Product> = {}): Product {
   return {
     id: 'p1', locationId: 'loc1', name: 'Vestido Azul', category: 'festa', size: 'M', color: 'azul',
     rentalPrice: 250, depositAmount: 150, photos: ['https://example.com/a.jpg'],
-    status: 'active', availability: 'available', hasAllocationHistory: false,
+    status: 'active', availability: 'available', code: 1, hasAllocationHistory: false,
     createdAt: '2026-07-01T00:00:00.000Z',
     ...overrides,
   }
+}
+
+// The list is handed entries, not raw allocations: each row carries the day
+// it belongs to, so one list can mix pieces going out with pieces coming back.
+function outEntries(...allocations: Allocation[]): CalendarEntry[] {
+  return buildEntries({ 'going-out': allocations, 'due-back': [], overdue: [] }, 'going-out')
 }
 
 const products = new Map([['p1', makeProduct()]])
@@ -34,10 +42,9 @@ describe('CalendarDayItemsList', () => {
   it('renders a thumbnail, product name, client name and date for each row', () => {
     render(
       <CalendarDayItemsList
-        allocations={[makeAllocation()]}
+        entries={outEntries(makeAllocation())}
         products={products}
         clientNames={clientNames}
-        dateField="checkoutDate"
       />,
     )
     expect(screen.getByText('Vestido Azul')).toBeInTheDocument()
@@ -49,10 +56,9 @@ describe('CalendarDayItemsList', () => {
     const noPhotoProducts = new Map([['p1', makeProduct({ photos: [] })]])
     render(
       <CalendarDayItemsList
-        allocations={[makeAllocation()]}
+        entries={outEntries(makeAllocation())}
         products={noPhotoProducts}
         clientNames={clientNames}
-        dateField="checkoutDate"
       />,
     )
     expect(screen.getByText('Vestido Azul')).toBeInTheDocument()
@@ -65,10 +71,9 @@ describe('CalendarDayItemsList', () => {
     )
     render(
       <CalendarDayItemsList
-        allocations={allocations}
+        entries={outEntries(...allocations)}
         products={products}
         clientNames={clientNames}
-        dateField="checkoutDate"
         pageSize={10}
       />,
     )
@@ -83,26 +88,28 @@ describe('CalendarDayItemsList', () => {
     expect(screen.getByText('1 / 3')).toBeInTheDocument()
   })
 
-  it('opens ProductDetailModal with the right product when a row is clicked', async () => {
+  it('opens the photo zoom panel with the right product when a row is clicked', async () => {
+    // MemoryRouter: the zoom's "Abrir ficha do produto" routes to Produtos.
     render(
-      <CalendarDayItemsList
-        allocations={[makeAllocation()]}
-        products={products}
-        clientNames={clientNames}
-        dateField="checkoutDate"
-      />,
+      <MemoryRouter>
+        <CalendarDayItemsList
+          entries={outEntries(makeAllocation())}
+          products={products}
+          clientNames={clientNames}
+        />
+      </MemoryRouter>,
     )
     await userEvent.click(screen.getByText('Vestido Azul'))
     expect(screen.getByText('festa')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Abrir ficha do produto' })).toBeInTheDocument()
   })
 
   it('renders without crashing and hides pagination controls when there are no allocations', () => {
     render(
       <CalendarDayItemsList
-        allocations={[]}
+        entries={outEntries()}
         products={products}
         clientNames={clientNames}
-        dateField="checkoutDate"
         pageSize={10}
       />,
     )
@@ -116,10 +123,9 @@ describe('CalendarDayItemsList', () => {
     )
     render(
       <CalendarDayItemsList
-        allocations={allocations}
+        entries={outEntries(...allocations)}
         products={products}
         clientNames={clientNames}
-        dateField="checkoutDate"
         pageSize={10}
       />,
     )
@@ -138,10 +144,9 @@ describe('CalendarDayItemsList', () => {
     const emptyProducts = new Map<string, Product>()
     render(
       <CalendarDayItemsList
-        allocations={[makeAllocation({ productId: 'missing-product' })]}
+        entries={outEntries(makeAllocation({ productId: 'missing-product' }))}
         products={emptyProducts}
         clientNames={clientNames}
-        dateField="checkoutDate"
       />,
     )
     expect(screen.getByText('missing-product')).toBeInTheDocument()
@@ -157,10 +162,9 @@ describe('CalendarDayItemsList', () => {
     )
     const { rerender } = render(
       <CalendarDayItemsList
-        allocations={manyAllocations}
+        entries={outEntries(...manyAllocations)}
         products={products}
         clientNames={clientNames}
-        dateField="checkoutDate"
         pageSize={10}
       />,
     )
@@ -172,10 +176,9 @@ describe('CalendarDayItemsList', () => {
     const fewAllocations = [makeAllocation({ id: 'only', checkoutDate: '2026-07-10' })]
     rerender(
       <CalendarDayItemsList
-        allocations={fewAllocations}
+        entries={outEntries(...fewAllocations)}
         products={products}
         clientNames={clientNames}
-        dateField="checkoutDate"
         pageSize={10}
       />,
     )
@@ -190,10 +193,9 @@ describe('CalendarDayItemsList', () => {
     )
     const { rerender } = render(
       <CalendarDayItemsList
-        allocations={manyAllocations}
+        entries={outEntries(...manyAllocations)}
         products={products}
         clientNames={clientNames}
-        dateField="checkoutDate"
         pageSize={10}
       />,
     )
@@ -207,10 +209,9 @@ describe('CalendarDayItemsList', () => {
     )
     rerender(
       <CalendarDayItemsList
-        allocations={fewerAllocations}
+        entries={outEntries(...fewerAllocations)}
         products={products}
         clientNames={clientNames}
-        dateField="checkoutDate"
         pageSize={10}
       />,
     )

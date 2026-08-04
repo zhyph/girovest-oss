@@ -9,6 +9,8 @@
     }
   },
   "fields": {
+    "name": "Nome da loja",
+    "address": "Endereço",
     "phone": "Telefone",
     "maintenanceBufferDays": "Dias de higienização entre aluguéis"
   },
@@ -33,6 +35,7 @@
     "copied": "Identificador copiado."
   },
   "maintenanceBufferHelp": "Dias em que a peça fica indisponível depois de voltar, para limpeza e reparos, antes de sair para o próximo cliente. Use 0 para liberar já no dia seguinte à devolução.",
+  "shopIdentityHelp": "Nome e endereço aparecem no cabeçalho do contrato impresso e o nome também identifica a loja no menu lateral e no título da janela.",
   "tours": {
     "title": "Tours guiados",
     "help": "Reveja as explicações passo a passo de cada tela sempre que precisar se lembrar de como algo funciona.",
@@ -69,6 +72,28 @@
       "title": "Esta pasta já foi usada por outra instalação",
       "message": "A pasta \"{{path}}\" já guarda um backup de outra instalação do Girovest — por exemplo, o pendrive de um backup restaurado em um computador novo. Se essa outra instalação ainda estiver em uso, ela perderá o controle desta pasta e seus backups mais antigos poderão ser apagados com o tempo. Usar esta pasta mesmo assim?",
       "confirmAction": "Usar esta pasta mesmo assim"
-    }
+    },
+    "desktopOnly": "Backup e restauração estão disponíveis apenas no aplicativo para computador. Abra o Girovest instalado nesta máquina para fazer ou restaurar uma cópia dos dados."
+  },
+  "sections": {
+    "shop": "Loja",
+    "shopHint": "Identificação, contato e higienização",
+    "contract": "Contrato",
+    "contractHint": "{{count}} cláusulas",
+    "backup": "Backup",
+    "backupHint": "Cópia dos dados",
+    "appearance": "Aparência",
+    "appearanceHint": "Tema e conectividade",
+    "support": "Suporte",
+    "supportHint": "Tours e versão"
+  },
+  "unsaved": "Alterações não salvas.",
+  "discard": "Descartar",
+  "validation": {
+    "required": "Campo obrigatório.",
+    "clauseRequired": "Escreva a cláusula ou remova-a.",
+    "maintenanceBufferRange": "Informe um número de dias entre 0 e 60.",
+    "sectionHasErrors": "Há campos a corrigir.",
+    "summary": "Corrija os campos destacados antes de salvar."
   }
 }

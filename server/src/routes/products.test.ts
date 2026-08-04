@@ -213,6 +213,103 @@ describe('POST /api/products/events/ticket', () => {
   })
 })
 
+describe('POST /:id/photos', () => {
+  /*
+    The desktop picker and the phone's intake page must land in the same place
+    in the same shape. If they ever diverge, the serving route (which matches
+    a literal `/api/products/<id>/photos/<uuid>.jpg` against the stored array)
+    starts 404ing photos that are on disk, and only one of the two intakes
+    breaks — which is exactly the kind of split nobody notices until a client
+    is looking at an empty card.
+  */
+  it('stores an uploaded photo in the same shape the phone intake produces, and serves it', async () => {
+    const uploadRes = await request(app)
+      .post(`/api/products/${productId}/photos`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({ photos: [TINY_JPEG] })
+
+    expect(uploadRes.status).toBe(201)
+    const storedPath = uploadRes.body.photos[0] as string
+    expect(storedPath).toMatch(new RegExp(`^/api/products/${productId}/photos/[0-9a-f-]+\\.jpg$`))
+
+    const photoRes = await request(app).get(storedPath).set('Authorization', `Bearer ${staffToken}`)
+    expect(photoRes.status).toBe(200)
+    expect(photoRes.headers['content-type']).toContain('image/jpeg')
+  })
+
+  it('appends rather than replaces, so a picker upload cannot wipe the phone session photos', async () => {
+    await request(app)
+      .post(`/api/products/${productId}/photos`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({ photos: [TINY_JPEG] })
+    const second = await request(app)
+      .post(`/api/products/${productId}/photos`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({ photos: [TINY_JPEG] })
+
+    expect(second.body.photos).toHaveLength(2)
+    expect(second.body.photos[0]).not.toBe(second.body.photos[1])
+  })
+
+  it('rejects a payload that is not a JPEG data URL', async () => {
+    const response = await request(app)
+      .post(`/api/products/${productId}/photos`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({ photos: ['https://example.com/not-an-upload.jpg'] })
+
+    expect(response.status).toBe(400)
+    expect(fs.readdirSync(photosDir)).toHaveLength(0)
+  })
+
+  it('requires authentication', async () => {
+    const response = await request(app).post(`/api/products/${productId}/photos`).send({ photos: [TINY_JPEG] })
+    expect(response.status).toBe(401)
+  })
+
+  it('refuses a product belonging to another location', async () => {
+    const other = await prisma.location.create({ data: { name: 'Outra', address: 'B' } })
+    const otherProduct = await prisma.product.create({
+      data: { locationId: other.id, name: 'X', category: 'festa', size: 'M', color: 'azul', rentalPrice: 1, depositAmount: 0 },
+    })
+
+    const response = await request(app)
+      .post(`/api/products/${otherProduct.id}/photos`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({ photos: [TINY_JPEG] })
+
+    expect(response.status).toBe(404)
+  })
+
+  /*
+    The raised body limit is scoped to this one route. Everything else keeps
+    the default 100 kB ceiling — a regression here would quietly turn every
+    product write into an unbounded upload endpoint.
+  */
+  it('accepts a body far past the default limit here, and nowhere else', async () => {
+    const bigJpeg = `data:image/jpeg;base64,${Buffer.concat([
+      Buffer.from([0xff, 0xd8, 0xff]),
+      Buffer.alloc(400 * 1024, 0),
+    ]).toString('base64')}`
+    const uploadRes = await request(app)
+      .post(`/api/products/${productId}/photos`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({ photos: [bigJpeg] })
+    expect(uploadRes.status).toBe(201)
+
+    // Rejected before the handler ever sees it. body-parser's own
+    // entity.too.large surfaces through errorMiddleware as a 500 rather than a
+    // 413 — the status is the wart, the refusal is the invariant.
+    const patchRes = await request(app)
+      .patch(`/api/products/${productId}`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({ description: 'x'.repeat(400 * 1024) })
+    expect(patchRes.status).toBeGreaterThanOrEqual(400)
+
+    const after = await prisma.product.findUniqueOrThrow({ where: { id: productId } })
+    expect(after.description).toBeNull()
+  })
+})
+
 describe('GET /:id/photos/:filename', () => {
   it('serves a photo file that was written to PRODUCT_PHOTOS_DIR', async () => {
     const filename = 'abc123.jpg'
@@ -353,5 +450,21 @@ describe('GET /:id/photos/:filename', () => {
       .get(`/api/products/${productA.id}/photos/${filename}`)
       .set('Authorization', `Bearer ${token}`)
     expect(res.status).toBe(404)
+  })
+})
+
+describe('GET /api/products/leaving-maintenance', () => {
+  it('resolves as its own route rather than a product lookup for that id', async () => {
+    const response = await request(app)
+      .get('/api/products/leaving-maintenance')
+      .set('Authorization', `Bearer ${staffToken}`)
+
+    expect(response.status).toBe(200)
+    expect(response.body).toEqual({ count: 0, items: [] })
+  })
+
+  it('requires authentication', async () => {
+    const response = await request(app).get('/api/products/leaving-maintenance')
+    expect(response.status).toBe(401)
   })
 })

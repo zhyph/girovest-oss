@@ -16,6 +16,12 @@ export function useUpdateLocationSettings() {
   return useMutation({
     mutationFn: (values: LocationSettingsFormValues) =>
       apiFetch<LocationSettings>('/api/settings', { method: 'PATCH', body: JSON.stringify(values) }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: SETTINGS_KEY }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: SETTINGS_KEY })
+      // The shop name reaches the nav rail and the window title through
+      // /api/auth/me, not through this query — without this the brand line
+      // keeps showing the old name until the next login.
+      await queryClient.invalidateQueries({ queryKey: ['auth', 'me'] })
+    },
   })
 }

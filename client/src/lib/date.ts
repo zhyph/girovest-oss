@@ -23,6 +23,27 @@ export function toIsoDateOnly(date: Date): string {
   return `${year}-${month}-${day}`
 }
 
+/**
+ * The "now" every overdue question is asked as of: start of today, local.
+ *
+ * Shared by Contratos and Calendário so the two screens cannot disagree about
+ * what counts as late. It is the coarsest value that still agrees with the
+ * badge `contractState` draws beside each row: it lands after today's
+ * UTC-midnight due dates (so a piece due today reads as late, exactly as the
+ * badge says) and before tomorrow's, for the UTC-3 locale this app ships.
+ *
+ * END of today is the wrong end of the day and was the bug: at UTC-3 that
+ * instant is tomorrow 02:59 UTC, which is past tomorrow's UTC-midnight due
+ * dates, so the Calendário painted a piece due TOMORROW red today. Sending the
+ * raw instant instead of a whole day would also mint a new query key on every
+ * render.
+ */
+export function overdueAsOf(): Date {
+  const startOfToday = new Date()
+  startOfToday.setHours(0, 0, 0, 0)
+  return startOfToday
+}
+
 export function formatDate(date: Date, locale: string, options: Intl.DateTimeFormatOptions): string {
   return new Intl.DateTimeFormat(locale, options).format(date)
 }

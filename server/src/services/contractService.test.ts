@@ -1,7 +1,15 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { Prisma } from '../generated/prisma/client.js'
 import { prisma } from '../db/client.js'
 import { AppError } from '../errors/AppError.js'
-import { createContract, cancelContract, listContracts, getContract, setInstallmentPaid } from './contractService.js'
+import {
+  createContract,
+  cancelContract,
+  listContracts,
+  getContract,
+  setInstallmentPaid,
+  sumReceivables,
+} from './contractService.js'
 import { checkOutAllocation } from './allocationService.js'
 
 let locationId: string
@@ -170,7 +178,11 @@ describe('createContract', () => {
     expect(rejected).toHaveLength(1)
   })
 
-  it('CRITICAL: assigns unique sequential numbers to concurrent contracts for the same location on different products', async () => {
+  it('assigns unique sequential numbers to concurrent contracts for the same location on different products', async () => {
+    // NOTE: this passes even with the retry loop deleted — better-sqlite3
+    // serializes transactions, so the two attempts never actually collide
+    // under the test provider. Kept as a shape check only; the test below is
+    // the one that actually holds the retry down.
     const attemptWithProduct = (product: string) =>
       createContract(
         baseInput({
@@ -186,6 +198,75 @@ describe('createContract', () => {
     expect(fulfilled).toHaveLength(2)
     const numbers = fulfilled.map((r) => r.value.number).sort((a, b) => a - b)
     expect(numbers).toEqual([1, 2])
+  })
+
+  it('CRITICAL: re-reads and takes the next free number when a racer wins the unique constraint', async () => {
+    // The real race, forced: another staff member claims number 1 between this
+    // attempt's read and its write. Deleting the retry loop makes this throw;
+    // keeping it but reusing the number computed on the first attempt makes it
+    // come back as 1 instead of 2. Neither failure is caught by the
+    // Promise.allSettled test above, which never actually collides under
+    // better-sqlite3's serialized transactions.
+    const realTransaction = prisma.$transaction.bind(prisma)
+    let attempts = 0
+    const spy = vi.spyOn(prisma, '$transaction').mockImplementation((async (...args: unknown[]) => {
+      attempts += 1
+      if (attempts === 1) {
+        await prisma.contract.create({
+          data: {
+            number: 1,
+            locationId,
+            clientId,
+            staffId,
+            eventDate: new Date('2026-10-01'),
+            paymentMethod: 'Dinheiro',
+          },
+        })
+        throw new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+          code: 'P2002',
+          clientVersion: 'test',
+        })
+      }
+      return (realTransaction as (...a: never[]) => unknown)(...(args as never[]))
+    }) as never)
+
+    try {
+      const contract = await createContract(baseInput())
+      expect(attempts).toBe(2)
+      expect(contract.number).toBe(2)
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
+  it('gives up with a 409 rather than looping forever on unending write conflicts', async () => {
+    const spy = vi.spyOn(prisma, '$transaction').mockImplementation((() =>
+      Promise.reject(
+        new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+          code: 'P2002',
+          clientVersion: 'test',
+        }),
+      )) as never)
+
+    try {
+      await expect(createContract(baseInput())).rejects.toMatchObject({ status: 409 })
+      expect(spy).toHaveBeenCalledTimes(5)
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
+  it('does not swallow an unrelated database error as a write conflict', async () => {
+    const spy = vi.spyOn(prisma, '$transaction').mockImplementation((() =>
+      Promise.reject(new Error('disk is on fire'))) as never)
+
+    try {
+      await expect(createContract(baseInput())).rejects.toThrow('disk is on fire')
+      // One attempt, not five: only P2002/P2034 are retryable.
+      expect(spy).toHaveBeenCalledTimes(1)
+    } finally {
+      spy.mockRestore()
+    }
   })
 
   it('CRITICAL: a product taken out early cannot be booked for the days between the real pickup and its planned checkout date', async () => {
@@ -513,5 +594,203 @@ describe('setInstallmentPaid', () => {
     await expect(
       setInstallmentPaid(second.id, first.installments[0].id, locationId, true),
     ).rejects.toThrow(AppError)
+  })
+})
+
+describe('sumReceivables', () => {
+  const WEEK_START = new Date('2026-10-05')
+  const WEEK_END = new Date('2026-10-11')
+
+  it('sums only the unpaid installments due inside the window', async () => {
+    await createContract(
+      baseInput({
+        installments: [
+          { dueDate: new Date('2026-10-06'), amount: 150 },
+          { dueDate: new Date('2026-10-11'), amount: 50.5 },
+          // The day after the window closes — the single most likely
+          // off-by-one, so it is a fixture rather than a comment.
+          { dueDate: new Date('2026-10-12'), amount: 999 },
+          { dueDate: new Date('2026-10-04'), amount: 777 },
+        ],
+      }),
+    )
+
+    expect(await sumReceivables(locationId, WEEK_START, WEEK_END)).toEqual({ total: 200.5, count: 2 })
+  })
+
+  it('drops an installment as soon as it is marked paid', async () => {
+    const contract = await createContract(
+      baseInput({
+        installments: [
+          { dueDate: new Date('2026-10-06'), amount: 150 },
+          { dueDate: new Date('2026-10-07'), amount: 60 },
+        ],
+      }),
+    )
+    const paidOne = contract.installments.find((installment) => installment.amount === 150)!
+    await setInstallmentPaid(contract.id, paidOne.id, locationId, true)
+
+    expect(await sumReceivables(locationId, WEEK_START, WEEK_END)).toEqual({ total: 60, count: 1 })
+  })
+
+  it('reports zero rather than null when nothing is due in the window', async () => {
+    await createContract(baseInput({ installments: [{ dueDate: new Date('2026-12-01'), amount: 300 }] }))
+
+    expect(await sumReceivables(locationId, WEEK_START, WEEK_END)).toEqual({ total: 0, count: 0 })
+  })
+
+  it('CRITICAL: stops counting a contract once it is cancelled', async () => {
+    const abandoned = await createContract(
+      baseInput({ installments: [{ dueDate: new Date('2026-10-06'), amount: 150 }] }),
+    )
+    const kept = await createContract(
+      baseInput({
+        items: [
+          { productId: secondProductId, checkoutDate: new Date('2026-10-02'), dueDate: new Date('2026-10-05'), priceCharged: 100 },
+        ],
+        installments: [{ dueDate: new Date('2026-10-07'), amount: 60 }],
+      }),
+    )
+
+    expect(await sumReceivables(locationId, WEEK_START, WEEK_END)).toEqual({ total: 210, count: 2 })
+
+    // Cancelling does not delete the instalments, so without an explicit
+    // exclusion the Painel keeps promising the shop money for a dress it
+    // agreed never to send out.
+    await cancelContract(abandoned.id, locationId)
+
+    expect(await sumReceivables(locationId, WEEK_START, WEEK_END)).toEqual({ total: 60, count: 1 })
+    expect(kept.id).toBeDefined()
+  })
+
+  it('never counts another location\'s installments', async () => {
+    await createContract(baseInput({ installments: [{ dueDate: new Date('2026-10-06'), amount: 150 }] }))
+    const otherLocation = await prisma.location.create({ data: { name: 'Other', address: 'X' } })
+
+    expect(await sumReceivables(otherLocation.id, WEEK_START, WEEK_END)).toEqual({ total: 0, count: 0 })
+  })
+})
+
+describe('listContracts status filters and counts', () => {
+  const DAY = 24 * 60 * 60 * 1000
+
+  async function seedStates() {
+    // Reserved and unsigned: active, not overdue.
+    const reserved = await createContract(baseInput())
+    // Checked out and past due: active AND overdue.
+    const late = await createContract(
+      baseInput({
+        items: [
+          { productId: secondProductId, checkoutDate: new Date('2026-01-02'), dueDate: new Date('2026-01-05'), priceCharged: 100 },
+        ],
+      }),
+    )
+    await prisma.allocation.updateMany({ where: { contractId: late.id }, data: { status: 'checked_out' } })
+    // Everything back and signed: neither active nor unsigned.
+    const done = await createContract(
+      baseInput({
+        items: [
+          { productId, checkoutDate: new Date('2027-03-02'), dueDate: new Date('2027-03-05'), priceCharged: 100 },
+        ],
+      }),
+    )
+    await prisma.allocation.updateMany({ where: { contractId: done.id }, data: { status: 'returned' } })
+    await prisma.contract.update({ where: { id: done.id }, data: { signatureStatus: 'signed' } })
+    return { reserved, late, done }
+  }
+
+  it('counts every view across the whole dataset, not just the requested page', async () => {
+    const { reserved, late } = await seedStates()
+
+    // One row per page: the counts must still describe all three contracts,
+    // which is the entire point of computing them here rather than over
+    // whatever the page happened to return.
+    const result = await listContracts(locationId, { page: 1, pageSize: 1 })
+
+    expect(result.contracts).toHaveLength(1)
+    expect(result.counts).toEqual({ all: 3, active: 2, overdue: 1, unsigned: 2 })
+    expect([reserved.id, late.id]).toContain(result.contracts[0].id === reserved.id ? reserved.id : late.id)
+  })
+
+  it('narrows the rows themselves, and pages within the narrowed set', async () => {
+    const { late } = await seedStates()
+
+    const result = await listContracts(locationId, { status: 'overdue' })
+
+    expect(result.contracts.map((contract) => contract.id)).toEqual([late.id])
+    // `total` drives pagination, so it has to follow the filter rather than
+    // the whole dataset — otherwise a filtered list offers pages that are
+    // empty when you reach them.
+    expect(result.total).toBe(1)
+    expect(result.counts.all).toBe(3)
+  })
+
+  it('treats a contract with nothing reserved or out as no longer active', async () => {
+    const { done } = await seedStates()
+
+    const active = await listContracts(locationId, { status: 'active' })
+    expect(active.contracts.map((contract) => contract.id)).not.toContain(done.id)
+  })
+
+  it('leaves a cancelled contract out of active', async () => {
+    const contract = await createContract(baseInput())
+    await cancelContract(contract.id, locationId)
+
+    const result = await listContracts(locationId, { status: 'active' })
+    expect(result.contracts).toHaveLength(0)
+    expect(result.counts.active).toBe(0)
+  })
+
+  it('CRITICAL: leaves a cancelled contract out of unsigned too', async () => {
+    const contract = await createContract(baseInput())
+    expect(contract.signatureStatus).toBe('unsigned')
+    await cancelContract(contract.id, locationId)
+
+    // "Sem assinatura" is a worklist. A contract cancelled before anyone
+    // signed it can never be signed now, so leaving it in means the chip
+    // counts an action nobody will ever take — forever.
+    const result = await listContracts(locationId, { status: 'unsigned' })
+    expect(result.contracts).toHaveLength(0)
+    expect(result.counts.unsigned).toBe(0)
+  })
+
+  it('counts a piece due today as overdue and one due tomorrow as not', async () => {
+    // The boundary the desktop's own badge draws: `asOf` comes from the
+    // caller precisely so these two answers cannot drift apart.
+    const asOf = new Date()
+    const dueToday = new Date(Date.UTC(asOf.getUTCFullYear(), asOf.getUTCMonth(), asOf.getUTCDate()))
+    const dueTomorrow = new Date(dueToday.getTime() + DAY)
+
+    const first = await createContract(baseInput())
+    await prisma.allocation.updateMany({
+      where: { contractId: first.id },
+      data: { status: 'checked_out', dueDate: dueToday },
+    })
+    const second = await createContract(
+      baseInput({
+        items: [
+          { productId: secondProductId, checkoutDate: new Date('2026-01-02'), dueDate: new Date('2026-01-05'), priceCharged: 100 },
+        ],
+      }),
+    )
+    await prisma.allocation.updateMany({
+      where: { contractId: second.id },
+      data: { status: 'checked_out', dueDate: dueTomorrow },
+    })
+
+    const result = await listContracts(locationId, { status: 'overdue', asOf: new Date(dueToday.getTime() + 1) })
+
+    expect(result.contracts.map((contract) => contract.id)).toEqual([first.id])
+  })
+
+  it('measures the counts against the search, not against the chip', async () => {
+    await seedStates()
+    const otherClient = await prisma.client.create({
+      data: { locationId, name: 'Cliente Sem Contrato', phone: '2', email: 'x@example.com' },
+    })
+
+    const result = await listContracts(locationId, { search: otherClient.name })
+
+    expect(result.counts).toEqual({ all: 0, active: 0, overdue: 0, unsigned: 0 })
   })
 })

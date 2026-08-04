@@ -1,5 +1,5 @@
 import { Button } from './button.tsx'
-import { Modal } from './modal.tsx'
+import { Dialog, DialogContent, DialogTitle } from './dialog.tsx'
 
 export function ConfirmDialog({
   open,
@@ -23,16 +23,19 @@ export function ConfirmDialog({
   confirmDisabled?: boolean
 }) {
   return (
-    <Modal open={open} onClose={onCancel} title={title}>
-      <p className="mb-4 text-sm text-foreground">{message}</p>
-      <div className="flex justify-end gap-2">
-        <Button type="button" variant="secondary" onClick={onCancel}>
-          {cancelLabel}
-        </Button>
-        <Button type="button" variant={confirmVariant} onClick={onConfirm} disabled={confirmDisabled}>
-          {confirmLabel}
-        </Button>
-      </div>
-    </Modal>
+    <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onCancel()}>
+      <DialogContent showCloseButton={false} className="max-w-sm gap-0 p-5">
+        <DialogTitle className="mb-3 text-heading">{title}</DialogTitle>
+        <p className="mb-4 text-sm text-foreground">{message}</p>
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="secondary" onClick={onCancel}>
+            {cancelLabel}
+          </Button>
+          <Button type="button" variant={confirmVariant} onClick={onConfirm} disabled={confirmDisabled}>
+            {confirmLabel}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
