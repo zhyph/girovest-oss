@@ -353,6 +353,19 @@ describe.sequential('listLeavingMaintenance', () => {
     expect(result.items).toEqual([{ id: almostReady, name: 'Quase pronto', availableOn: '2026-08-12' }])
   })
 
+  it('still lists a piece whose cleaning window closes exactly today', async () => {
+    // Ten-day window, back on Jul 31 (UTC midnight): window Aug 1–10, so it
+    // closes on ASOF's own day and the piece is free tomorrow. The row is only
+    // loaded if the query's cut-off is a whole UTC day — cutting at
+    // `ASOF - 10 * 24h` lands at Jul 31 12:00 and drops this return.
+    await prisma.location.update({ where: { id: locationId }, data: { maintenanceBufferDays: 10 } })
+    const closingToday = await returnedProduct(locationId, 'Fecha hoje', '2026-07-31')
+
+    const result = await listLeavingMaintenance(locationId, 2, ASOF)
+
+    expect(result.items).toEqual([{ id: closingToday, name: 'Fecha hoje', availableOn: '2026-08-11' }])
+  })
+
   it('returns nothing when the shop configured no cleaning window at all', async () => {
     // maintenanceBufferDays defaults to 0 on the fixture location.
     await returnedProduct(locationId, 'Voltou ontem', '2026-08-09')
