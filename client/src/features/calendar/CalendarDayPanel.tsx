@@ -2,23 +2,14 @@ import { useTranslation } from 'react-i18next'
 import { formatDate } from '../../lib/date.ts'
 import { useLocale } from '../../lib/LocaleContext.tsx'
 import { CalendarDayItemsList } from './CalendarDayItemsList.tsx'
-import type { Allocation } from '../allocations/allocationSchemas.ts'
+import { TONE_TEXT, type CalendarEntry, type CalendarTone } from './calendarEntries.ts'
 import type { Product } from '../products/productSchemas.ts'
 
 export type DaySection = {
   key: string
   label: string
-  tone: 'ok' | 'due' | 'danger'
-  dateField: 'checkoutDate' | 'dueDate'
-  allocations: Allocation[]
-}
-
-// One state, one colour — the same three the chips and the day cells use,
-// so a piece that reads as "voltando" in the grid reads as "voltando" here.
-const TONE_CLASS: Record<DaySection['tone'], string> = {
-  ok: 'text-success-foreground',
-  due: 'text-warning-foreground',
-  danger: 'text-destructive-subtle-foreground',
+  tone: CalendarTone
+  entries: CalendarEntry[]
 }
 
 /**
@@ -49,8 +40,8 @@ export function CalendarDayPanel({
     )
   }
 
-  const populated = sections.filter((section) => section.allocations.length > 0)
-  const total = populated.reduce((sum, section) => sum + section.allocations.length, 0)
+  const populated = sections.filter((section) => section.entries.length > 0)
+  const total = populated.reduce((sum, section) => sum + section.entries.length, 0)
 
   return (
     <div className="flex flex-col">
@@ -66,15 +57,10 @@ export function CalendarDayPanel({
       {populated.map((section) => (
         <div key={section.key} className="flex flex-col gap-2.5 border-b border-border px-5 py-4">
           <div className="flex items-baseline justify-between gap-3">
-            <span className={`text-label uppercase ${TONE_CLASS[section.tone]}`}>{section.label}</span>
-            <span className="tabular text-xs text-foreground-subtle">{section.allocations.length}</span>
+            <span className={`text-label uppercase ${TONE_TEXT[section.tone]}`}>{section.label}</span>
+            <span className="tabular text-xs text-foreground-subtle">{section.entries.length}</span>
           </div>
-          <CalendarDayItemsList
-            allocations={section.allocations}
-            products={products}
-            clientNames={clientNames}
-            dateField={section.dateField}
-          />
+          <CalendarDayItemsList entries={section.entries} products={products} clientNames={clientNames} />
         </div>
       ))}
     </div>

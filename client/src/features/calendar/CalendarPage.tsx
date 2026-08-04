@@ -2,12 +2,23 @@ import { lazy, Suspense, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { RouteFallback } from '../../components/RouteFallback.tsx'
+import { FilterChip } from '../../components/ui/toolbar.tsx'
 import { cn } from '../../lib/cn.ts'
-import { formatDate, parseDateOnly } from '../../lib/date.ts'
+import { formatDate } from '../../lib/date.ts'
 import { useLocale } from '../../lib/LocaleContext.tsx'
 import { useProducts } from '../products/useProducts.ts'
 import { useClients } from '../clients/useClients.ts'
-import { useCalendarTab, type CalendarTab } from './useCalendar.ts'
+import { useCalendarTab } from './useCalendar.ts'
+import {
+  buildEntries,
+  dayKey,
+  FILTER_LABEL_KEY,
+  FILTER_ORDER,
+  KIND_ORDER,
+  KIND_TONE,
+  type AllocationsByKind,
+  type CalendarFilter,
+} from './calendarEntries.ts'
 import { AgendaView } from './AgendaView.tsx'
 import { CalendarDayPanel, type DaySection } from './CalendarDayPanel.tsx'
 
@@ -26,26 +37,6 @@ const monthViewImport = import('./MonthView.tsx')
 monthViewImport.catch(() => {})
 const MonthView = lazy(() => monthViewImport.then((m) => ({ default: m.MonthView })))
 
-const tabDateField: Record<CalendarTab, 'checkoutDate' | 'dueDate'> = {
-  'going-out': 'checkoutDate',
-  'due-back': 'dueDate',
-  overdue: 'dueDate',
-}
-
-const TAB_TONE: Record<CalendarTab, DaySection['tone']> = {
-  'going-out': 'due',
-  'due-back': 'ok',
-  overdue: 'danger',
-}
-
-const TABS: CalendarTab[] = ['going-out', 'due-back', 'overdue']
-
-const TAB_LABEL_KEY: Record<CalendarTab, string> = {
-  'going-out': 'tabs.goingOut',
-  'due-back': 'tabs.dueBack',
-  overdue: 'tabs.overdue',
-}
-
 function monthRange(anchor: Date) {
   const from = new Date(anchor.getFullYear(), anchor.getMonth(), 1)
   const to = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0, 23, 59, 59)
@@ -56,16 +47,13 @@ function addMonths(anchor: Date, delta: number) {
   return new Date(anchor.getFullYear(), anchor.getMonth() + delta, 1)
 }
 
-function isSameDay(a: Date, b: Date) {
-  return (
-    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
-  )
-}
-
 export function CalendarPage() {
   const { t } = useTranslation('calendarScreen')
   const { locale } = useLocale()
-  const [tab, setTab] = useState<CalendarTab>('going-out')
+  // "Tudo" first, and selected on arrival: the shop opens this screen to see
+  // the day, not one direction of it. Narrowing to Saindo or Voltando is the
+  // deliberate act, not the starting point.
+  const [filter, setFilter] = useState<CalendarFilter>('all')
   const [view, setView] = useState<'agenda' | 'grid'>('grid')
   const [anchor, setAnchor] = useState(new Date())
   const [selectedDay, setSelectedDay] = useState<Date | null>(null)
@@ -80,20 +68,34 @@ export function CalendarPage() {
   const goingOut = useCalendarTab('going-out', from, to)
   const dueBack = useCalendarTab('due-back', from, to)
   const overdue = useCalendarTab('overdue', from, to)
-  const byTab: Record<CalendarTab, ReturnType<typeof useCalendarTab>> = {
-    'going-out': goingOut,
-    'due-back': dueBack,
-    overdue,
+
+  const byKind: AllocationsByKind = useMemo(
+    () => ({
+      'going-out': goingOut.data ?? [],
+      'due-back': dueBack.data ?? [],
+      overdue: overdue.data ?? [],
+    }),
+    [goingOut.data, dueBack.data, overdue.data],
+  )
+
+  const allEntries = useMemo(() => buildEntries(byKind, 'all'), [byKind])
+  const entries = useMemo(
+    () => (filter === 'all' ? allEntries : buildEntries(byKind, filter)),
+    [allEntries, byKind, filter],
+  )
+
+  // Each chip counts exactly what selecting it would show, "Tudo" included —
+  // so its number is the deduplicated union, not the sum of the other three.
+  const counts: Record<CalendarFilter, number> = {
+    all: allEntries.length,
+    'going-out': byKind['going-out'].length,
+    'due-back': byKind['due-back'].length,
+    overdue: byKind.overdue.length,
   }
-  const allocations = byTab[tab].data ?? []
 
   const { data: products } = useProducts()
   const { data: clients } = useClients()
 
-  const productNames = useMemo(
-    () => new Map((products ?? []).map((product) => [product.id, product.name])),
-    [products],
-  )
   const productsById = useMemo(
     () => new Map((products ?? []).map((product) => [product.id, product])),
     [products],
@@ -103,23 +105,20 @@ export function CalendarPage() {
     [clients],
   )
 
+  // Built from the full union rather than from the active chip: the panel's
+  // job is to say what goes out *and* what comes back on the chosen day,
+  // which is the question the shop actually asks, and narrowing the grid to
+  // one direction does not narrow that question.
   const daySections: DaySection[] = useMemo(() => {
     if (!selectedDay) return []
-    return TABS.map((key) => {
-      const dateField = tabDateField[key]
-      return {
-        key,
-        label: t(TAB_LABEL_KEY[key]),
-        tone: TAB_TONE[key],
-        dateField,
-        allocations: (byTab[key].data ?? []).filter((allocation) =>
-          isSameDay(parseDateOnly(allocation[dateField]), selectedDay),
-        ),
-      }
-    })
-    // byTab is rebuilt every render; the query data it wraps is what matters.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDay, goingOut.data, dueBack.data, overdue.data, t])
+    const key = dayKey(selectedDay)
+    return KIND_ORDER.map((kind) => ({
+      key: kind,
+      label: t(FILTER_LABEL_KEY[kind]),
+      tone: KIND_TONE[kind],
+      entries: allEntries.filter((entry) => entry.kind === kind && dayKey(entry.date) === key),
+    }))
+  }, [selectedDay, allEntries, t])
 
   const monthLabel = formatDate(anchor, locale, { month: 'long', year: 'numeric' })
 
@@ -179,26 +178,16 @@ export function CalendarPage() {
         <div className="mx-0.5 h-5.5 w-px bg-border" />
 
         <div className="flex items-center gap-1.5">
-          {TABS.map((key) => {
-            const active = tab === key
-            const count = byTab[key].data?.length ?? 0
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setTab(key)}
-                aria-pressed={active}
-                className={cn(
-                  'h-7 rounded-full border px-3 text-meta font-medium',
-                  active
-                    ? 'border-primary bg-primary text-primary-foreground'
-                    : 'border-border-strong bg-transparent text-muted-foreground hover:bg-surface-sunken hover:text-foreground',
-                )}
-              >
-                {t(TAB_LABEL_KEY[key])} <span className="tabular opacity-60">{count}</span>
-              </button>
-            )
-          })}
+          {FILTER_ORDER.map((key) => (
+            <FilterChip
+              key={key}
+              active={filter === key}
+              onClick={() => setFilter(key)}
+              count={counts[key]}
+            >
+              {t(FILTER_LABEL_KEY[key])}
+            </FilterChip>
+          ))}
         </div>
 
         <div className="ml-auto flex rounded-control border border-border-strong bg-surface-sunken p-0.5">
@@ -222,20 +211,12 @@ export function CalendarPage() {
       <div className="flex min-h-0 flex-1 border-t border-border-strong">
         <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
           {view === 'agenda' ? (
-            <AgendaView
-              allocations={allocations}
-              dateField={tabDateField[tab]}
-              products={productsById}
-              clientNames={clientNames}
-            />
+            <AgendaView entries={entries} products={productsById} clientNames={clientNames} />
           ) : (
             <Suspense fallback={<RouteFallback />}>
               <MonthView
-                allocations={allocations}
-                dateField={tabDateField[tab]}
-                productNames={productNames}
+                entries={entries}
                 products={productsById}
-                clientNames={clientNames}
                 date={anchor}
                 selectedDay={selectedDay}
                 onNavigate={setAnchor}

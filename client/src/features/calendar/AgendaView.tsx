@@ -1,7 +1,6 @@
 import { useTranslation } from 'react-i18next'
-import { parseDateOnly } from '../../lib/date.ts'
 import { CalendarDayItemsList } from './CalendarDayItemsList.tsx'
-import type { Allocation } from '../allocations/allocationSchemas.ts'
+import type { CalendarEntry } from './calendarEntries.ts'
 import type { Product } from '../products/productSchemas.ts'
 
 type Group = 'overdue' | 'today' | 'tomorrow' | 'thisWeek' | 'later'
@@ -24,32 +23,33 @@ function groupFor(date: Date, today: Date): Group {
 }
 
 export function AgendaView({
-  allocations,
-  dateField,
+  entries,
   products,
   clientNames,
 }: {
-  allocations: Allocation[]
-  dateField: 'checkoutDate' | 'dueDate'
+  entries: CalendarEntry[]
   products: Map<string, Product>
   clientNames: Map<string, string>
 }) {
   const { t } = useTranslation('calendarScreen')
 
-  if (allocations.length === 0) {
+  if (entries.length === 0) {
     return <p className="text-muted-foreground">{t('empty')}</p>
   }
 
-  const sorted = [...allocations].sort(
-    (a, b) => parseDateOnly(a[dateField]).getTime() - parseDateOnly(b[dateField]).getTime(),
-  )
+  const sorted = [...entries].sort((a, b) => a.date.getTime() - b.date.getTime())
+
+  // Decided once for the whole view, not per group: a group that happens to
+  // hold only pieces going out would otherwise drop the tag while the group
+  // below it kept it, and the reader would take the difference for meaning.
+  const showKind = new Set(entries.map((entry) => entry.kind)).size > 1
 
   const today = new Date()
-  const grouped = new Map<Group, Allocation[]>()
-  for (const allocation of sorted) {
-    const group = groupFor(parseDateOnly(allocation[dateField]), today)
+  const grouped = new Map<Group, CalendarEntry[]>()
+  for (const entry of sorted) {
+    const group = groupFor(entry.date, today)
     const bucket = grouped.get(group) ?? []
-    bucket.push(allocation)
+    bucket.push(entry)
     grouped.set(group, bucket)
   }
 
@@ -59,10 +59,10 @@ export function AgendaView({
         <div key={group} className="flex flex-col gap-2">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t(`groups.${group}`)}</h2>
           <CalendarDayItemsList
-            allocations={grouped.get(group)!}
+            entries={grouped.get(group)!}
             products={products}
             clientNames={clientNames}
-            dateField={dateField}
+            showKind={showKind}
           />
         </div>
       ))}

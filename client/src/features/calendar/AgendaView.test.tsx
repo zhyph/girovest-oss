@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import '../../i18n.ts'
 import { AgendaView } from './AgendaView.tsx'
+import { buildEntries, type CalendarEntry } from './calendarEntries.ts'
 import type { Allocation } from '../allocations/allocationSchemas.ts'
 import type { Product } from '../products/productSchemas.ts'
 
@@ -42,20 +43,25 @@ function makeProduct(overrides: Partial<Product> = {}): Product {
   }
 }
 
+// The view groups by each entry's own date, so a fixture is a set of
+// entries rather than an array plus one shared date field.
+function outEntries(...allocations: Allocation[]): CalendarEntry[] {
+  return buildEntries({ 'going-out': allocations, 'due-back': [], overdue: [] }, 'going-out')
+}
+
 const products = new Map([['p1', makeProduct()]])
 const clientNames = new Map([['c1', 'Maria Silva']])
 
 describe('AgendaView', () => {
   it('shows the empty message when there are no allocations', () => {
-    render(<AgendaView allocations={[]} dateField="checkoutDate" products={products} clientNames={clientNames} />)
+    render(<AgendaView entries={[]} products={products} clientNames={clientNames} />)
     expect(screen.getByText('Nada para mostrar neste período.')).toBeInTheDocument()
   })
 
   it('shows the client name alongside the product name', () => {
     render(
       <AgendaView
-        allocations={[makeAllocation({ checkoutDate: isoDateDaysFromNow(0) })]}
-        dateField="checkoutDate"
+        entries={outEntries(makeAllocation({ checkoutDate: isoDateDaysFromNow(0) }))}
         products={products}
         clientNames={clientNames}
       />,
@@ -67,14 +73,13 @@ describe('AgendaView', () => {
   it('groups allocations into Hoje/Amanhã/Esta semana/Mais tarde/Atrasado', () => {
     render(
       <AgendaView
-        allocations={[
+        entries={outEntries(
           makeAllocation({ id: 'overdue', checkoutDate: isoDateDaysFromNow(-3) }),
           makeAllocation({ id: 'today', checkoutDate: isoDateDaysFromNow(0) }),
           makeAllocation({ id: 'tomorrow', checkoutDate: isoDateDaysFromNow(1) }),
           makeAllocation({ id: 'this-week', checkoutDate: isoDateDaysFromNow(4) }),
           makeAllocation({ id: 'later', checkoutDate: isoDateDaysFromNow(20) }),
-        ]}
-        dateField="checkoutDate"
+        )}
         products={products}
         clientNames={clientNames}
       />,
@@ -90,8 +95,7 @@ describe('AgendaView', () => {
   it('omits group headers that have no allocations', () => {
     render(
       <AgendaView
-        allocations={[makeAllocation({ checkoutDate: isoDateDaysFromNow(0) })]}
-        dateField="checkoutDate"
+        entries={outEntries(makeAllocation({ checkoutDate: isoDateDaysFromNow(0) }))}
         products={products}
         clientNames={clientNames}
       />,
@@ -107,7 +111,29 @@ describe('AgendaView', () => {
     const allocations = Array.from({ length: 25 }, (_, i) =>
       makeAllocation({ id: `a${i}`, checkoutDate: isoDateDaysFromNow(0) }),
     )
-    render(<AgendaView allocations={allocations} dateField="checkoutDate" products={products} clientNames={clientNames} />)
+    render(<AgendaView entries={outEntries(...allocations)} products={products} clientNames={clientNames} />)
     expect(screen.getByText('1 / 2')).toBeInTheDocument()
+  })
+
+  it('tags each row with its state once the list mixes states, and leaves the tag off when it does not', () => {
+    const goingOut = makeAllocation({ id: 'out', checkoutDate: isoDateDaysFromNow(0) })
+    const dueBack = makeAllocation({ id: 'back', dueDate: isoDateDaysFromNow(0) })
+
+    const { rerender } = render(
+      <AgendaView entries={outEntries(goingOut)} products={products} clientNames={clientNames} />,
+    )
+    // One state in the list: the tag would say the same thing on every row.
+    expect(screen.queryByText('Saindo')).not.toBeInTheDocument()
+
+    rerender(
+      <AgendaView
+        entries={buildEntries({ 'going-out': [goingOut], 'due-back': [dueBack], overdue: [] }, 'all')}
+        products={products}
+        clientNames={clientNames}
+      />,
+    )
+    // Under "Tudo" the rows are otherwise indistinguishable from each other.
+    expect(screen.getByText('Saindo')).toBeInTheDocument()
+    expect(screen.getByText('Voltando')).toBeInTheDocument()
   })
 })

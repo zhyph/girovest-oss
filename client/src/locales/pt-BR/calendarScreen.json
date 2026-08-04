@@ -1,9 +1,19 @@
 {
   "title": "Calendário",
   "tabs": {
+    "all": "Tudo",
     "goingOut": "Saindo",
     "dueBack": "Voltando",
     "overdue": "Atrasados"
+  },
+  "dayCell": {
+    "goingOut_one": "• {{count}} saindo",
+    "goingOut_other": "• {{count}} saindo",
+    "dueBack_one": "• {{count}} voltando",
+    "dueBack_other": "• {{count}} voltando",
+    "overdue_one": "• {{count}} atrasado",
+    "overdue_other": "• {{count}} atrasados",
+    "more": "+{{hidden}}"
   },
   "viewMonth": "Ver mês",
   "viewAgenda": "Ver agenda",
@@ -24,8 +34,7 @@
     "today": "Hoje",
     "previous": "Anterior",
     "next": "Próximo",
-    "month": "Mês",
-    "showMore": "+{{count}} mais"
+    "month": "Mês"
   },
   "controls": {
     "previousMonth": "Mês anterior",
