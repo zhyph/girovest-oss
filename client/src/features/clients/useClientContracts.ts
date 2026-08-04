@@ -21,14 +21,18 @@ const FIRST_PASS_PAGE_SIZE = 200
  * first window the two calls resolve to the same query key and cost one
  * request, not two.
  */
-export function useAllContracts(): Contract[] {
+export function useAllContracts(): { contracts: Contract[]; isPending: boolean } {
   const firstPass = useContractsList({ page: 1, pageSize: FIRST_PASS_PAGE_SIZE })
   const total = firstPass.data?.total ?? 0
   const fullPass = useContractsList({
     page: 1,
     pageSize: total > FIRST_PASS_PAGE_SIZE ? total : FIRST_PASS_PAGE_SIZE,
   })
-  return fullPass.data?.contracts ?? []
+  // isPending, not isLoading: isLoading is false during a background refetch
+  // (e.g. after a contract is created elsewhere), which would flip callers
+  // back to a "not known yet" state on every refetch instead of only the
+  // first load.
+  return { contracts: fullPass.data?.contracts ?? [], isPending: fullPass.isPending }
 }
 
 export type ClientRentalSummary = {

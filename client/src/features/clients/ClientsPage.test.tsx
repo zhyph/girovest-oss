@@ -34,6 +34,7 @@ function renderWithQueryClient(ui: React.ReactElement) {
 function mockContracts(contracts: Contract[]) {
   vi.spyOn(useContractsModule, 'useContractsList').mockReturnValue({
     data: { contracts, total: contracts.length, page: 1, pageSize: 200 },
+    isPending: false,
   } as never)
 }
 
@@ -243,7 +244,7 @@ describe('ClientsPage', () => {
     // since the two are separate queries. Both facts in this row come from
     // the contracts one, so neither can be stated yet. Same guard
     // ClientDetailPanel already applies to its own contract count.
-    vi.spyOn(useContractsModule, 'useContractsList').mockReturnValue({ data: undefined } as never)
+    vi.spyOn(useContractsModule, 'useContractsList').mockReturnValue({ data: undefined, isPending: true } as never)
 
     renderWithQueryClient(<ClientsPage />)
 

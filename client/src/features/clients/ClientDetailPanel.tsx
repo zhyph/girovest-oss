@@ -25,6 +25,7 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 export function ClientDetailPanel({
   client,
   contracts,
+  contractsLoading,
   onEdit,
   onDelete,
   onNewContract,
@@ -32,6 +33,13 @@ export function ClientDetailPanel({
   client: Client | null
   /** Every contract of the location; this panel keeps only the client's own. */
   contracts: Contract[]
+  /**
+   * Whether `contracts` reflects an in-flight query rather than the location's
+   * actual (possibly genuinely empty) contract history. `contracts.length ===
+   * 0` cannot answer that on its own — a freshly-installed shop with truly no
+   * contracts anywhere would read as "still loading" forever.
+   */
+  contractsLoading: boolean
   onEdit: (client: Client) => void
   onDelete?: (client: Client) => void
   onNewContract?: (client: Client) => void
@@ -88,12 +96,14 @@ export function ClientDetailPanel({
           <span className="text-heading">{client.name}</span>
           <span className="text-meta text-muted-foreground">
             {/*
-              Falls back to the bare "Cliente desde" while no contract has
-              arrived at all, which is both the loading state and a shop with
-              no contracts yet. Printing "0 contratos" against an in-flight
-              query would be a claim the panel cannot yet stand behind.
+              Falls back to the bare "Cliente desde" while the contracts query
+              is in flight — gated on contractsLoading, not on contracts being
+              empty, so a shop with genuinely zero contracts anywhere still
+              resolves to "0 contratos" instead of looking permanently stuck
+              loading. Printing "0 contratos" against an in-flight query would
+              be a claim the panel cannot yet stand behind.
             */}
-            {contracts.length === 0
+            {contractsLoading
               ? t('detail.since', {
                   date: formatDate(parseDateOnly(client.createdAt), locale, { month: 'long', year: 'numeric' }),
                 })
@@ -158,7 +168,11 @@ export function ClientDetailPanel({
           )}
         </div>
         {history.length === 0 ? (
-          <p className="text-meta text-muted-foreground">{t('detail.noHistory')}</p>
+          // Same distinction as the "since" line above: while the query is
+          // still in flight, an empty `history` says nothing about whether
+          // this client has rentals — render nothing rather than a "never
+          // rented" claim the panel cannot yet back up.
+          contractsLoading ? null : <p className="text-meta text-muted-foreground">{t('detail.noHistory')}</p>
         ) : (
           <div className="overflow-hidden rounded-panel border border-border">
             {history.map((entry) => {
