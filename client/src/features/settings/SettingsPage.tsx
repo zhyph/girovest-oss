@@ -78,12 +78,14 @@ export function SettingsPage() {
   const [section, setSection] = useState<SettingsSection>('shop')
   const { handleSubmit, control, register, reset, formState } = useForm<LocationSettingsFormValues>({
     resolver: zodResolver(locationSettingsSchema),
-    defaultValues: { phone: '', maintenanceBufferDays: 0, connectivityMode: 'lan', clauses: [] },
+    defaultValues: { name: '', address: '', phone: '', maintenanceBufferDays: 0, connectivityMode: 'lan', clauses: [] },
   })
 
   useEffect(() => {
     if (settings) {
       reset({
+        name: settings.name,
+        address: settings.address,
         phone: settings.phone ?? '',
         maintenanceBufferDays: settings.maintenanceBufferDays,
         connectivityMode: settings.connectivityMode,
@@ -164,6 +166,33 @@ export function SettingsPage() {
         </SectionPanel>
 
         <SectionPanel active={section === 'shop'}>
+          {/*
+            Set once by the setup wizard and never editable since — but both
+            print on the contract header, and the name is also the brand line
+            in the nav rail and the window title, so a shop that moved or
+            renamed itself had no way to correct either.
+          */}
+          <label className="flex max-w-sm flex-col gap-1 text-sm">
+            {t('fields.name')}
+            <Input
+              aria-label={t('fields.name')}
+              aria-describedby="shop-identity-help"
+              aria-invalid={formState.errors.name ? true : undefined}
+              {...register('name')}
+            />
+          </label>
+          <label className="flex max-w-sm flex-col gap-1 text-sm">
+            {t('fields.address')}
+            <Input
+              aria-label={t('fields.address')}
+              aria-describedby="shop-identity-help"
+              aria-invalid={formState.errors.address ? true : undefined}
+              {...register('address')}
+            />
+            <span id="shop-identity-help" className="text-xs text-muted-foreground">
+              {t('shopIdentityHelp')}
+            </span>
+          </label>
           <label className="flex max-w-xs flex-col gap-1 text-sm">
             {t('fields.phone')}
             <Controller

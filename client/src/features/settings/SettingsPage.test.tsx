@@ -13,6 +13,7 @@ import type { LocationSettings } from './settingsSchemas.ts'
 const settings: LocationSettings = {
   id: 'loc1',
   name: 'Priscila Moda Festa',
+  address: 'Rua das Flores, 120',
   maintenanceBufferDays: 0,
   phone: '11987654321',
   connectivityMode: 'lan',
@@ -80,9 +81,11 @@ describe('SettingsPage', () => {
     expect(screen.getByRole('button', { name: 'Sistema' })).toHaveAttribute('aria-pressed', 'false')
   })
 
-  it('shows the current phone and clause rows', () => {
+  it('shows the current shop identity, phone and clause rows', () => {
     mockSettingsHooks()
     renderWithToast(<SettingsPage />)
+    expect(screen.getByLabelText('Nome da loja')).toHaveValue('Priscila Moda Festa')
+    expect(screen.getByLabelText('Endereço')).toHaveValue('Rua das Flores, 120')
     expect(screen.getByLabelText('Telefone')).toHaveValue('(11) 98765-4321')
     expect(screen.getByDisplayValue('Primeira cláusula')).toBeInTheDocument()
     expect(screen.getByDisplayValue('Segunda cláusula')).toBeInTheDocument()
@@ -123,6 +126,8 @@ describe('SettingsPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
 
     expect(updateImpl).toHaveBeenCalledWith({
+      name: 'Priscila Moda Festa',
+      address: 'Rua das Flores, 120',
       phone: '11987654321',
       maintenanceBufferDays: 0,
       connectivityMode: 'lan',
@@ -141,6 +146,38 @@ describe('SettingsPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
 
     expect(updateImpl).toHaveBeenCalledWith(expect.objectContaining({ connectivityMode: 'relay' }))
+  })
+
+  it('saves an edited shop name and address', async () => {
+    const updateImpl = vi.fn().mockResolvedValue(settings)
+    mockSettingsHooks(updateImpl)
+    renderWithToast(<SettingsPage />)
+
+    const nameField = screen.getByLabelText('Nome da loja')
+    await userEvent.clear(nameField)
+    await userEvent.type(nameField, 'Priscila Alta Costura')
+    const addressField = screen.getByLabelText('Endereço')
+    await userEvent.clear(addressField)
+    await userEvent.type(addressField, 'Avenida Central, 4000')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+
+    expect(updateImpl).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Priscila Alta Costura', address: 'Avenida Central, 4000' }),
+    )
+  })
+
+  it('refuses to save an empty shop name', async () => {
+    const updateImpl = vi.fn().mockResolvedValue(settings)
+    mockSettingsHooks(updateImpl)
+    renderWithToast(<SettingsPage />)
+
+    await userEvent.clear(screen.getByLabelText('Nome da loja'))
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+
+    // A blank name would leave the nav rail and every printed contract
+    // header with nothing in it.
+    expect(updateImpl).not.toHaveBeenCalled()
   })
 })
 

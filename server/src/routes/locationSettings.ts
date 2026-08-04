@@ -16,6 +16,11 @@ locationSettingsRouter.get('/', async (req, res) => {
 const clauseSchema = z.object({ text: z.string().min(1) })
 
 const updateSchema = z.object({
+  // Both print on the contract header and name the app itself, so neither may
+  // be blanked out — an empty shop name would leave the nav rail and every
+  // printed contract with a blank where the shop's identity goes.
+  name: z.string().trim().min(1).max(200).optional(),
+  address: z.string().trim().min(1).max(300).optional(),
   phone: z.string().nullable().optional(),
   clauses: z.array(clauseSchema).optional(),
   // Capped because this silently blocks days on every piece in the shop —

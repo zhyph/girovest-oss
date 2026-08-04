@@ -9,6 +9,8 @@
     }
   },
   "fields": {
+    "name": "Nome da loja",
+    "address": "Endereço",
     "phone": "Telefone",
     "maintenanceBufferDays": "Dias de higienização entre aluguéis"
   },
@@ -33,6 +35,7 @@
     "copied": "Identificador copiado."
   },
   "maintenanceBufferHelp": "Dias em que a peça fica indisponível depois de voltar, para limpeza e reparos, antes de sair para o próximo cliente. Use 0 para liberar já no dia seguinte à devolução.",
+  "shopIdentityHelp": "Nome e endereço aparecem no cabeçalho do contrato impresso e o nome também identifica a loja no menu lateral e no título da janela.",
   "tours": {
     "title": "Tours guiados",
     "help": "Reveja as explicações passo a passo de cada tela sempre que precisar se lembrar de como algo funciona.",
@@ -73,7 +76,7 @@
   },
   "sections": {
     "shop": "Loja",
-    "shopHint": "Contato e higienização",
+    "shopHint": "Identificação, contato e higienização",
     "contract": "Contrato",
     "contractHint": "{{count}} cláusulas",
     "backup": "Backup",

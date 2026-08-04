@@ -7,6 +7,10 @@ export interface ClauseInput {
 }
 
 export interface UpdateLocationSettingsInput {
+  /** The shop's own name — prints as the contract header and titles the app. */
+  name?: string
+  /** The shop's street address, printed under the name on the contract. */
+  address?: string
   phone?: string | null
   clauses?: ClauseInput[]
   maintenanceBufferDays?: number
@@ -22,6 +26,7 @@ export interface ClauseDTO {
 export interface LocationSettingsDTO {
   id: string
   name: string
+  address: string
   phone: string | null
   maintenanceBufferDays: number
   connectivityMode: 'lan' | 'relay'
@@ -31,6 +36,7 @@ export interface LocationSettingsDTO {
 function toDTO(location: {
   id: string
   name: string
+  address: string
   phone: string | null
   maintenanceBufferDays: number
   connectivityMode: string
@@ -39,6 +45,7 @@ function toDTO(location: {
   return {
     id: location.id,
     name: location.name,
+    address: location.address,
     phone: location.phone,
     maintenanceBufferDays: location.maintenanceBufferDays,
     connectivityMode: location.connectivityMode === 'relay' ? 'relay' : 'lan',
@@ -65,6 +72,8 @@ export async function updateLocationSettings(
 
   await prisma.$transaction(async (tx) => {
     if (
+      data.name !== undefined ||
+      data.address !== undefined ||
       data.phone !== undefined ||
       data.maintenanceBufferDays !== undefined ||
       data.connectivityMode !== undefined
@@ -72,6 +81,8 @@ export async function updateLocationSettings(
       await tx.location.update({
         where: { id: locationId },
         data: {
+          ...(data.name !== undefined ? { name: data.name } : {}),
+          ...(data.address !== undefined ? { address: data.address } : {}),
           ...(data.phone !== undefined ? { phone: data.phone } : {}),
           ...(data.maintenanceBufferDays !== undefined
             ? { maintenanceBufferDays: data.maintenanceBufferDays }

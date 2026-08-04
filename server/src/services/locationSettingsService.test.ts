@@ -90,3 +90,47 @@ describe('updateLocationSettings', () => {
     expect(updated.connectivityMode).toBe('relay')
   })
 })
+
+describe('editing the shop identity', () => {
+  it('reads back the name and address the setup wizard stored', async () => {
+    const location = await prisma.location.create({ data: { name: 'Ateliê Rosa', address: 'Rua A, 100' } })
+
+    const settings = await getLocationSettings(location.id)
+
+    expect(settings.name).toBe('Ateliê Rosa')
+    expect(settings.address).toBe('Rua A, 100')
+  })
+
+  it('updates the name and address without disturbing the other settings', async () => {
+    const location = await prisma.location.create({
+      data: {
+        name: 'Ateliê Rosa',
+        address: 'Rua A, 100',
+        phone: '11987654321',
+        maintenanceBufferDays: 3,
+        contractClauses: { create: [{ text: 'Only clause', sortOrder: 0 }] },
+      },
+    })
+
+    const settings = await updateLocationSettings(location.id, {
+      name: 'Ateliê Rosa & Cia',
+      address: 'Avenida B, 2000',
+    })
+
+    expect(settings.name).toBe('Ateliê Rosa & Cia')
+    expect(settings.address).toBe('Avenida B, 2000')
+    // The PATCH is partial: omitting a field must leave it alone, not blank it.
+    expect(settings.phone).toBe('11987654321')
+    expect(settings.maintenanceBufferDays).toBe(3)
+    expect(settings.clauses.map((clause) => clause.text)).toEqual(['Only clause'])
+  })
+
+  it('leaves the name and address untouched when the payload omits them', async () => {
+    const location = await prisma.location.create({ data: { name: 'Ateliê Rosa', address: 'Rua A, 100' } })
+
+    const settings = await updateLocationSettings(location.id, { phone: '11999999999' })
+
+    expect(settings.name).toBe('Ateliê Rosa')
+    expect(settings.address).toBe('Rua A, 100')
+  })
+})
