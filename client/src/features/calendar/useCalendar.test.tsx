@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import * as apiModule from '../../lib/api.ts'
+import { overdueAsOf } from '../../lib/date.ts'
 import { useCalendarTab } from './useCalendar.ts'
 
 function wrapper({ children }: { children: React.ReactNode }) {
@@ -40,6 +41,21 @@ describe('useCalendarTab', () => {
     expect(asOf.getFullYear()).toBe(today.getFullYear())
     expect(asOf.getMonth()).toBe(today.getMonth())
     expect(asOf.getDate()).toBe(today.getDate())
+  })
+
+  it('CRITICAL: asks with the same "now" Contratos does, not the end of today', async () => {
+    // Landing anywhere later in the day than this — the end of today, say —
+    // reaches past tomorrow's UTC-midnight due dates at UTC-3 and paints a
+    // piece due TOMORROW as atrasado. Contratos' list already gets this right;
+    // the two screens have to agree or the same contract reads differently
+    // depending on which screen you opened.
+    renderHook(() => useCalendarTab('overdue', MONTH_FROM, MONTH_TO), { wrapper })
+
+    await waitFor(() => expect(apiFetch).toHaveBeenCalled())
+    const url = apiFetch.mock.calls[0][0] as string
+    const asOf = decodeURIComponent(url.slice(url.indexOf('asOf=') + 'asOf='.length))
+
+    expect(asOf).toBe(overdueAsOf().toISOString())
   })
 
   it('keeps the going-out and due-back windows scoped to the visible month', async () => {

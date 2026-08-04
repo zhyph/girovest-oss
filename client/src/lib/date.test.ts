@@ -1,5 +1,36 @@
-import { describe, it, expect } from 'vitest'
-import { parseDateOnly, formatDate, isValidIsoDate } from './date.ts'
+import { describe, it, expect, afterEach } from 'vitest'
+import { parseDateOnly, formatDate, isValidIsoDate, overdueAsOf } from './date.ts'
+
+describe('overdueAsOf', () => {
+  const originalTz = process.env.TZ
+  afterEach(() => {
+    process.env.TZ = originalTz
+  })
+
+  /** What the server does with the value: `dueDate: { lt: asOf }`. */
+  function readsAsOverdue(dueDateIso: string): boolean {
+    return new Date(dueDateIso).getTime() < overdueAsOf().getTime()
+  }
+
+  it('CRITICAL: a piece due today is late, a piece due tomorrow is not', () => {
+    // Pinned to the locale this app ships in, so the assertion means the same
+    // thing on a UTC CI runner as it does on a shop machine.
+    process.env.TZ = 'America/Sao_Paulo'
+    // Due dates are date-only values the server stores at UTC midnight.
+    const today = new Date()
+    const utcMidnight = (dayOffset: number) =>
+      new Date(
+        Date.UTC(today.getFullYear(), today.getMonth(), today.getDate() + dayOffset),
+      ).toISOString()
+
+    expect(readsAsOverdue(utcMidnight(-1))).toBe(true)
+    expect(readsAsOverdue(utcMidnight(0))).toBe(true)
+    // End of today — the value the Calendário used to send — is tomorrow
+    // 02:59 UTC here, which swallows tomorrow's due dates and paints them red
+    // a day early.
+    expect(readsAsOverdue(utcMidnight(1))).toBe(false)
+  })
+})
 
 describe('parseDateOnly', () => {
   it('keeps the calendar day intact regardless of the UTC suffix', () => {

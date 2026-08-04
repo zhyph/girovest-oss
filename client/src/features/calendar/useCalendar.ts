@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api.ts'
-import { toIsoDateOnly } from '../../lib/date.ts'
+import { overdueAsOf, toIsoDateOnly } from '../../lib/date.ts'
 import type { Allocation } from '../allocations/allocationSchemas.ts'
 
 export type CalendarTab = 'going-out' | 'due-back' | 'overdue'
@@ -13,14 +13,11 @@ export type CalendarTab = 'going-out' | 'due-back' | 'overdue'
  * merely due later that month as overdue. It was survivable while Atrasados
  * was a tab you had to pick deliberately; once the grid started showing all
  * three sets together by default, it painted a dress due next Thursday red
- * on arrival. End of today, matching the Painel's own overdue tile, so the
- * two screens cannot disagree about what counts as late.
+ * on arrival. The replacement then used the END of today, which at UTC-3 is
+ * past tomorrow's UTC-midnight due dates and painted anything due TOMORROW
+ * red as well — so the shared `overdueAsOf` Contratos already uses is what
+ * both screens ask with now.
  */
-function overdueAsOf(): Date {
-  const endOfToday = new Date()
-  endOfToday.setHours(23, 59, 59, 999)
-  return endOfToday
-}
 
 export function useCalendarTab(tab: CalendarTab, from: Date, to: Date) {
   const fromIso = from.toISOString()

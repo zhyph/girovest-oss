@@ -1,5 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { apiFetch, BACKGROUND_REQUEST_INIT } from '../../lib/api.ts'
+import { overdueAsOf } from '../../lib/date.ts'
 import type { Contract, ContractDetail, NewContractFormValues, SigningTokenResponse } from './contractSchemas.ts'
 
 export const CONTRACTS_KEY = ['contracts']
@@ -22,27 +23,13 @@ export interface ContractsPage {
   counts: ContractStatusCounts
 }
 
-/**
- * Start of today, local. The overdue view is the only one that needs a
- * "now", and this is the coarsest value that still agrees with the badge
- * `contractState` draws beside each row: it lands after today's UTC-midnight
- * due dates (so a piece due today reads as late, exactly as the badge says)
- * and before tomorrow's, for the UTC-3 locale this app ships. Sending the
- * raw instant instead would mint a new query key on every render.
- */
-function overdueAsOf(): string {
-  const startOfToday = new Date()
-  startOfToday.setHours(0, 0, 0, 0)
-  return startOfToday.toISOString()
-}
-
 export function useContractsList({
   page = 1,
   pageSize = 20,
   search = '',
   status = 'all',
 }: { page?: number; pageSize?: number; search?: string; status?: ContractStatusFilter } = {}) {
-  const asOf = overdueAsOf()
+  const asOf = overdueAsOf().toISOString()
   return useQuery({
     queryKey: [...CONTRACTS_KEY, page, pageSize, search, status, asOf],
     queryFn: () =>
