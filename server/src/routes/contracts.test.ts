@@ -306,3 +306,29 @@ describe('POST /api/contracts/:id/sign-token', () => {
     expect(res.body.relayUrl).toBeUndefined()
   })
 })
+
+describe('GET /api/contracts/installments/receivable', () => {
+  it('answers with the window total and count', async () => {
+    const response = await request(app)
+      .get('/api/contracts/installments/receivable?from=2026-01-01&to=2026-12-31')
+      .set('Authorization', `Bearer ${staffToken}`)
+
+    expect(response.status).toBe(200)
+    expect(response.body).toEqual({ total: expect.any(Number), count: expect.any(Number) })
+  })
+
+  it('rejects a malformed date instead of silently widening the window', async () => {
+    const response = await request(app)
+      .get('/api/contracts/installments/receivable?from=2026-02-31&to=2026-12-31')
+      .set('Authorization', `Bearer ${staffToken}`)
+
+    expect(response.status).toBe(400)
+  })
+
+  it('requires authentication', async () => {
+    const response = await request(app).get(
+      '/api/contracts/installments/receivable?from=2026-01-01&to=2026-12-31',
+    )
+    expect(response.status).toBe(401)
+  })
+})

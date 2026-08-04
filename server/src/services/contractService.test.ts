@@ -1,7 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { prisma } from '../db/client.js'
 import { AppError } from '../errors/AppError.js'
-import { createContract, cancelContract, listContracts, getContract, setInstallmentPaid } from './contractService.js'
+import {
+  createContract,
+  cancelContract,
+  listContracts,
+  getContract,
+  setInstallmentPaid,
+  sumReceivables,
+} from './contractService.js'
 import { checkOutAllocation } from './allocationService.js'
 
 let locationId: string
@@ -513,5 +520,55 @@ describe('setInstallmentPaid', () => {
     await expect(
       setInstallmentPaid(second.id, first.installments[0].id, locationId, true),
     ).rejects.toThrow(AppError)
+  })
+})
+
+describe('sumReceivables', () => {
+  const WEEK_START = new Date('2026-10-05')
+  const WEEK_END = new Date('2026-10-11')
+
+  it('sums only the unpaid installments due inside the window', async () => {
+    await createContract(
+      baseInput({
+        installments: [
+          { dueDate: new Date('2026-10-06'), amount: 150 },
+          { dueDate: new Date('2026-10-11'), amount: 50.5 },
+          // The day after the window closes — the single most likely
+          // off-by-one, so it is a fixture rather than a comment.
+          { dueDate: new Date('2026-10-12'), amount: 999 },
+          { dueDate: new Date('2026-10-04'), amount: 777 },
+        ],
+      }),
+    )
+
+    expect(await sumReceivables(locationId, WEEK_START, WEEK_END)).toEqual({ total: 200.5, count: 2 })
+  })
+
+  it('drops an installment as soon as it is marked paid', async () => {
+    const contract = await createContract(
+      baseInput({
+        installments: [
+          { dueDate: new Date('2026-10-06'), amount: 150 },
+          { dueDate: new Date('2026-10-07'), amount: 60 },
+        ],
+      }),
+    )
+    const paidOne = contract.installments.find((installment) => installment.amount === 150)!
+    await setInstallmentPaid(contract.id, paidOne.id, locationId, true)
+
+    expect(await sumReceivables(locationId, WEEK_START, WEEK_END)).toEqual({ total: 60, count: 1 })
+  })
+
+  it('reports zero rather than null when nothing is due in the window', async () => {
+    await createContract(baseInput({ installments: [{ dueDate: new Date('2026-12-01'), amount: 300 }] }))
+
+    expect(await sumReceivables(locationId, WEEK_START, WEEK_END)).toEqual({ total: 0, count: 0 })
+  })
+
+  it('never counts another location\'s installments', async () => {
+    await createContract(baseInput({ installments: [{ dueDate: new Date('2026-10-06'), amount: 150 }] }))
+    const otherLocation = await prisma.location.create({ data: { name: 'Other', address: 'X' } })
+
+    expect(await sumReceivables(otherLocation.id, WEEK_START, WEEK_END)).toEqual({ total: 0, count: 0 })
   })
 })

@@ -10,6 +10,7 @@ import {
   listContracts,
   getContract,
   setInstallmentPaid,
+  sumReceivables,
 } from '../services/contractService.js'
 import { issueSigningToken } from '../services/signingService.js'
 import { detectLanCandidates } from '../network/lanNetwork.js'
@@ -40,6 +41,20 @@ contractsRouter.get('/', async (req, res) => {
   const pageSize = Number(req.query.pageSize ?? 20)
   const search = typeof req.query.search === 'string' ? req.query.search : ''
   res.json(await listContracts(locationId, { page, pageSize, search }))
+})
+
+const receivablesSchema = z.object({ from: isoDate, to: isoDate })
+
+// Two path segments, so it can never be swallowed by `/:id` below — but it is
+// declared first anyway, so that reordering the file can't silently turn this
+// into a contract lookup for the id "installments".
+contractsRouter.get('/installments/receivable', async (req, res) => {
+  if (!req.staff) throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Unauthorized')
+  const parsed = receivablesSchema.safeParse(req.query)
+  if (!parsed.success) {
+    throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'from and to query params are required')
+  }
+  res.json(await sumReceivables(req.staff.locationId, parsed.data.from, parsed.data.to))
 })
 
 contractsRouter.get('/:id', async (req, res) => {

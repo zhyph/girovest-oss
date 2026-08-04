@@ -355,3 +355,19 @@ describe('GET /:id/photos/:filename', () => {
     expect(res.status).toBe(404)
   })
 })
+
+describe('GET /api/products/leaving-maintenance', () => {
+  it('resolves as its own route rather than a product lookup for that id', async () => {
+    const response = await request(app)
+      .get('/api/products/leaving-maintenance')
+      .set('Authorization', `Bearer ${staffToken}`)
+
+    expect(response.status).toBe(200)
+    expect(response.body).toEqual({ count: 0, items: [] })
+  })
+
+  it('requires authentication', async () => {
+    const response = await request(app).get('/api/products/leaving-maintenance')
+    expect(response.status).toBe(401)
+  })
+})

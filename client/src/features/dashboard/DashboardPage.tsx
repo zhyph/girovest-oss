@@ -9,6 +9,7 @@ import { AuthenticatedPhoto } from '../../components/ui/authenticated-photo.tsx'
 import CountUp from '../../components/CountUp.tsx'
 import { cn } from '../../lib/cn.ts'
 import { parseDateOnly, formatDate } from '../../lib/date.ts'
+import { formatCurrency, getLocaleConfig } from '../../lib/locale.ts'
 import { useLocale } from '../../lib/LocaleContext.tsx'
 import { useClients } from '../clients/useClients.ts'
 import { useProducts } from '../products/useProducts.ts'
@@ -17,7 +18,22 @@ import { useDashboard, type AllocationSummary } from './useDashboard.ts'
 import { BackupReminderBanner } from './BackupReminderBanner.tsx'
 import type { Product } from '../products/productSchemas.ts'
 
-function StatTile({ label, value, danger }: { label: string; value: number; danger?: boolean }) {
+function StatTile({
+  label,
+  value,
+  danger,
+  display,
+}: {
+  label: string
+  value: number
+  danger?: boolean
+  /**
+   * Pre-formatted text to show instead of the animated counter. Money is not
+   * a tally — counting up to R$ 4.280,00 digit by digit reads as a slot
+   * machine, and CountUp has no currency formatter to hand it anyway.
+   */
+  display?: string
+}) {
   const isUrgent = danger && value > 0
   return (
     <div
@@ -42,7 +58,7 @@ function StatTile({ label, value, danger }: { label: string; value: number; dang
           isUrgent ? 'text-destructive-subtle-foreground' : 'text-foreground',
         )}
       >
-        <CountUp to={value} duration={0.6} />
+        {display ?? <CountUp to={value} duration={0.6} />}
       </span>
     </div>
   )
@@ -97,7 +113,17 @@ export function DashboardPage() {
   const { t } = useTranslation('dashboard')
   const { locale } = useLocale()
   const navigate = useNavigate()
-  const { goingOutToday, dueBackToday, overdue, upcoming, isLoading, isError } = useDashboard()
+  const {
+    goingOutToday,
+    dueBackToday,
+    overdue,
+    upcoming,
+    receivablesThisWeek,
+    leavingMaintenance,
+    isLoading,
+    isError,
+  } = useDashboard()
+  const currency = getLocaleConfig(locale).currency
   const { data: products } = useProducts()
   const { data: clients } = useClients()
   useSectionTour('dashboard', !isLoading && !isError)
@@ -180,10 +206,15 @@ export function DashboardPage() {
             the thing you glance at while reading the movement list beside
             them, so scrolling the list must not carry them off-screen.
           */}
-          <div className="mb-4 grid flex-shrink-0 grid-cols-3 gap-3" data-tour="dashboard.stats">
+          <div className="mb-4 grid flex-shrink-0 grid-cols-4 gap-3" data-tour="dashboard.stats">
             <StatTile label={t('goingOutToday')} value={goingOutToday.length} />
             <StatTile label={t('dueBackToday')} value={dueBackToday.length} />
             <StatTile label={t('overdue')} value={overdue.length} danger />
+            <StatTile
+              label={t('receivableThisWeek')}
+              value={receivablesThisWeek.count}
+              display={formatCurrency(receivablesThisWeek.total, locale, currency)}
+            />
           </div>
 
           <div className="grid min-h-0 flex-1 grid-cols-[1.5fr_1fr] items-start gap-4 overflow-y-auto">
@@ -212,6 +243,7 @@ export function DashboardPage() {
               )}
             </Panel>
 
+            <div className="flex flex-col gap-4">
             <Panel label={t('upcoming')} tour="dashboard.upcoming">
               {upcoming.length === 0 ? (
                 <p className="px-4 py-3.5 text-meta text-muted-foreground">{t('upcomingEmpty')}</p>
@@ -239,6 +271,42 @@ export function DashboardPage() {
                 })
               )}
             </Panel>
+
+            {/*
+              The cleaning window is invisible everywhere else: a piece in it
+              simply reads "Em higienização" with no hint of when that ends.
+              This is the one place the shop can see what it will be able to
+              promise a walk-in customer in the next couple of days.
+            */}
+            <Panel
+              label={t('leavingMaintenance')}
+              aside={
+                leavingMaintenance.count > 0 ? (
+                  <span className="tabular text-meta text-muted-foreground">{leavingMaintenance.count}</span>
+                ) : undefined
+              }
+            >
+              {leavingMaintenance.items.length === 0 ? (
+                <p className="px-4 py-3.5 text-meta text-muted-foreground">{t('leavingMaintenanceEmpty')}</p>
+              ) : (
+                leavingMaintenance.items.map((item) => (
+                  <div
+                    key={item.id}
+                    className="grid grid-cols-[30px_1fr_52px] items-center gap-2.5 border-b border-hairline px-4 py-2 last:border-b-0"
+                  >
+                    <Thumb product={productsById.get(item.id)} className="size-7.5" />
+                    <span className="min-w-0 truncate text-[13px] font-semibold">{item.name}</span>
+                    <span className="tabular text-right text-meta text-muted-foreground">
+                      {formatDate(parseDateOnly(item.availableOn), locale, {
+                        day: '2-digit',
+                        month: '2-digit',
+                      })}
+                    </span>
+                  </div>
+                ))
+              )}
+            </Panel>
+            </div>
           </div>
         </>
       )}

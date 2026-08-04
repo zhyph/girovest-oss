@@ -247,6 +247,40 @@ export async function getContract(id: string, locationId: string) {
   return contract
 }
 
+export interface ReceivablesSummary {
+  /** Sum of every still-unpaid installment falling inside the window. */
+  total: number
+  /** How many installments make up that sum. */
+  count: number
+}
+
+/**
+ * What the shop is still owed for installments due between `from` and `to`.
+ *
+ * Scoped through `Installment.contract.locationId` — Installment carries no
+ * locationId column of its own, exactly like setInstallmentPaid's lookup.
+ * Only unpaid rows count: the question this answers is "how much money is
+ * still coming in", not "how much was billed".
+ *
+ * Both bounds are inclusive. Installment.dueDate is a date-only value stored
+ * at UTC midnight, so callers pass plain YYYY-MM-DD days (see the route's
+ * `isoDate` parsing) and a `to` of the window's last day covers that day.
+ */
+export async function sumReceivables(locationId: string, from: Date, to: Date): Promise<ReceivablesSummary> {
+  const result = await prisma.installment.aggregate({
+    where: {
+      paid: false,
+      dueDate: { gte: from, lte: to },
+      contract: { locationId },
+    },
+    _sum: { amount: true },
+    _count: { _all: true },
+  })
+  // `_sum` is null (not 0) when nothing matched, which would render as an
+  // empty tile rather than R$ 0,00.
+  return { total: result._sum.amount ?? 0, count: result._count._all }
+}
+
 /**
  * Records that an installment was (or was not) paid.
  *

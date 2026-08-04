@@ -8,6 +8,7 @@ import {
   getProduct,
   updateProduct,
   deleteProduct,
+  listLeavingMaintenance,
 } from './productService.js'
 
 let locationId: string
@@ -298,5 +299,97 @@ describe.sequential('maintenance window across shops', () => {
     expect(noBufferListing?.availability).toBe('available')
     expect(slowShopListing?.id).toBe(slowShopProductId)
     expect(slowShopListing?.availability).toBe('maintenance')
+  })
+})
+
+describe.sequential('listLeavingMaintenance', () => {
+  // Fixed instant so the assertions never depend on the day the suite runs.
+  const ASOF = new Date('2026-08-10T12:00:00.000Z')
+
+  async function returnedProduct(ownerLocationId: string, name: string, returnedOn: string) {
+    const staff = await prisma.staff.create({
+      data: {
+        name: 'S', login: `s-${Date.now()}-${Math.random()}`, passwordHash: 'x', role: 'staff',
+        locationId: ownerLocationId,
+      },
+    })
+    const client = await prisma.client.create({
+      data: { locationId: ownerLocationId, name: 'C', phone: '1', email: 'c@example.com' },
+    })
+    const product = await prisma.product.create({
+      data: {
+        locationId: ownerLocationId, name, category: 'Festa', size: 'M', color: 'Azul',
+        rentalPrice: 100, depositAmount: 50,
+      },
+    })
+    await prisma.allocation.create({
+      data: {
+        productId: product.id, clientId: client.id, staffId: staff.id,
+        checkoutDate: new Date('2026-07-01'), dueDate: new Date('2026-07-05'),
+        actualReturnDate: new Date(returnedOn), status: 'returned', priceCharged: 100,
+      },
+    })
+    return product.id
+  }
+
+  it('lists only the pieces whose cleaning window closes inside the next two days', async () => {
+    // A ten-day window: a piece back on Aug 1 is free again on Aug 12
+    // (window Aug 2–11), one back on Aug 5 not until Aug 16.
+    await prisma.location.update({ where: { id: locationId }, data: { maintenanceBufferDays: 10 } })
+    const almostReady = await returnedProduct(locationId, 'Quase pronto', '2026-08-01')
+    await returnedProduct(locationId, 'Ainda longe', '2026-08-05')
+    // Never rented: available, not in any cleaning window.
+    await prisma.product.create({
+      data: {
+        locationId, name: 'Nunca alugado', category: 'Festa', size: 'P', color: 'Verde',
+        rentalPrice: 100, depositAmount: 50,
+      },
+    })
+
+    const result = await listLeavingMaintenance(locationId, 2, ASOF)
+
+    expect(result.count).toBe(1)
+    expect(result.items).toEqual([{ id: almostReady, name: 'Quase pronto', availableOn: '2026-08-12' }])
+  })
+
+  it('returns nothing when the shop configured no cleaning window at all', async () => {
+    // maintenanceBufferDays defaults to 0 on the fixture location.
+    await returnedProduct(locationId, 'Voltou ontem', '2026-08-09')
+
+    expect(await listLeavingMaintenance(locationId, 2, ASOF)).toEqual({ count: 0, items: [] })
+  })
+
+  it("never reports another shop's pieces", async () => {
+    await prisma.location.update({ where: { id: locationId }, data: { maintenanceBufferDays: 10 } })
+    await prisma.location.update({ where: { id: otherLocationId }, data: { maintenanceBufferDays: 10 } })
+    await returnedProduct(otherLocationId, 'Peça da outra loja', '2026-08-01')
+
+    expect(await listLeavingMaintenance(locationId, 2, ASOF)).toEqual({ count: 0, items: [] })
+  })
+
+  it('ignores a piece a customer is still holding, whatever an older cleaning window says', async () => {
+    await prisma.location.update({ where: { id: locationId }, data: { maintenanceBufferDays: 10 } })
+    const productId = await returnedProduct(locationId, 'Saiu de novo', '2026-08-01')
+    const staff = await prisma.staff.findFirstOrThrow({ where: { locationId } })
+    const client = await prisma.client.findFirstOrThrow({ where: { locationId } })
+    // Out again today: a dress that is not in the shop cannot be "coming out
+    // of cleaning", even though its previous return's window closes tomorrow.
+    await prisma.allocation.create({
+      data: {
+        productId, clientId: client.id, staffId: staff.id,
+        checkoutDate: new Date('2026-08-09'), dueDate: new Date('2026-08-20'),
+        status: 'checked_out', priceCharged: 100,
+      },
+    })
+
+    expect(await listLeavingMaintenance(locationId, 2, ASOF)).toEqual({ count: 0, items: [] })
+  })
+
+  it('leaves retired and maintenance-flagged pieces out of the catalogue count', async () => {
+    await prisma.location.update({ where: { id: locationId }, data: { maintenanceBufferDays: 10 } })
+    const retiredId = await returnedProduct(locationId, 'Aposentado', '2026-08-01')
+    await prisma.product.update({ where: { id: retiredId }, data: { status: 'retired' } })
+
+    expect(await listLeavingMaintenance(locationId, 2, ASOF)).toEqual({ count: 0, items: [] })
   })
 })

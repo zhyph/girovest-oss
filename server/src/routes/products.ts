@@ -13,6 +13,7 @@ import {
   getProduct,
   updateProduct,
   deleteProduct,
+  listLeavingMaintenance,
 } from '../services/productService.js'
 import { issueProductPhotoSession } from '../services/productPhotoTokenService.js'
 import { mintSseTicket } from '../services/sseTicketService.js'
@@ -54,6 +55,13 @@ productsRouter.post('/', async (req, res) => {
 
 productsRouter.get('/', async (req, res) => {
   res.json(await listProducts(req.staff!.locationId))
+})
+
+// MUST stay above `/:id` — it is a single path segment, so declaring it after
+// would have Express resolve it as a product lookup for the id
+// "leaving-maintenance" and answer 404 forever.
+productsRouter.get('/leaving-maintenance', async (req, res) => {
+  res.json(await listLeavingMaintenance(req.staff!.locationId))
 })
 
 productsRouter.get('/:id', async (req, res) => {

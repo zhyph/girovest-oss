@@ -24,6 +24,8 @@ describe('DashboardPage', () => {
       dueBackToday: [] as never,
       overdue: [] as never,
       upcoming: [] as never,
+      receivablesThisWeek: { total: 0, count: 0 },
+      leavingMaintenance: { count: 0, items: [] },
       isLoading: false,
       isError: false,
     })
@@ -35,7 +37,7 @@ describe('DashboardPage', () => {
     const scrollRegion = container.querySelector('.overflow-y-auto')
     expect(scrollRegion).not.toBeNull()
 
-    const statGrid = container.querySelector('.grid.grid-cols-3')
+    const statGrid = container.querySelector('.grid.grid-cols-4')
     expect(statGrid).not.toBeNull()
 
     // The stat tiles must be pinned outside the scroll region, not nested
@@ -52,6 +54,8 @@ describe('DashboardPage', () => {
       dueBackToday: [] as never,
       overdue: [{ id: '2' }, { id: '3' }] as never,
       upcoming: [] as never,
+      receivablesThisWeek: { total: 0, count: 0 },
+      leavingMaintenance: { count: 0, items: [] },
       isLoading: false,
       isError: false,
     })
@@ -73,6 +77,8 @@ describe('DashboardPage', () => {
       dueBackToday: [] as never,
       overdue: [] as never,
       upcoming: [] as never,
+      receivablesThisWeek: { total: 0, count: 0 },
+      leavingMaintenance: { count: 0, items: [] },
       isLoading: true,
       isError: false,
     })
@@ -92,6 +98,8 @@ describe('DashboardPage', () => {
       dueBackToday: [] as never,
       overdue: [] as never,
       upcoming: [] as never,
+      receivablesThisWeek: { total: 0, count: 0 },
+      leavingMaintenance: { count: 0, items: [] },
       isLoading: false,
       isError: true,
     })
@@ -116,6 +124,8 @@ describe('DashboardPage', () => {
       dueBackToday: [] as never,
       overdue: [] as never,
       upcoming: [{ id: 'a1', productId: 'p1', clientId: 'c1', checkoutDate: '2026-07-25', dueDate: '2026-07-30', status: 'reserved' }] as never,
+      receivablesThisWeek: { total: 0, count: 0 },
+      leavingMaintenance: { count: 0, items: [] },
       isLoading: false,
       isError: false,
     })
@@ -137,6 +147,8 @@ describe('DashboardPage', () => {
       dueBackToday: [] as never,
       overdue: [] as never,
       upcoming: [] as never,
+      receivablesThisWeek: { total: 0, count: 0 },
+      leavingMaintenance: { count: 0, items: [] },
       isLoading: false,
       isError: false,
     })
@@ -144,5 +156,65 @@ describe('DashboardPage', () => {
     renderDashboard()
 
     expect(screen.getByText('Nada programado para os próximos dias.')).toBeInTheDocument()
+  })
+
+  it('shows the week\'s receivables as money, not as a count', () => {
+    mockProductsAndClients()
+    vi.spyOn(useDashboardModule, 'useDashboard').mockReturnValue({
+      goingOutToday: [] as never,
+      dueBackToday: [] as never,
+      overdue: [] as never,
+      upcoming: [] as never,
+      receivablesThisWeek: { total: 4280.5, count: 3 },
+      leavingMaintenance: { count: 0, items: [] },
+      isLoading: false,
+      isError: false,
+    })
+
+    renderDashboard()
+
+    expect(screen.getByText('A receber esta semana')).toBeInTheDocument()
+    // The formatted total, not the installment count — a tile reading "3"
+    // here would be the regression this guards against.
+    expect(screen.getByText(/4\.280,50/)).toBeInTheDocument()
+    expect(screen.queryByText('3')).not.toBeInTheDocument()
+  })
+
+  it('lists the pieces leaving the cleaning window and when they free up', () => {
+    mockProductsAndClients()
+    vi.spyOn(useDashboardModule, 'useDashboard').mockReturnValue({
+      goingOutToday: [] as never,
+      dueBackToday: [] as never,
+      overdue: [] as never,
+      upcoming: [] as never,
+      receivablesThisWeek: { total: 0, count: 0 },
+      leavingMaintenance: { count: 1, items: [{ id: 'p9', name: 'Vestido Longo', availableOn: '2026-08-06' }] },
+      isLoading: false,
+      isError: false,
+    })
+
+    renderDashboard()
+
+    expect(screen.getByText('Saindo da higienização')).toBeInTheDocument()
+    expect(screen.getByText('Vestido Longo')).toBeInTheDocument()
+    expect(screen.getByText('06/08')).toBeInTheDocument()
+  })
+
+  it('shows the empty cleaning-window message when nothing is coming back', () => {
+    mockProductsAndClients()
+    vi.spyOn(useDashboardModule, 'useDashboard').mockReturnValue({
+      goingOutToday: [] as never,
+      dueBackToday: [] as never,
+      overdue: [] as never,
+      upcoming: [] as never,
+      receivablesThisWeek: { total: 0, count: 0 },
+      leavingMaintenance: { count: 0, items: [] },
+      isLoading: false,
+      isError: false,
+    })
+
+    renderDashboard()
+
+    expect(screen.getByText('Nenhuma peça sai da higienização nos próximos dias.')).toBeInTheDocument()
   })
 })

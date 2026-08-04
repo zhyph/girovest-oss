@@ -2,10 +2,17 @@ import { prisma } from '../db/client.js'
 import { scopedDb } from '../db/scopedClient.js'
 import { AppError } from '../errors/AppError.js'
 import { ErrorCodes } from '../errors/errorCodes.js'
-import { derivedAvailability, type AllocationWindow, type DerivedAvailability } from '../domain/occupancy.js'
+import {
+  addUtcDays,
+  derivedAvailability,
+  maintenanceEndsOn,
+  type AllocationWindow,
+  type DerivedAvailability,
+} from '../domain/occupancy.js'
 import {
   blockingAllocationsWhere,
   loadBlockingWindows,
+  maintenanceBufferForLocation,
   maintenanceBufferForProduct,
   toWindow,
 } from './occupancyQuery.js'
@@ -223,6 +230,79 @@ export async function updateProduct(locationId: string, id: string, data: Update
     } as any,
   })
   return toDTO(row, await availabilityFor(id), await hasHistory(id))
+}
+
+export interface LeavingMaintenanceItem {
+  id: string
+  name: string
+  /** First day the piece can go out again: the day after its cleaning window ends. */
+  availableOn: string
+}
+
+export interface LeavingMaintenanceSummary {
+  count: number
+  items: LeavingMaintenanceItem[]
+}
+
+/** How far ahead the dashboard looks for pieces about to come back into circulation. */
+export const LEAVING_MAINTENANCE_WINDOW_DAYS = 2
+
+/**
+ * Pieces sitting in the shop's cleaning window today whose window closes
+ * within the next `withinDays` days — what the shop can promise a walk-in
+ * customer this week without touching anything that is still out.
+ *
+ * Deliberately reuses the same maintenance-window machinery availability does
+ * (`maintenanceBufferForLocation` + `blockingAllocationsWhere` +
+ * `maintenanceEndsOn`), so this can never drift from what the Produtos screen
+ * calls "Em higienização".
+ */
+export async function listLeavingMaintenance(
+  locationId: string,
+  withinDays: number = LEAVING_MAINTENANCE_WINDOW_DAYS,
+  asOf: Date = new Date(),
+): Promise<LeavingMaintenanceSummary> {
+  const maintenanceBufferDays = await maintenanceBufferForLocation(locationId)
+  // With no cleaning buffer configured a piece is free the day after it comes
+  // back — there is no window to leave, and no allocations worth loading.
+  if (maintenanceBufferDays === 0) return { count: 0, items: [] }
+
+  const rows = await scopedDb(locationId).product.findMany({
+    where: { status: 'active' },
+    select: { id: true, name: true },
+    orderBy: { name: 'asc' },
+  })
+  if (rows.length === 0) return { count: 0, items: [] }
+
+  const allocations = await prisma.allocation.findMany({
+    where: blockingAllocationsWhere(
+      rows.map((row) => row.id),
+      maintenanceBufferDays,
+      asOf,
+    ),
+  })
+  const windowsByProduct = new Map<string, AllocationWindow[]>()
+  for (const allocation of allocations) {
+    windowsByProduct.set(allocation.productId, [
+      ...(windowsByProduct.get(allocation.productId) ?? []),
+      toWindow(allocation),
+    ])
+  }
+
+  const cutoff = addUtcDays(asOf, withinDays)
+  const items: LeavingMaintenanceItem[] = []
+  for (const row of rows) {
+    const endsOn = maintenanceEndsOn(windowsByProduct.get(row.id) ?? [], asOf, { maintenanceBufferDays })
+    if (!endsOn || endsOn.getTime() > cutoff.getTime()) continue
+    items.push({
+      id: row.id,
+      name: row.name,
+      availableOn: addUtcDays(endsOn, 1).toISOString().slice(0, 10),
+    })
+  }
+  items.sort((a, b) => a.availableOn.localeCompare(b.availableOn) || a.name.localeCompare(b.name))
+
+  return { count: items.length, items }
 }
 
 export async function deleteProduct(locationId: string, id: string): Promise<void> {

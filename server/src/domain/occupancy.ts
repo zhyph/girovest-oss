@@ -147,3 +147,34 @@ export function derivedAvailability(
   )
   return beingCleaned ? 'maintenance' : 'available'
 }
+
+/**
+ * The last day a piece stays held for cleaning, for a piece that is in its
+ * cleaning window on `asOf` — `null` for anything else, including a piece a
+ * customer is holding today (a rental outranks cleaning in
+ * `derivedAvailability`, and a dress that is out of the shop is not "coming
+ * out of cleaning" no matter what an older allocation's buffer says).
+ *
+ * The latest end among the windows covering today wins: two returns close
+ * together each open their own cleaning window, and the piece is only free
+ * once the last one closes.
+ */
+export function maintenanceEndsOn(
+  allocations: AllocationWindow[],
+  asOf: Date,
+  { maintenanceBufferDays = 0 }: Pick<OccupancyOptions, 'maintenanceBufferDays'> = {},
+): Date | null {
+  if (derivedAvailability(allocations, asOf, { maintenanceBufferDays }) !== 'maintenance') return null
+
+  const endsCoveringToday = allocations
+    .map((allocation) => occupancyOf(allocation, asOf, maintenanceBufferDays).maintenance)
+    .filter((window) => window !== null && rangesOverlap(window.start, window.end, asOf, asOf))
+    .map((window) => window!.end.getTime())
+
+  return endsCoveringToday.length === 0 ? null : new Date(Math.max(...endsCoveringToday))
+}
+
+/** UTC-day arithmetic, exported so callers can compare against a maintenance end. */
+export function addUtcDays(date: Date, days: number): Date {
+  return addDays(date, days)
+}
