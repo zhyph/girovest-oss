@@ -21,6 +21,24 @@ app.disable('x-powered-by')
 // to JS unless it is named here, and X-Renewed-Token is how sliding session
 // renewal reaches the client (see auth/authMiddleware.ts).
 app.use(cors({ exposedHeaders: [RENEWED_TOKEN_HEADER] }))
+
+/**
+ * One endpoint carries images; every other one carries a form's worth of
+ * text, and the default 100 kB limit is the right ceiling for those.
+ *
+ * Scoped by an explicit path test rather than by mounting a wider parser on
+ * `/api/products`, so raising the ceiling for photo upload cannot also raise
+ * it for product create/update. body-parser marks the request as parsed, so
+ * the general parser below simply skips a body this one already read.
+ */
+const PHOTO_UPLOAD_PATH = /^\/api\/products\/[^/]+\/photos\/?$/
+const photoUploadJson = express.json({ limit: '12mb' })
+app.use((req, res, next) => {
+  if (req.method === 'POST' && PHOTO_UPLOAD_PATH.test(req.path)) {
+    return photoUploadJson(req, res, next)
+  }
+  next()
+})
 app.use(express.json())
 
 app.get('/health', (_req, res) => {

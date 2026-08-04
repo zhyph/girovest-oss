@@ -18,6 +18,71 @@ function photosDir(): string {
 
 const PHOTO_DATA_URL_PATTERN = /^data:image\/jpeg;base64,([A-Za-z0-9+/]+=*)$/
 
+/**
+ * Roughly 10 MB of decoded image per photo. Base64 costs a third on the wire,
+ * which is what the route's own body limit accounts for.
+ */
+const MAX_PHOTO_BYTES = 10 * 1024 * 1024
+
+/**
+ * Writes photos to disk and hands back the URL paths they are served from.
+ *
+ * The single place a product photo is ever created, shared by the phone's
+ * intake page and by the desktop's own file picker. Both must produce exactly
+ * the same thing — a JPEG under PRODUCT_PHOTOS_DIR, named
+ * `<uuid>.jpg`, referenced as `/api/products/<id>/photos/<uuid>.jpg` — because
+ * everything downstream (the serving route's filename pattern, the zoom
+ * panel, the SSE live update) reads that shape and nothing else. Two intake
+ * paths writing two shapes is how the serving route would start needing to
+ * know where a photo came from.
+ */
+export function storePhotoDataUrls(productId: string, photos: string[]): string[] {
+  const dir = photosDir()
+  const writtenPaths: string[] = []
+  for (const photo of photos) {
+    const match = photo.match(PHOTO_DATA_URL_PATTERN)
+    if (!match) {
+      throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'Invalid photo payload')
+    }
+    const bytes = Buffer.from(match[1], 'base64')
+    if (bytes.byteLength > MAX_PHOTO_BYTES) {
+      throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'Photo is too large')
+    }
+    const filename = `${crypto.randomUUID()}.jpg`
+    fs.writeFileSync(path.join(dir, filename), bytes)
+    writtenPaths.push(`/api/products/${productId}/photos/${filename}`)
+  }
+  return writtenPaths
+}
+
+/**
+ * Appends already-decoded photos to a product and announces them, scoped to
+ * one location. The desktop picker's entry point; submitPhotos below is the
+ * phone's, and the two meet here so a photo behaves identically either way.
+ */
+export async function appendProductPhotos(
+  locationId: string,
+  productId: string,
+  photos: string[],
+): Promise<{ photos: string[] }> {
+  const product = await scopedDb(locationId).product.findUnique({ where: { id: productId } })
+  if (!product || product.locationId !== locationId) {
+    throw new AppError(ErrorCodes.NOT_FOUND, 404, `Product ${productId} not found`)
+  }
+
+  const writtenPaths = storePhotoDataUrls(productId, photos)
+  const existingPhotos = JSON.parse(product.photos) as string[]
+  const updatedPhotos = [...existingPhotos, ...writtenPaths]
+  await scopedDb(locationId).product.update({
+    where: { id: productId },
+    data: { photos: JSON.stringify(updatedPhotos) },
+  })
+
+  productPhotoEvents.emit('photo', { productId, locationId, photos: updatedPhotos })
+
+  return { photos: updatedPhotos }
+}
+
 export async function issueProductPhotoSession(
   staffId: string,
   locationId: string,
@@ -56,34 +121,7 @@ export async function submitPhotos(
   photos: string[],
 ): Promise<{ photos: string[] }> {
   const photoToken = await requireValidToken(token)
-
-  const product = await scopedDb(photoToken.locationId).product.findUnique({ where: { id: productId } })
-  if (!product || product.locationId !== photoToken.locationId) {
-    throw new AppError(ErrorCodes.NOT_FOUND, 404, `Product ${productId} not found`)
-  }
-
-  const dir = photosDir()
-  const writtenPaths: string[] = []
-  for (const photo of photos) {
-    const match = photo.match(PHOTO_DATA_URL_PATTERN)
-    if (!match) {
-      throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'Invalid photo payload')
-    }
-    const filename = `${crypto.randomUUID()}.jpg`
-    fs.writeFileSync(path.join(dir, filename), Buffer.from(match[1], 'base64'))
-    writtenPaths.push(`/api/products/${productId}/photos/${filename}`)
-  }
-
-  const existingPhotos = JSON.parse(product.photos) as string[]
-  const updatedPhotos = [...existingPhotos, ...writtenPaths]
-  await scopedDb(photoToken.locationId).product.update({
-    where: { id: productId },
-    data: { photos: JSON.stringify(updatedPhotos) },
-  })
-
-  productPhotoEvents.emit('photo', { productId, locationId: photoToken.locationId, photos: updatedPhotos })
-
-  return { photos: updatedPhotos }
+  return appendProductPhotos(photoToken.locationId, productId, photos)
 }
 
 export type CreateProductFromPhotoTokenInput = Omit<CreateProductInput, 'locationId' | 'photos'>

@@ -15,7 +15,7 @@ import {
   deleteProduct,
   listLeavingMaintenance,
 } from '../services/productService.js'
-import { issueProductPhotoSession } from '../services/productPhotoTokenService.js'
+import { appendProductPhotos, issueProductPhotoSession } from '../services/productPhotoTokenService.js'
 import { mintSseTicket } from '../services/sseTicketService.js'
 import { reachableSigningCandidates } from './contracts.js'
 import { openRelayConnection } from '../network/relayClient.js'
@@ -120,6 +120,30 @@ productsRouter.post('/events/ticket', async (req, res) => {
   if (!req.staff) throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Unauthorized')
   const { ticket, expiresAt } = mintSseTicket(req.staff.staffId, req.staff.locationId)
   res.status(201).json({ ticket, expiresAt })
+})
+
+/**
+ * The desktop and web UI's own photo intake, beside the phone's.
+ *
+ * Deliberately the same JSON-of-data-URLs shape the phone page already posts,
+ * rather than multipart/form-data: it lets both paths share one writer
+ * (appendProductPhotos), needs no upload-parser dependency in a server that
+ * is also packaged inside Electron, and works identically in the packaged
+ * desktop build and the hosted web build — the browser downscales to JPEG
+ * before sending either way, so a phone photo does not travel at full size.
+ * The body limit that makes this possible is scoped to this one route in
+ * app.ts; every other endpoint keeps the default.
+ */
+const uploadPhotosSchema = z.object({
+  photos: z.array(z.string()).min(1).max(20),
+})
+
+productsRouter.post('/:id/photos', async (req, res) => {
+  const parsed = uploadPhotosSchema.safeParse(req.body)
+  if (!parsed.success) {
+    throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'Invalid photo payload')
+  }
+  res.status(201).json(await appendProductPhotos(req.staff!.locationId, req.params.id, parsed.data.photos))
 })
 
 // Filenames are always crypto.randomUUID() + '.jpg', generated only by
