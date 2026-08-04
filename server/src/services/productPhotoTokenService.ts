@@ -146,12 +146,20 @@ export async function appendProductPhotos(
     try {
       const updatedPhotos = await prisma.$transaction(
         async (tx) => {
+          // scopedDb wraps the top-level prisma client, not a transaction's
+          // tx — it cannot reach in here. Safe unscoped only because the
+          // very next line re-verifies locationId by hand before any read
+          // of product.photos is trusted or any write happens, mirroring
+          // clientService.ts's updateClient() precedent for the same
+          // limitation.
+          // ast-grep-ignore: no-unscoped-location-model — re-verified against locationId on the next line before use; scopedDb cannot wrap a transaction's tx.
           const product = await tx.product.findUnique({ where: { id: productId } })
           if (!product || product.locationId !== locationId) {
             throw new AppError(ErrorCodes.NOT_FOUND, 404, `Product ${productId} not found`)
           }
           const existingPhotos = JSON.parse(product.photos) as string[]
           const next = [...existingPhotos, ...writtenPaths]
+          // ast-grep-ignore: no-unscoped-location-model — id was just proven to belong to locationId by the findUnique check above; the update can only ever touch that same row.
           await tx.product.update({ where: { id: productId }, data: { photos: JSON.stringify(next) } })
           return next
         },

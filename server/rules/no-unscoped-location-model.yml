@@ -23,6 +23,10 @@
 #   the getClient(locationId, id) call immediately above the transaction
 #   already 404s on a cross-location id — see the comment at that call site
 #   before copying this pattern elsewhere.
+# - productPhotoTokenService.ts: appendProductPhotos()'s tx.product.findUnique
+#   re-verifies locationId by hand before its result is trusted, and its
+#   tx.product.update immediately follows a successful re-verification against
+#   the same id — same shape as clientService.ts's exemption above.
 #
 # The file-level `ignores:` below is only for files where scoping is meaningless:
 # scopedClient.ts itself (it IS the wrapper), tests (they seed fixtures across
