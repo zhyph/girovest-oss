@@ -639,6 +639,30 @@ describe('sumReceivables', () => {
     expect(await sumReceivables(locationId, WEEK_START, WEEK_END)).toEqual({ total: 0, count: 0 })
   })
 
+  it('CRITICAL: stops counting a contract once it is cancelled', async () => {
+    const abandoned = await createContract(
+      baseInput({ installments: [{ dueDate: new Date('2026-10-06'), amount: 150 }] }),
+    )
+    const kept = await createContract(
+      baseInput({
+        items: [
+          { productId: secondProductId, checkoutDate: new Date('2026-10-02'), dueDate: new Date('2026-10-05'), priceCharged: 100 },
+        ],
+        installments: [{ dueDate: new Date('2026-10-07'), amount: 60 }],
+      }),
+    )
+
+    expect(await sumReceivables(locationId, WEEK_START, WEEK_END)).toEqual({ total: 210, count: 2 })
+
+    // Cancelling does not delete the instalments, so without an explicit
+    // exclusion the Painel keeps promising the shop money for a dress it
+    // agreed never to send out.
+    await cancelContract(abandoned.id, locationId)
+
+    expect(await sumReceivables(locationId, WEEK_START, WEEK_END)).toEqual({ total: 60, count: 1 })
+    expect(kept.id).toBeDefined()
+  })
+
   it('never counts another location\'s installments', async () => {
     await createContract(baseInput({ installments: [{ dueDate: new Date('2026-10-06'), amount: 150 }] }))
     const otherLocation = await prisma.location.create({ data: { name: 'Other', address: 'X' } })
@@ -715,6 +739,19 @@ describe('listContracts status filters and counts', () => {
     const result = await listContracts(locationId, { status: 'active' })
     expect(result.contracts).toHaveLength(0)
     expect(result.counts.active).toBe(0)
+  })
+
+  it('CRITICAL: leaves a cancelled contract out of unsigned too', async () => {
+    const contract = await createContract(baseInput())
+    expect(contract.signatureStatus).toBe('unsigned')
+    await cancelContract(contract.id, locationId)
+
+    // "Sem assinatura" is a worklist. A contract cancelled before anyone
+    // signed it can never be signed now, so leaving it in means the chip
+    // counts an action nobody will ever take — forever.
+    const result = await listContracts(locationId, { status: 'unsigned' })
+    expect(result.contracts).toHaveLength(0)
+    expect(result.counts.unsigned).toBe(0)
   })
 
   it('counts a piece due today as overdue and one due tomorrow as not', async () => {

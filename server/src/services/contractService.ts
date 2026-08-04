@@ -219,6 +219,15 @@ export interface ContractStatusCounts {
  * allocations and returned when every live one is back, and neither shape has
  * a reserved or checked_out allocation left to match here.
  */
+/**
+ * "This contract was not cancelled", expressed the same way `contractState`
+ * derives it on the client: a contract is cancelled when nothing is left of
+ * it, i.e. every one of its pieces is. Contracts carry no cancelled flag of
+ * their own — cancelContract only rewrites the allocations — so this is the
+ * only place the fact exists.
+ */
+const NOT_CANCELLED = { allocations: { some: { status: { not: 'cancelled' } } } }
+
 function statusWhere(status: ContractStatusFilter, asOf: Date) {
   switch (status) {
     case 'active':
@@ -226,7 +235,12 @@ function statusWhere(status: ContractStatusFilter, asOf: Date) {
     case 'overdue':
       return { allocations: { some: { status: 'checked_out', dueDate: { lt: asOf } } } }
     case 'unsigned':
-      return { signatureStatus: { not: 'signed' } }
+      // Cancelled contracts are excluded, matching `active` just above.
+      // "Sem assinatura" is a worklist — something the shop still has to go
+      // and get signed — and a contract that was cancelled before anyone
+      // signed it can never leave that list on its own, so it would sit there
+      // forever asking for an action nobody will ever take.
+      return { signatureStatus: { not: 'signed' }, ...NOT_CANCELLED }
     case 'all':
       return {}
   }
@@ -321,6 +335,12 @@ export interface ReceivablesSummary {
  * Only unpaid rows count: the question this answers is "how much money is
  * still coming in", not "how much was billed".
  *
+ * Cancelled contracts are left out. Cancelling a contract does not delete its
+ * instalments, so without this a contract the shop already walked away from
+ * keeps generating accounts receivable — the Painel would report money coming
+ * in for dresses that were never sent out. Same rule `contractTotal` follows
+ * on the client and the `active`/`unsigned` filters follow above.
+ *
  * Both bounds are inclusive. Installment.dueDate is a date-only value stored
  * at UTC midnight, so callers pass plain YYYY-MM-DD days (see the route's
  * `isoDate` parsing) and a `to` of the window's last day covers that day.
@@ -330,7 +350,7 @@ export async function sumReceivables(locationId: string, from: Date, to: Date): 
     where: {
       paid: false,
       dueDate: { gte: from, lte: to },
-      contract: { locationId },
+      contract: { locationId, ...NOT_CANCELLED },
     },
     _sum: { amount: true },
     _count: { _all: true },
