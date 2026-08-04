@@ -8,6 +8,9 @@ import { DashboardPage } from '../dashboard/DashboardPage.tsx'
 import { ClientsPage } from '../clients/ClientsPage.tsx'
 import { ProductsPage } from '../products/ProductsPage.tsx'
 import { ContractsPage } from '../contracts/ContractsPage.tsx'
+import { SettingsPage } from '../settings/SettingsPage.tsx'
+import { Sidebar } from '../../app/Sidebar.tsx'
+import * as useLocationSettingsModule from '../settings/useLocationSettings.ts'
 import * as useDashboardModule from '../dashboard/useDashboard.ts'
 import * as useClientsModule from '../clients/useClients.ts'
 import * as useProductsModule from '../products/useProducts.ts'
@@ -65,7 +68,15 @@ describe('tour anchors match rendered DOM', () => {
     vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [], isLoading: false } as never)
     vi.spyOn(useClientsModule, 'useClients').mockReturnValue({ data: [], isLoading: false } as never)
 
-    renderWithProviders(<DashboardPage />)
+    // Rendered with the shell, not bare: the Painel's tour opens on the nav
+    // rail, which belongs to AppLayout rather than to the page. A bare render
+    // would report the rail anchor missing forever.
+    renderWithProviders(
+      <>
+        <Sidebar />
+        <DashboardPage />
+      </>,
+    )
 
     expectAllAnchorsPresent('dashboard')
   })
@@ -143,5 +154,23 @@ describe('tour anchors match rendered DOM', () => {
     renderWithProviders(<ContractsPage />)
 
     expectAllAnchorsPresent('contracts')
+  })
+
+  it('settings: a âncora da navegação de seções existe', () => {
+    vi.spyOn(useLocationSettingsModule, 'useLocationSettings').mockReturnValue({
+      data: {
+        name: 'Loja Teste', address: 'Rua X', phone: '11999990000',
+        maintenanceBufferDays: 1, connectivityMode: 'lan', clauses: [],
+      },
+      isLoading: false,
+    } as never)
+    vi.spyOn(useLocationSettingsModule, 'useUpdateLocationSettings').mockReturnValue({
+      mutateAsync: vi.fn(),
+      isPending: false,
+    } as never)
+
+    renderWithProviders(<SettingsPage />)
+
+    expectAllAnchorsPresent('settings')
   })
 })

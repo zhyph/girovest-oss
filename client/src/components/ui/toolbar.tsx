@@ -15,12 +15,15 @@ import { cn } from '../../lib/cn.ts'
 export function Toolbar({
   search,
   filters,
+  filtersDataTour,
   extra,
   actions,
   className,
 }: {
   search?: ReactNode
   filters?: ReactNode
+  /** Onboarding-tour anchor for the filter row as a whole. */
+  filtersDataTour?: string
   /** Secondary controls that are neither a filter nor the primary action. */
   extra?: ReactNode
   /** Right-aligned. At most one filled button among these. */
@@ -30,7 +33,11 @@ export function Toolbar({
   return (
     <div className={cn('flex flex-shrink-0 flex-wrap items-center gap-2.5 pb-3.5', className)}>
       {search}
-      {filters && <div className="flex items-center gap-1.5">{filters}</div>}
+      {filters && (
+        <div className="flex items-center gap-1.5" data-tour={filtersDataTour}>
+          {filters}
+        </div>
+      )}
       {extra}
       {actions && <div className="ml-auto flex flex-shrink-0 items-center gap-2">{actions}</div>}
     </div>

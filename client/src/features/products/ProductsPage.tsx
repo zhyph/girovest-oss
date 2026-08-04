@@ -245,6 +245,7 @@ export function ProductsPage() {
             dataTour="products.search"
           />
         }
+        filtersDataTour="products.filters"
         filters={
           <>
             {(['all', 'available', 'rented', 'maintenance'] as const).map((key) => (
@@ -268,7 +269,10 @@ export function ProductsPage() {
             <Button variant="ghost" onClick={() => setAddingPhotosRemotely(true)} data-tour="products.photoSession">
               {t('photoIntake.sessionAction')}
             </Button>
-            <div className="flex rounded-control border border-border-strong bg-surface-sunken p-0.5">
+            <div
+              data-tour="products.views"
+              className="flex rounded-control border border-border-strong bg-surface-sunken p-0.5"
+            >
               {(['grid', 'list'] as const).map((key) => (
                 <button
                   key={key}

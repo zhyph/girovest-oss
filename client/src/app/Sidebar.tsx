@@ -72,7 +72,7 @@ function ShortcutSection({ alwaysShowLabels, onNavigate }: { alwaysShowLabels?: 
     : 'hidden group-hover:inline group-focus-within:inline lg:inline'
 
   return (
-    <div className="mt-4 flex flex-col gap-px border-t border-border px-0 pt-3">
+    <div data-tour="dashboard.shortcut" className="mt-4 flex flex-col gap-px border-t border-border px-0 pt-3">
       <span className={cn('px-2 pb-1.5 text-label text-foreground-subtle uppercase', hideWhenCollapsed)}>
         {t('nav.shortcuts')}
       </span>
@@ -134,6 +134,7 @@ export function Sidebar() {
         on screen and competed with the content.
       */}
       <nav
+        data-tour="dashboard.rail"
         className={cn(
           'group hidden w-16 shrink-0 flex-col overflow-hidden border-r border-border-strong bg-background px-2.5 pt-4 pb-3',
           'transition-[width] duration-150 hover:w-50 focus-within:w-50 lg:flex lg:w-50',

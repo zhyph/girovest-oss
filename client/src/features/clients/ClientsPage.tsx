@@ -181,7 +181,13 @@ export function ClientsPage() {
         key: 'actions',
         width: '34px',
         cell: (client) => (
-          <RowActions label={t('detail.moreActions')}>
+          // Anchored on the first row only. The ⋯ pattern repeats down every
+          // list in the app, so the tour needs one of them to point at, not
+          // twenty identical attributes competing to be the one found.
+          <RowActions
+            label={t('detail.moreActions')}
+            dataTour={client.id === pageClients[0]?.id ? 'clients.rowActions' : undefined}
+          >
             <DropdownMenuItem onSelect={() => setEditing(client)}>
               {t('common:actions.edit', { ns: 'common' })}
             </DropdownMenuItem>
@@ -189,7 +195,7 @@ export function ClientsPage() {
         ),
       },
     ],
-    [t, summaries, productsById, hasContractHistory],
+    [t, summaries, productsById, hasContractHistory, pageClients],
   )
 
   if (isLoading) return <div>{t('title')}</div>
@@ -252,7 +258,10 @@ export function ClientsPage() {
           }
         />
 
-        <aside className="min-h-0 w-130 flex-shrink-0 overflow-y-auto border-l border-border-strong">
+        <aside
+          data-tour="clients.detail"
+          className="min-h-0 w-130 flex-shrink-0 overflow-y-auto border-l border-border-strong"
+        >
           <ClientDetailPanel
             client={selected}
             contracts={contracts}

@@ -7,6 +7,14 @@
   },
   "dashboard": {
     "steps": {
+      "rail": {
+        "title": "Menu do aplicativo",
+        "description": "Todas as telas ficam aqui: Painel, Clientes, Produtos, Contratos, Calendário e Configurações. Passe o mouse para ver os nomes."
+      },
+      "shortcut": {
+        "title": "Atalho de contrato",
+        "description": "Novo contrato de qualquer tela, sem passar por Contratos antes."
+      },
       "title": {
         "title": "Seu painel",
         "description": "Aqui você vê um resumo do dia: o que está saindo, o que está voltando e o que está atrasado."
@@ -37,7 +45,15 @@
       },
       "table": {
         "title": "Lista de clientes",
-        "description": "Clique em qualquer cliente da lista para ver ou editar os dados dele."
+        "description": "Clique em um cliente para selecioná-lo. Os dados dele aparecem no painel ao lado, sem sair da lista."
+      },
+      "detail": {
+        "title": "Painel do cliente",
+        "description": "Contato, documentos e o histórico de aluguéis do cliente selecionado. Clique na foto de uma peça para ampliá-la."
+      },
+      "rowActions": {
+        "title": "Menu de ações",
+        "description": "Os três pontinhos guardam as ações menos usadas — excluir, por exemplo. Eles aparecem em todas as listas do aplicativo."
       },
       "pagination": {
         "title": "Navegar pela lista",
@@ -59,9 +75,17 @@
         "title": "Buscar produto",
         "description": "Digite nome, categoria ou cor para encontrar uma peça rapidamente."
       },
+      "filters": {
+        "title": "Filtros",
+        "description": "Mostre só o que está disponível, alugado ou em manutenção — e refine por categoria e tamanho."
+      },
+      "views": {
+        "title": "Grade ou lista",
+        "description": "Grade para reconhecer as peças pela foto; lista para comparar códigos, tamanhos e preços."
+      },
       "table": {
-        "title": "Lista de produtos",
-        "description": "Clique em qualquer produto para ver ou editar os dados dele, e acompanhe se está disponível, reservado ou alugado."
+        "title": "Catálogo",
+        "description": "Clique na foto de qualquer peça para ampliá-la e ver tamanho, cor e situação. Clique no nome para editar a ficha."
       }
     }
   },
@@ -75,13 +99,29 @@
         "title": "Buscar contrato",
         "description": "Digite o nome do cliente para encontrar um contrato rapidamente."
       },
+      "filters": {
+        "title": "Filtros",
+        "description": "Ativos, atrasados ou não assinados. Os números ao lado contam todos os contratos, não só os desta página."
+      },
       "card": {
-        "title": "Contrato",
-        "description": "Cada contrato mostra o cliente, as peças alugadas e as ações disponíveis: registrar retirada, devolução ou assinatura."
+        "title": "Lista de contratos",
+        "description": "Clique em um contrato para selecioná-lo. Ele é agrupado pela semana do evento, não pela data em que foi feito."
+      },
+      "detail": {
+        "title": "Painel do contrato",
+        "description": "Peças, pagamentos e ações do contrato selecionado. Uma parcela só pode ser marcada como paga a partir da data de vencimento."
       },
       "pagination": {
         "title": "Mais contratos",
         "description": "Use estes botões para navegar entre as páginas quando houver muitos contratos."
+      }
+    }
+  },
+  "settings": {
+    "steps": {
+      "sections": {
+        "title": "Configurações em seções",
+        "description": "As configurações estão divididas em cinco seções: loja, aparência, contrato, backup e ajuda. Escolha uma aqui — o botão Salvar vale para todas."
       }
     }
   }

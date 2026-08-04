@@ -68,11 +68,21 @@ function DropdownMenuSeparator({ className, ...props }: React.ComponentProps<typ
  * six instalments previously rendered sixteen buttons competing for the
  * same attention.
  */
-function RowActions({ label, children }: { label: string; children: React.ReactNode }) {
+function RowActions({
+  label,
+  children,
+  dataTour,
+}: {
+  label: string
+  children: React.ReactNode
+  /** Onboarding-tour anchor for the ⋯ trigger. */
+  dataTour?: string
+}) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
         aria-label={label}
+        data-tour={dataTour}
         // Stops the click from also selecting the row it sits in.
         onClick={(event) => event.stopPropagation()}
         className="inline-flex size-7 items-center justify-center rounded-control text-foreground-subtle outline-none hover:bg-surface-sunken hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"

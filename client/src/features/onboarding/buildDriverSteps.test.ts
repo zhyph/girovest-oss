@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { buildDriverSteps } from './buildDriverSteps.ts'
+import { TOURS } from './tours.ts'
+import tourCopy from '../../locales/pt-BR/tour.json'
 
 function addAnchor(selectorValue: string) {
   const el = document.createElement('div')
@@ -55,5 +57,28 @@ describe('buildDriverSteps', () => {
 
     expect(t).toHaveBeenCalledWith('dashboard.steps.title.title')
     expect(t).toHaveBeenCalledWith('dashboard.steps.title.description')
+  })
+})
+
+/*
+  A step whose copy is missing does not fail loudly — driver.js happily shows
+  the raw key as its title. Registering the anchor and writing the two lines
+  are separate edits in separate files, which is exactly the pair that gets
+  half-done.
+*/
+describe('every registered step has copy', () => {
+  it('finds a title and a description for each anchor in every section', () => {
+    for (const [section, steps] of Object.entries(TOURS)) {
+      for (const step of steps) {
+        const copy = (
+          tourCopy as unknown as Record<
+            string,
+            { steps?: Record<string, { title?: string; description?: string }> }
+          >
+        )[section]?.steps?.[step.anchor]
+        expect(copy?.title, `missing title for ${section}.${step.anchor}`).toBeTruthy()
+        expect(copy?.description, `missing description for ${section}.${step.anchor}`).toBeTruthy()
+      }
+    }
   })
 })

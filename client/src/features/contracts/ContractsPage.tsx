@@ -910,6 +910,7 @@ export function ContractsPage() {
             dataTour="contracts.search"
           />
         }
+        filtersDataTour="contracts.filters"
         filters={(['active', 'overdue', 'unsigned', 'all'] as const).map((key) => (
           <FilterChip key={key} active={filter === key} onClick={() => handleFilterChange(key)} count={counts[key]}>
             {t(`filters.${key}`)}
@@ -945,7 +946,10 @@ export function ContractsPage() {
           }
         />
 
-        <aside className="min-h-0 w-130 flex-shrink-0 overflow-y-auto border-l border-border-strong">
+        <aside
+          data-tour="contracts.detail"
+          className="min-h-0 w-130 flex-shrink-0 overflow-y-auto border-l border-border-strong"
+        >
           <ContractDetailPanel
             contract={selected}
             client={selected ? clientsById.get(selected.clientId) : undefined}

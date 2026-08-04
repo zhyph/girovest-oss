@@ -13,6 +13,7 @@ import { showErrorToast, showSuccessToast } from '../../lib/toast.ts'
 import { useTheme, type ThemePreference } from '../../lib/useTheme.ts'
 import { useInstallId } from '../../lib/useInstallId.ts'
 import { TOUR_SECTIONS } from '../onboarding/sections.ts'
+import { useSectionTour } from '../onboarding/useSectionTour.ts'
 import { SECTION_ROUTES } from '../onboarding/tours.ts'
 import { requestTourReplay } from '../onboarding/tourReplay.ts'
 import { locationSettingsSchema, type LocationSettingsFormValues } from './settingsSchemas.ts'
@@ -105,6 +106,10 @@ export function SettingsPage() {
   }
 
   const [section, setSection] = useState<SettingsSection>('shop')
+  // The section nav is always mounted, so this needs no readiness gate: the
+  // one thing the tour points at is on screen before the settings query
+  // resolves.
+  useSectionTour('settings')
   const { handleSubmit, control, register, reset, formState } = useForm<LocationSettingsFormValues>({
     resolver: zodResolver(locationSettingsSchema),
     defaultValues: { name: '', address: '', phone: '', maintenanceBufferDays: 0, connectivityMode: 'lan', clauses: [] },
@@ -148,6 +153,7 @@ export function SettingsPage() {
       <ScreenTitle>{t('title')}</ScreenTitle>
       <div className="flex min-h-0 flex-1 border-t border-border-strong">
         <nav
+          data-tour="settings.sections"
           aria-label={t('title')}
           className="flex w-52 flex-shrink-0 flex-col gap-0.5 border-r border-border p-2.5"
         >

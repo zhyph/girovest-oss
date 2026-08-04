@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
@@ -50,6 +50,13 @@ function mockSettingsHooks(updateImpl: (...args: never[]) => Promise<unknown> = 
 // the root class in one call.
 afterEach(() => {
   setThemePreference('system')
+  localStorage.removeItem('girovest.tour.v1.settings')
+})
+
+// Configurações now has its own guided tour, which launches on first visit.
+// Pre-marked seen so driver.js never mounts over the assertions here.
+beforeEach(() => {
+  localStorage.setItem('girovest.tour.v1.settings', '1')
 })
 
 describe('SettingsPage', () => {
@@ -217,7 +224,9 @@ describe('identificador da instalação', () => {
     mockSettingsHooks()
     renderWithToast(<SettingsPage />)
     await goToSection('Suporte')
-    await screen.findByText('Configurações')
+    // "Configurações" also names the screen heading and, now, its own row in
+    // the replay-tour list — scoped to the section heading it was checking for.
+    await screen.findByRole('heading', { name: 'Configurações' })
     expect(screen.queryByText('Identificador desta instalação')).not.toBeInTheDocument()
   })
 
