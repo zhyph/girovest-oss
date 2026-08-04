@@ -51,6 +51,35 @@ function SectionPanel({
   )
 }
 
+/**
+ * Which section a failed field lives in, so an error raised in a section you
+ * are not looking at can still be pointed at.
+ *
+ * `hidden` sections stay mounted but are removed from the accessibility tree
+ * and from view, so an inline message beside the field is not enough on its
+ * own: a shop that cleared its address in Loja, switched to Cláusulas and hit
+ * Salvar got a save that silently did nothing, with the only explanation on a
+ * panel it could not see.
+ */
+const SECTION_OF_FIELD: Record<string, SettingsSection> = {
+  name: 'shop',
+  address: 'shop',
+  phone: 'shop',
+  maintenanceBufferDays: 'shop',
+  clauses: 'contract',
+  connectivityMode: 'appearance',
+}
+
+/** The one inline error line, so every field reports failure the same way. */
+function FieldError({ children }: { children?: React.ReactNode }) {
+  if (!children) return null
+  return (
+    <span role="alert" className="text-xs text-destructive">
+      {children}
+    </span>
+  )
+}
+
 export function SettingsPage() {
   const { t } = useTranslation('settings')
   const navigate = useNavigate()
@@ -96,6 +125,12 @@ export function SettingsPage() {
 
   const clauses = useFieldArray({ control, name: 'clauses' })
 
+  const sectionsWithErrors = new Set(
+    Object.keys(formState.errors)
+      .map((field) => SECTION_OF_FIELD[field])
+      .filter((value): value is SettingsSection => value !== undefined),
+  )
+
   async function onSubmit(values: LocationSettingsFormValues) {
     try {
       await updateSettings.mutateAsync(values)
@@ -118,6 +153,7 @@ export function SettingsPage() {
         >
           {SETTINGS_SECTIONS.map((key) => {
             const active = section === key
+            const hasErrors = sectionsWithErrors.has(key)
             return (
               <button
                 key={key}
@@ -132,10 +168,22 @@ export function SettingsPage() {
                 )}
               >
                 <span className="text-[13.5px] font-medium">{t(`sections.${key}`)}</span>
-                <span className={cn('text-[11.5px]', active ? 'text-primary' : 'text-foreground-subtle')}>
-                  {key === 'contract'
-                    ? t('sections.contractHint', { count: clauses.fields.length })
-                    : t(`sections.${key}Hint`)}
+                {/*
+                  The hint line doubles as the error marker: a section you are
+                  not looking at is the only place a validation failure can
+                  hide, and this nav is the one part of it still on screen.
+                */}
+                <span
+                  className={cn(
+                    'text-[11.5px]',
+                    hasErrors ? 'text-destructive' : active ? 'text-primary' : 'text-foreground-subtle',
+                  )}
+                >
+                  {hasErrors
+                    ? t('validation.sectionHasErrors')
+                    : key === 'contract'
+                      ? t('sections.contractHint', { count: clauses.fields.length })
+                      : t(`sections.${key}Hint`)}
                 </span>
               </button>
             )
@@ -180,6 +228,7 @@ export function SettingsPage() {
               aria-invalid={formState.errors.name ? true : undefined}
               {...register('name')}
             />
+            <FieldError>{formState.errors.name && t('validation.required')}</FieldError>
           </label>
           <label className="flex max-w-sm flex-col gap-1 text-sm">
             {t('fields.address')}
@@ -189,6 +238,7 @@ export function SettingsPage() {
               aria-invalid={formState.errors.address ? true : undefined}
               {...register('address')}
             />
+            <FieldError>{formState.errors.address && t('validation.required')}</FieldError>
             <span id="shop-identity-help" className="text-xs text-muted-foreground">
               {t('shopIdentityHelp')}
             </span>
@@ -211,8 +261,12 @@ export function SettingsPage() {
               max={60}
               aria-label={t('fields.maintenanceBufferDays')}
               aria-describedby="maintenance-buffer-help"
+              aria-invalid={formState.errors.maintenanceBufferDays ? true : undefined}
               {...register('maintenanceBufferDays', { valueAsNumber: true })}
             />
+            <FieldError>
+              {formState.errors.maintenanceBufferDays && t('validation.maintenanceBufferRange')}
+            </FieldError>
             <span id="maintenance-buffer-help" className="text-xs text-muted-foreground">
               {t('maintenanceBufferHelp')}
             </span>
@@ -238,25 +292,41 @@ export function SettingsPage() {
         <SectionPanel active={section === 'contract'}>
           <div className="flex flex-col gap-2.5">
             <SectionLabel>{t('clauses.title')}</SectionLabel>
-            {clauses.fields.map((field, index) => (
-              <div key={field.id} className="flex items-start gap-2">
-                <textarea
-                  {...register(`clauses.${index}.text`)}
-                  aria-label={t('clauses.textFieldAria')}
-                  rows={2}
-                  className="min-h-[3.5rem] w-full resize-y rounded-md border border-input bg-card px-3 py-2 text-sm text-foreground transition-colors [field-sizing:content] hover:border-input-hover focus:outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => clauses.remove(index)}
-                  aria-label={t('clauses.remove')}
-                >
-                  <X size={16} />
-                </Button>
-              </div>
-            ))}
+            {clauses.fields.map((field, index) => {
+              const invalid = formState.errors.clauses?.[index]?.text !== undefined
+              return (
+                <div key={field.id} className="flex flex-col gap-1">
+                  <div className="flex items-start gap-2">
+                    <textarea
+                      {...register(`clauses.${index}.text`)}
+                      aria-label={t('clauses.textFieldAria')}
+                      aria-invalid={invalid ? true : undefined}
+                      rows={2}
+                      className={cn(
+                        'min-h-[3.5rem] w-full resize-y rounded-md border border-input bg-card px-3 py-2 text-sm text-foreground transition-colors [field-sizing:content] hover:border-input-hover focus:outline-none focus:border-ring focus:ring-2 focus:ring-ring/30',
+                        'aria-invalid:border-destructive aria-invalid:bg-destructive-subtle aria-invalid:focus:border-destructive aria-invalid:focus:ring-destructive/30',
+                      )}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => clauses.remove(index)}
+                      aria-label={t('clauses.remove')}
+                    >
+                      <X size={16} />
+                    </Button>
+                  </div>
+                  {/*
+                    An empty clause fails the schema but prints as a blank
+                    numbered line on the contract, so it cannot just be
+                    accepted — and it used to fail with no marker at all, on a
+                    field that looks perfectly fine empty.
+                  */}
+                  <FieldError>{invalid && t('validation.clauseRequired')}</FieldError>
+                </div>
+              )
+            })}
             <Button type="button" variant="secondary" onClick={() => clauses.append({ text: '' })}>
               {t('clauses.add')}
             </Button>
@@ -271,7 +341,19 @@ export function SettingsPage() {
         */}
         {formState.isDirty && (
           <div className="absolute right-0 bottom-0 left-52 flex items-center justify-end gap-2.5 border-t border-border-strong bg-surface px-6 py-3 shadow-[0_-8px_20px_-14px_rgb(46_35_32/0.28)]">
-            <span className="mr-auto text-meta text-muted-foreground">{t('unsaved')}</span>
+            {/*
+              The save bar is the only thing on screen no matter which section
+              is showing, so a rejected submit says so here as well as beside
+              the field — otherwise pressing Salvar with a hidden section's
+              field empty looked exactly like nothing happening.
+            */}
+            {sectionsWithErrors.size > 0 ? (
+              <span role="alert" className="mr-auto text-meta text-destructive">
+                {t('validation.summary')}
+              </span>
+            ) : (
+              <span className="mr-auto text-meta text-muted-foreground">{t('unsaved')}</span>
+            )}
             <Button type="button" variant="secondary" onClick={() => reset()}>
               {t('discard')}
             </Button>
@@ -322,7 +404,21 @@ export function SettingsPage() {
         </SectionPanel>
 
         <SectionPanel active={section === 'backup'}>
-          {hasGirovestBridge() && <BackupSection />}
+          {/*
+            Backup and restore go through the desktop shell's IPC bridge —
+            picking a folder, writing a zip, restarting the app — none of which
+            a browser tab can do. The hosted build therefore has no actions to
+            offer here, but rendering nothing left the tab completely blank,
+            which reads as a broken screen rather than an unavailable feature.
+          */}
+          {hasGirovestBridge() ? (
+            <BackupSection />
+          ) : (
+            <div className="flex flex-col gap-2">
+              <SectionLabel>{t('backup.title')}</SectionLabel>
+              <p className="max-w-prose text-sm text-muted-foreground">{t('backup.desktopOnly')}</p>
+            </div>
+          )}
         </SectionPanel>
         </div>
         </div>

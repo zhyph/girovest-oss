@@ -286,3 +286,66 @@ describe('SettingsPage sections', () => {
     expect(screen.getByRole('button', { name: 'Salvar' })).toBeInTheDocument()
   })
 })
+
+describe('validation feedback', () => {
+  it('CRITICAL: says why a save was refused, from whichever section is on screen', async () => {
+    const update = vi.fn()
+    mockSettingsHooks(update)
+    renderWithToast(<SettingsPage />)
+
+    await userEvent.clear(screen.getByLabelText('Endereço'))
+    // Leave Loja for a section that does not contain the offending field.
+    // The panel it lives on is `hidden`, so an inline message there is
+    // invisible AND out of the accessibility tree — before this, pressing
+    // Salvar simply did nothing at all, with no explanation anywhere.
+    await goToSection('Contrato')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+
+    expect(update).not.toHaveBeenCalled()
+    expect(screen.getByText('Corrija os campos destacados antes de salvar.')).toBeVisible()
+    // And the nav points at the section holding the bad field.
+    expect(screen.getByRole('button', { name: /^Loja/ })).toHaveTextContent('Há campos a corrigir.')
+  })
+
+  it('marks an emptied required field inline and for assistive tech', async () => {
+    mockSettingsHooks(vi.fn())
+    renderWithToast(<SettingsPage />)
+
+    await userEvent.clear(screen.getByLabelText('Nome da loja'))
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+
+    expect(screen.getByLabelText('Nome da loja')).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getAllByText('Campo obrigatório.')[0]).toBeVisible()
+  })
+
+  it('CRITICAL: marks an emptied clause instead of failing silently', async () => {
+    const update = vi.fn()
+    mockSettingsHooks(update)
+    renderWithToast(<SettingsPage />)
+    await goToSection('Contrato')
+
+    const [firstClause] = screen.getAllByLabelText('Texto da cláusula')
+    await userEvent.clear(firstClause)
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+
+    expect(update).not.toHaveBeenCalled()
+    // An empty clause prints as a blank numbered line on the contract, so it
+    // has to be rejected — visibly, on a field that looks fine when empty.
+    expect(firstClause).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByText('Escreva a cláusula ou remova-a.')).toBeVisible()
+  })
+})
+
+describe('backup section without the desktop bridge', () => {
+  it('CRITICAL: explains itself instead of rendering an empty tab', async () => {
+    // No window.girovest: the hosted web build, and every browser anyone
+    // tests the app in. This tab used to render literally nothing.
+    mockSettingsHooks()
+    renderWithToast(<SettingsPage />)
+    await goToSection('Backup')
+
+    expect(
+      screen.getByText(/Backup e restauração estão disponíveis apenas no aplicativo para computador/),
+    ).toBeVisible()
+  })
+})
