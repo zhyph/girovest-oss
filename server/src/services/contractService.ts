@@ -196,15 +196,67 @@ export async function cancelContract(id: string, locationId: string) {
   })
 }
 
+export const CONTRACT_STATUS_FILTERS = ['all', 'active', 'overdue', 'unsigned'] as const
+export type ContractStatusFilter = (typeof CONTRACT_STATUS_FILTERS)[number]
+
+export interface ContractStatusCounts {
+  all: number
+  active: number
+  overdue: number
+  unsigned: number
+}
+
+/**
+ * The SQL twin of the client's `contractState`, one view at a time.
+ *
+ * Deliberately overlapping rather than a partition: an overdue contract is
+ * still active, and still unsigned if nobody signed it. These are "show me
+ * what I have to act on", not mutually exclusive buckets.
+ *
+ * `active` is expressed as "has a piece still reserved or still out" rather
+ * than by enumerating the states it excludes, which makes it agree with
+ * contractState by construction: that function returns cancelled with no live
+ * allocations and returned when every live one is back, and neither shape has
+ * a reserved or checked_out allocation left to match here.
+ */
+function statusWhere(status: ContractStatusFilter, asOf: Date) {
+  switch (status) {
+    case 'active':
+      return { allocations: { some: { status: { in: ['reserved', 'checked_out'] } } } }
+    case 'overdue':
+      return { allocations: { some: { status: 'checked_out', dueDate: { lt: asOf } } } }
+    case 'unsigned':
+      return { signatureStatus: { not: 'signed' } }
+    case 'all':
+      return {}
+  }
+}
+
 export async function listContracts(
   locationId: string,
-  { page = 1, pageSize = 20, search = '' }: { page?: number; pageSize?: number; search?: string } = {},
+  {
+    page = 1,
+    pageSize = 20,
+    search = '',
+    status = 'all',
+    asOf = new Date(),
+  }: {
+    page?: number
+    pageSize?: number
+    search?: string
+    status?: ContractStatusFilter
+    asOf?: Date
+  } = {},
 ) {
   const searchMode = process.env.DB_PROVIDER === 'postgresql' ? { mode: 'insensitive' as const } : {}
   const trimmedSearch = search.trim()
   const searchAsNumber = Number(trimmedSearch)
   const isNumericSearch = trimmedSearch !== '' && Number.isInteger(searchAsNumber)
-  const where = {
+  // Everything the current search matches, before any chip narrows it. The
+  // counts are measured against THIS, not against the filtered set — a chip
+  // that counted its own result would always report the number already on
+  // screen, which answers nothing. Same rule Produtos' chips follow.
+  const searched = {
     locationId,
     ...(trimmedSearch
       ? {
@@ -215,7 +267,9 @@ export async function listContracts(
         }
       : {}),
   }
-  const [contracts, total] = await Promise.all([
+  const where = { ...searched, ...statusWhere(status, asOf) }
+
+  const [contracts, total, active, overdue, unsigned, all] = await Promise.all([
     prisma.contract.findMany({
       where,
       orderBy: { createdAt: 'desc' },
@@ -224,8 +278,13 @@ export async function listContracts(
       take: pageSize,
     }),
     prisma.contract.count({ where }),
+    prisma.contract.count({ where: { ...searched, ...statusWhere('active', asOf) } }),
+    prisma.contract.count({ where: { ...searched, ...statusWhere('overdue', asOf) } }),
+    prisma.contract.count({ where: { ...searched, ...statusWhere('unsigned', asOf) } }),
+    prisma.contract.count({ where: searched }),
   ])
-  return { contracts, total, page, pageSize }
+  const counts: ContractStatusCounts = { all, active, overdue, unsigned }
+  return { contracts, total, page, pageSize, counts }
 }
 
 export async function getContract(id: string, locationId: string) {

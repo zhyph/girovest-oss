@@ -31,7 +31,13 @@ import {
   useCancelAllocation,
 } from '../allocations/useAllocations.ts'
 import type { Allocation } from '../allocations/allocationSchemas.ts'
-import { useContractsList, useCancelContract, useSetInstallmentPaid, CONTRACTS_KEY } from './useContracts.ts'
+import {
+  useContractsList,
+  useCancelContract,
+  useSetInstallmentPaid,
+  CONTRACTS_KEY,
+  type ContractStatusFilter,
+} from './useContracts.ts'
 import type { Contract } from './contractSchemas.ts'
 import { NewContractForm } from './NewContractForm.tsx'
 import { SignRemotelyModal } from './SignRemotelyModal.tsx'
@@ -51,24 +57,6 @@ export function contractState(contract: Contract, today = new Date()): EntitySta
   if (live.some((allocation) => allocation.status === 'checked_out')) return 'checked_out'
   if (live.every((allocation) => allocation.status === 'returned')) return 'returned'
   return 'reserved'
-}
-
-export type ContractFilter = 'active' | 'overdue' | 'unsigned' | 'all'
-
-/**
- * Deliberately overlapping views, not a partition: an overdue contract is
- * still an active one, and it is still unsigned if nobody signed it. The
- * chips answer "show me the ones I have to do something about", and a
- * contract can qualify on more than one count.
- */
-const FILTER_MATCHES: Record<ContractFilter, (contract: Contract, today: Date) => boolean> = {
-  active: (contract, today) => {
-    const state = contractState(contract, today)
-    return state === 'reserved' || state === 'checked_out' || state === 'overdue'
-  },
-  overdue: (contract, today) => contractState(contract, today) === 'overdue',
-  unsigned: (contract) => contract.signatureStatus !== 'signed',
-  all: () => true,
 }
 
 export type ContractWeekGroup = 'thisWeek' | 'upcoming' | 'past'
@@ -698,8 +686,8 @@ export function ContractsPage() {
   const { locale } = useLocale()
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState<ContractFilter>('all')
-  const { data, isLoading } = useContractsList({ page, search })
+  const [filter, setFilter] = useState<ContractStatusFilter>('all')
+  const { data, isLoading } = useContractsList({ page, search, status: filter })
   const { data: products } = useProducts()
   const { data: clients } = useClients()
   // `?novo=1` is how the rail's "Nova alocação" shortcut opens this form
@@ -708,12 +696,20 @@ export function ContractsPage() {
   // URL too and a refresh doesn't silently reopen the form.
   const [searchParams, setSearchParams] = useSearchParams()
   const showForm = searchParams.get('novo') === '1'
+  // Set by the Clientes screen's own "Novo contrato" shortcut, which knows
+  // who the contract is for. Cleared with `novo` so a stale id cannot outlive
+  // the dialog that used it.
+  const presetClientId = searchParams.get('clienteId') ?? undefined
   const setShowForm = (open: boolean) => {
     setSearchParams(
       (previous) => {
         const next = new URLSearchParams(previous)
-        if (open) next.set('novo', '1')
-        else next.delete('novo')
+        if (open) {
+          next.set('novo', '1')
+        } else {
+          next.delete('novo')
+          next.delete('clienteId')
+        }
         return next
       },
       { replace: true },
@@ -738,23 +734,16 @@ export function ContractsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const contracts = data?.contracts
-  // The server paginates and searches; the chips and the week grouping work
-  // over the page that came back, so their counts describe what is on screen
-  // rather than the whole archive. Filtering server-side would need a new
-  // query param on GET /api/contracts, which this pass deliberately does not
-  // touch.
+  // Both the chip counts and the narrowing are the server's answers now, over
+  // the whole archive rather than over whichever page came back. The week
+  // grouping stays client-side on purpose: a group header counts the rows
+  // printed under it, so it can only ever describe the page it is drawn on.
   const today = new Date()
-  const counts: Record<ContractFilter, number> = {
-    active: (contracts ?? []).filter((contract) => FILTER_MATCHES.active(contract, today)).length,
-    overdue: (contracts ?? []).filter((contract) => FILTER_MATCHES.overdue(contract, today)).length,
-    unsigned: (contracts ?? []).filter((contract) => FILTER_MATCHES.unsigned(contract, today)).length,
-    all: (contracts ?? []).length,
-  }
-  const visible = (contracts ?? []).filter((contract) => FILTER_MATCHES[filter](contract, today))
+  const counts = data?.counts ?? { all: 0, active: 0, overdue: 0, unsigned: 0 }
   const weekGroups = WEEK_GROUP_ORDER.map((key) => ({
     key,
     label: t(`groups.${key}`),
-    rows: visible.filter((contract) => contractWeekGroup(contract, today) === key),
+    rows: (contracts ?? []).filter((contract) => contractWeekGroup(contract, today) === key),
   }))
     .filter((group) => group.rows.length > 0)
     .map((group) => ({ ...group, meta: group.rows.length }))
@@ -764,6 +753,14 @@ export function ContractsPage() {
 
   function handleSearchChange(value: string) {
     setSearch(value)
+    setPage(1)
+  }
+
+  // Page 3 of "Todos" is very unlikely to exist under "Atrasados", and
+  // landing on an empty page reads as "no results" rather than as a paging
+  // accident.
+  function handleFilterChange(next: ContractStatusFilter) {
+    setFilter(next)
     setPage(1)
   }
 
@@ -865,7 +862,7 @@ export function ContractsPage() {
           />
         }
         filters={(['active', 'overdue', 'unsigned', 'all'] as const).map((key) => (
-          <FilterChip key={key} active={filter === key} onClick={() => setFilter(key)} count={counts[key]}>
+          <FilterChip key={key} active={filter === key} onClick={() => handleFilterChange(key)} count={counts[key]}>
             {t(`filters.${key}`)}
           </FilterChip>
         ))}
@@ -908,7 +905,15 @@ export function ContractsPage() {
           />
         </aside>
       </div>
-      {showForm && <NewContractForm onClose={() => setShowForm(false)} />}
+      {showForm && (
+        <NewContractForm
+          // Remounts when the preselected client changes, so the form picks
+          // up the new default rather than keeping the first one it saw.
+          key={presetClientId ?? 'new'}
+          clientId={presetClientId}
+          onClose={() => setShowForm(false)}
+        />
+      )}
     </div>
   )
 }

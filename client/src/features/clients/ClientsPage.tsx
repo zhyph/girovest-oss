@@ -231,6 +231,7 @@ export function ClientsPage() {
                   onNext: () => setPage(page + 1),
                   hasPrevious: page > 1,
                   hasNext: page < totalPages,
+                  dataTour: 'clients.pagination',
                 }
               : undefined
           }
@@ -242,7 +243,15 @@ export function ClientsPage() {
             contracts={contracts}
             onEdit={(client) => setEditing(client)}
             onDelete={(client) => setDeleting(client)}
-            onNewContract={() => navigate('/contratos?novo=1')}
+            // Carries the client through, so the contract form opens with
+            // the person already chosen rather than making staff retype the
+            // name they just had selected.
+            // The panel hands back the client it is showing, which is also
+            // the only one it could be — no need to reach for `selected` and
+            // then prove to the compiler that it is not null.
+            onNewContract={(client) =>
+              navigate(`/contratos?novo=1&clienteId=${encodeURIComponent(client.id)}`)
+            }
           />
         </aside>
       </div>

@@ -646,3 +646,114 @@ describe('sumReceivables', () => {
     expect(await sumReceivables(otherLocation.id, WEEK_START, WEEK_END)).toEqual({ total: 0, count: 0 })
   })
 })
+
+describe('listContracts status filters and counts', () => {
+  const DAY = 24 * 60 * 60 * 1000
+
+  async function seedStates() {
+    // Reserved and unsigned: active, not overdue.
+    const reserved = await createContract(baseInput())
+    // Checked out and past due: active AND overdue.
+    const late = await createContract(
+      baseInput({
+        items: [
+          { productId: secondProductId, checkoutDate: new Date('2026-01-02'), dueDate: new Date('2026-01-05'), priceCharged: 100 },
+        ],
+      }),
+    )
+    await prisma.allocation.updateMany({ where: { contractId: late.id }, data: { status: 'checked_out' } })
+    // Everything back and signed: neither active nor unsigned.
+    const done = await createContract(
+      baseInput({
+        items: [
+          { productId, checkoutDate: new Date('2027-03-02'), dueDate: new Date('2027-03-05'), priceCharged: 100 },
+        ],
+      }),
+    )
+    await prisma.allocation.updateMany({ where: { contractId: done.id }, data: { status: 'returned' } })
+    await prisma.contract.update({ where: { id: done.id }, data: { signatureStatus: 'signed' } })
+    return { reserved, late, done }
+  }
+
+  it('counts every view across the whole dataset, not just the requested page', async () => {
+    const { reserved, late } = await seedStates()
+
+    // One row per page: the counts must still describe all three contracts,
+    // which is the entire point of computing them here rather than over
+    // whatever the page happened to return.
+    const result = await listContracts(locationId, { page: 1, pageSize: 1 })
+
+    expect(result.contracts).toHaveLength(1)
+    expect(result.counts).toEqual({ all: 3, active: 2, overdue: 1, unsigned: 2 })
+    expect([reserved.id, late.id]).toContain(result.contracts[0].id === reserved.id ? reserved.id : late.id)
+  })
+
+  it('narrows the rows themselves, and pages within the narrowed set', async () => {
+    const { late } = await seedStates()
+
+    const result = await listContracts(locationId, { status: 'overdue' })
+
+    expect(result.contracts.map((contract) => contract.id)).toEqual([late.id])
+    // `total` drives pagination, so it has to follow the filter rather than
+    // the whole dataset — otherwise a filtered list offers pages that are
+    // empty when you reach them.
+    expect(result.total).toBe(1)
+    expect(result.counts.all).toBe(3)
+  })
+
+  it('treats a contract with nothing reserved or out as no longer active', async () => {
+    const { done } = await seedStates()
+
+    const active = await listContracts(locationId, { status: 'active' })
+    expect(active.contracts.map((contract) => contract.id)).not.toContain(done.id)
+  })
+
+  it('leaves a cancelled contract out of active', async () => {
+    const contract = await createContract(baseInput())
+    await cancelContract(contract.id, locationId)
+
+    const result = await listContracts(locationId, { status: 'active' })
+    expect(result.contracts).toHaveLength(0)
+    expect(result.counts.active).toBe(0)
+  })
+
+  it('counts a piece due today as overdue and one due tomorrow as not', async () => {
+    // The boundary the desktop's own badge draws: `asOf` comes from the
+    // caller precisely so these two answers cannot drift apart.
+    const asOf = new Date()
+    const dueToday = new Date(Date.UTC(asOf.getUTCFullYear(), asOf.getUTCMonth(), asOf.getUTCDate()))
+    const dueTomorrow = new Date(dueToday.getTime() + DAY)
+
+    const first = await createContract(baseInput())
+    await prisma.allocation.updateMany({
+      where: { contractId: first.id },
+      data: { status: 'checked_out', dueDate: dueToday },
+    })
+    const second = await createContract(
+      baseInput({
+        items: [
+          { productId: secondProductId, checkoutDate: new Date('2026-01-02'), dueDate: new Date('2026-01-05'), priceCharged: 100 },
+        ],
+      }),
+    )
+    await prisma.allocation.updateMany({
+      where: { contractId: second.id },
+      data: { status: 'checked_out', dueDate: dueTomorrow },
+    })
+
+    const result = await listContracts(locationId, { status: 'overdue', asOf: new Date(dueToday.getTime() + 1) })
+
+    expect(result.contracts.map((contract) => contract.id)).toEqual([first.id])
+  })
+
+  it('measures the counts against the search, not against the chip', async () => {
+    await seedStates()
+    const otherClient = await prisma.client.create({
+      data: { locationId, name: 'Cliente Sem Contrato', phone: '2', email: 'x@example.com' },
+    })
+
+    const result = await listContracts(locationId, { search: otherClient.name })
+
+    expect(result.counts).toEqual({ all: 0, active: 0, overdue: 0, unsigned: 0 })
+  })
+})

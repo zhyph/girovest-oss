@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, type Mock } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router'
@@ -10,6 +10,7 @@ import * as useProductsModule from '../products/useProducts.ts'
 import * as useClientsModule from '../clients/useClients.ts'
 import * as useAllocationsModule from '../allocations/useAllocations.ts'
 import * as toastModule from '../../lib/toast.ts'
+import * as NewContractFormModule from './NewContractForm.tsx'
 import type { Contract } from './contractSchemas.ts'
 
 function renderWithProviders(ui: React.ReactElement) {
@@ -80,11 +81,18 @@ function mockHooks(
     cancelImpl?: (...args: never[]) => Promise<unknown>
     checkOutImpl?: Mock
     setPaidImpl?: Mock
+    counts?: { all: number; active: number; overdue: number; unsigned: number }
   } = {},
 ) {
   const contracts = overrides.contracts ?? [contract]
   vi.spyOn(useContractsModule, 'useContractsList').mockReturnValue({
-    data: { contracts, total: contracts.length, page: 1, pageSize: 20 },
+    data: {
+      contracts,
+      total: contracts.length,
+      page: 1,
+      pageSize: 20,
+      counts: overrides.counts ?? { all: contracts.length, active: contracts.length, overdue: 0, unsigned: contracts.length },
+    },
     isLoading: false,
   } as never)
   vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [{ id: 'p1', name: 'Vestido Azul' }] } as never)
@@ -546,47 +554,56 @@ describe('ContractsPage split view', () => {
 })
 
 describe('status filter chips', () => {
-  const overdueContract: Contract = {
-    ...contract,
-    id: 'ct-late', number: 9, eventDate: '2020-01-05',
-    allocations: [{ ...contract.allocations[0], id: 'a-late', status: 'checked_out', dueDate: '2020-01-06' }],
-  }
-  const signedReturned: Contract = {
-    ...contract,
-    id: 'ct-done', number: 10, eventDate: '2020-01-05', signatureStatus: 'signed',
-    allocations: [{ ...contract.allocations[0], id: 'a-done', status: 'returned' }],
-  }
-
-  it('counts each view over the contracts on screen', async () => {
-    mockHooks({ contracts: [contract, overdueContract, signedReturned] })
+  it('shows the counts the server measured over the whole archive', async () => {
+    // Deliberately larger than the page: the counts describe every contract
+    // the search matches, not the 20 rows that came back, which is the whole
+    // reason they are computed server-side.
+    mockHooks({ counts: { all: 240, active: 96, overdue: 7, unsigned: 31 } })
     renderWithProviders(<ContractsPage />)
 
-    // contract: reserved + unsigned. overdueContract: overdue + unsigned.
-    // signedReturned: neither active nor unsigned.
-    expect(await screen.findByRole('button', { name: /^Ativos\s*2$/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /^Atrasados\s*1$/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /^Não assinados\s*2$/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /^Todos\s*3$/ })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /^Ativos\s*96$/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Atrasados\s*7$/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Não assinados\s*31$/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Todos\s*240$/ })).toBeInTheDocument()
   })
 
-  it('narrows the list to the picked view and marks it pressed', async () => {
-    mockHooks({ contracts: [contract, overdueContract, signedReturned] })
+  it('asks the server for the picked view instead of narrowing the page in the browser', async () => {
+    const listSpy = vi.fn().mockReturnValue({
+      data: { contracts: [contract], total: 1, page: 1, pageSize: 20, counts: { all: 1, active: 1, overdue: 0, unsigned: 1 } },
+      isLoading: false,
+    })
+    mockHooks()
+    vi.spyOn(useContractsModule, 'useContractsList').mockImplementation(listSpy as never)
     renderWithProviders(<ContractsPage />)
 
     await userEvent.click(await screen.findByRole('button', { name: /^Atrasados/ }))
 
     expect(screen.getByRole('button', { name: /^Atrasados/ })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: /#9/ })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /#3/ })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /#10/ })).not.toBeInTheDocument()
+    expect(listSpy).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'overdue' }))
+  })
+
+  it('returns to the first page when the view changes', async () => {
+    const listSpy = vi.fn().mockReturnValue({
+      data: { contracts: [contract], total: 60, page: 3, pageSize: 20, counts: { all: 60, active: 60, overdue: 2, unsigned: 60 } },
+      isLoading: false,
+    })
+    mockHooks()
+    vi.spyOn(useContractsModule, 'useContractsList').mockImplementation(listSpy as never)
+    renderWithProviders(<ContractsPage />)
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Próximo' }))
+    await userEvent.click(screen.getByRole('button', { name: /^Atrasados/ }))
+
+    // Page 3 of Todos almost certainly has no equivalent under Atrasados, and
+    // an empty page reads as "no results" rather than as a paging accident.
+    expect(listSpy).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'overdue', page: 1 }))
   })
 
   it('shows every contract by default', async () => {
-    mockHooks({ contracts: [contract, overdueContract, signedReturned] })
+    mockHooks({ counts: { all: 3, active: 2, overdue: 1, unsigned: 2 } })
     renderWithProviders(<ContractsPage />)
 
     expect(await screen.findByRole('button', { name: /^Todos\s*3$/ })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getAllByRole('button', { name: /#\d/ })).toHaveLength(3)
   })
 })
 
@@ -650,5 +667,60 @@ describe('client section in the detail panel', () => {
     const panel = document.querySelector('aside') as HTMLElement
 
     expect(within(panel).getAllByText('Não informado')).toHaveLength(2)
+  })
+})
+
+describe('opening the form for a client chosen elsewhere', () => {
+  function renderAt(entry: string) {
+    const queryClient = new QueryClient()
+    return render(
+      <MemoryRouter initialEntries={[entry]}>
+        <QueryClientProvider client={queryClient}>
+          <ContractsPage />
+        </QueryClientProvider>
+      </MemoryRouter>,
+    )
+  }
+
+  it('passes the clienteId param through to the form', async () => {
+    mockHooks()
+    // This file does not restore mocks between tests, so the spy would carry
+    // the previous test's calls if it were not cleared.
+    const formSpy = vi.spyOn(NewContractFormModule, 'NewContractForm').mockImplementation(() => <span data-testid="form-stub" />)
+    formSpy.mockClear()
+
+    renderAt('/contratos?novo=1&clienteId=c1')
+
+    await waitFor(() => expect(formSpy).toHaveBeenCalled())
+    expect(formSpy.mock.calls[0][0]).toMatchObject({ clientId: 'c1' })
+  })
+
+  it('leaves the form unpreselected when only novo=1 is present', async () => {
+    mockHooks()
+    const formSpy = vi.spyOn(NewContractFormModule, 'NewContractForm').mockImplementation(() => <span data-testid="form-stub" />)
+    formSpy.mockClear()
+
+    renderAt('/contratos?novo=1')
+
+    await waitFor(() => expect(formSpy).toHaveBeenCalled())
+    expect(formSpy.mock.calls[0][0].clientId).toBeUndefined()
+  })
+
+  it('drops the client id from the URL when the form closes', async () => {
+    mockHooks()
+    vi.spyOn(NewContractFormModule, 'NewContractForm').mockImplementation(
+      ({ onClose }: { onClose: () => void }) => (
+        <button type="button" onClick={onClose}>
+          fechar
+        </button>
+      ),
+    )
+
+    renderAt('/contratos?novo=1&clienteId=c1')
+    await userEvent.click(await screen.findByRole('button', { name: 'fechar' }))
+
+    // A stale id outliving its dialog would silently preselect the wrong
+    // person the next time the shortcut in the rail opens this form.
+    expect(screen.queryByRole('button', { name: 'fechar' })).not.toBeInTheDocument()
   })
 })

@@ -530,3 +530,42 @@ describe('dialog format', () => {
     expect(screen.getByText('Parcelas')).toBeInTheDocument()
   })
 })
+
+describe('opened for a client already on screen', () => {
+  it('starts with that client chosen instead of an empty field', async () => {
+    mockHooks()
+    renderWithToast(<NewContractForm clientId="c1" onClose={vi.fn()} />)
+
+    // The combobox trigger is a button showing the chosen label, not an
+    // input carrying a value.
+    expect(await screen.findByLabelText(/cliente/i)).toHaveTextContent('Maria Completa')
+  })
+
+  it('does not treat the preselection as an unsaved edit', async () => {
+    const onClose = vi.fn()
+    mockHooks()
+    renderWithToast(<NewContractForm clientId="c1" onClose={onClose} />)
+    expect(await screen.findByLabelText(/cliente/i)).toHaveTextContent('Maria Completa')
+
+    await userEvent.click(screen.getByRole('button', { name: /cancelar/i }))
+
+    // Closing an untouched dialog must not stop to ask about discarding —
+    // the preselected client is a default value, not something typed.
+    expect(screen.queryByText('Descartar alterações?')).not.toBeInTheDocument()
+    expect(onClose).toHaveBeenCalled()
+  })
+
+  it('opens empty, not broken, when the id no longer matches a client', async () => {
+    mockHooks()
+    renderWithToast(<NewContractForm clientId="ghost" onClose={vi.fn()} />)
+
+    expect(await screen.findByLabelText(/cliente/i)).not.toHaveTextContent('Maria Completa')
+  })
+
+  it('still opens empty when nothing was preselected', async () => {
+    mockHooks()
+    renderWithToast(<NewContractForm onClose={vi.fn()} />)
+
+    expect(await screen.findByLabelText(/cliente/i)).not.toHaveTextContent('Maria Completa')
+  })
+})

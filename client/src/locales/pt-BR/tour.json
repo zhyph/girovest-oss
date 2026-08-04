@@ -38,6 +38,10 @@
       "table": {
         "title": "Lista de clientes",
         "description": "Clique em qualquer cliente da lista para ver ou editar os dados dele."
+      },
+      "pagination": {
+        "title": "Navegar pela lista",
+        "description": "A lista mostra 20 clientes por vez. Use Anterior e Próximo para ver o restante do cadastro."
       }
     }
   },

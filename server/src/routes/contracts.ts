@@ -11,6 +11,7 @@ import {
   getContract,
   setInstallmentPaid,
   sumReceivables,
+  CONTRACT_STATUS_FILTERS,
 } from '../services/contractService.js'
 import { issueSigningToken } from '../services/signingService.js'
 import { detectLanCandidates } from '../network/lanNetwork.js'
@@ -34,13 +35,34 @@ export function reachableSigningCandidates(): ReturnType<typeof detectLanCandida
   return detectLanCandidates().filter((candidate) => candidate.address !== host)
 }
 
+const listQuerySchema = z.object({
+  status: z.enum(CONTRACT_STATUS_FILTERS).optional(),
+  // The caller's "now". Overdue is the one view that depends on it, and the
+  // desktop's clock is what the badge beside the row already compares
+  // against — deriving it here instead would let the chip and the badge
+  // disagree on a contract due today.
+  asOf: isoDate.optional(),
+})
+
 contractsRouter.get('/', async (req, res) => {
   if (!req.staff) throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Unauthorized')
+  const parsed = listQuerySchema.safeParse(req.query)
+  if (!parsed.success) {
+    throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'Invalid contract list query')
+  }
   const locationId = req.staff.locationId
   const page = Number(req.query.page ?? 1)
   const pageSize = Number(req.query.pageSize ?? 20)
   const search = typeof req.query.search === 'string' ? req.query.search : ''
-  res.json(await listContracts(locationId, { page, pageSize, search }))
+  res.json(
+    await listContracts(locationId, {
+      page,
+      pageSize,
+      search,
+      status: parsed.data.status,
+      asOf: parsed.data.asOf,
+    }),
+  )
 })
 
 const receivablesSchema = z.object({ from: isoDate, to: isoDate })

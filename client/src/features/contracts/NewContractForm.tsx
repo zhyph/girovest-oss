@@ -165,7 +165,20 @@ function useWatchField(
   return useWatch({ control, name }) as string
 }
 
-export function NewContractForm({ onClose }: { onClose: () => void }) {
+export function NewContractForm({
+  onClose,
+  clientId: preselectedClientId,
+}: {
+  onClose: () => void
+  /**
+   * Opens with this client already chosen — the Clientes screen starts a
+   * contract for the person on screen, and retyping the name you just had
+   * selected is the kind of step that makes staff skip the shortcut. An id
+   * that no longer exists simply leaves the field empty, since the combobox
+   * resolves it against the loaded clients rather than trusting it.
+   */
+  clientId?: string
+}) {
   const { t } = useTranslation('contracts')
   const { locale } = useLocale()
   const { data: clients } = useClients()
@@ -185,7 +198,7 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
   } = useForm<NewContractFormValues>({
     resolver: zodResolver(newContractSchema),
     defaultValues: {
-      clientId: '',
+      clientId: preselectedClientId ?? '',
       eventDate: '',
       paymentMethod: '',
       items: [{ productId: '', checkoutDate: '', dueDate: '', priceCharged: 0 }],
@@ -195,6 +208,9 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
 
   const items = useFieldArray({ control, name: 'items' })
   const installments = useFieldArray({ control, name: 'installments' })
+  // `isDirty` compares against defaultValues, and the preselected client IS
+  // a default value, so an untouched dialog opened from Clientes stays clean
+  // and closes without a discard prompt.
   const discardGuard = useUnsavedChangesGuard({ isDirty, onConfirmDiscard: onClose })
   const selectedClientId = watch('clientId')
   const selectedClient = clients?.find((client) => client.id === selectedClientId) ?? null

@@ -295,7 +295,10 @@ describe('ClientsPage', () => {
     const panel = document.querySelector('aside') as HTMLElement
     await userEvent.click(within(panel).getByRole('button', { name: 'Novo contrato' }))
 
-    expect(screen.getByTestId('location')).toHaveTextContent('/contratos?novo=1')
+    // Carries the client through, so the contract form opens with the person
+    // already chosen. Without the id the shortcut saves one click and then
+    // makes staff retype the name they just had selected.
+    expect(screen.getByTestId('location')).toHaveTextContent('/contratos?novo=1&clienteId=1')
   })
 
   it('paginates the list rather than letting it run on forever', async () => {

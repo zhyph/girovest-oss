@@ -70,9 +70,22 @@ describe('tour anchors match rendered DOM', () => {
     expectAllAnchorsPresent('dashboard')
   })
 
-  it('clients: todas as âncoras existem com pelo menos um cliente cadastrado', () => {
+  it('clients: todas as âncoras existem, incluindo paginação com múltiplas páginas', () => {
+    // 21 clients, one more than a page holds: the pagination strip only
+    // renders when there is somewhere to page to, so a single-client fixture
+    // would silently skip its anchor rather than fail on it.
     vi.spyOn(useClientsModule, 'useClients').mockReturnValue({
-      data: [{ id: '1', name: 'Maria Silva', phone: '11999990000', email: 'maria@x.com', notes: '', createdAt: '2026-01-01' }],
+      data: Array.from({ length: 21 }, (_, index) => ({
+        id: `c${index}`,
+        name: `Cliente ${index}`,
+        phone: '11999990000',
+        email: `cliente${index}@x.com`,
+        notes: '',
+        identityDocuments: [],
+        addressLines: [],
+        hasAllocationHistory: false,
+        createdAt: '2026-01-01',
+      })),
       isLoading: false,
     } as never)
 

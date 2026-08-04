@@ -29,6 +29,7 @@ export const TOURS: Record<SectionKey, TourStep[]> = {
     { anchor: 'create' },
     { anchor: 'search' },
     { anchor: 'table' },
+    { anchor: 'pagination' },
   ],
   products: [
     { anchor: 'create' },
