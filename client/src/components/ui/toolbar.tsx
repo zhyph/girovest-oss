@@ -42,12 +42,16 @@ export function ToolbarSearch({
   placeholder,
   label,
   className,
+  // The onboarding tour anchors onto the field itself, not the wrapper, so
+  // the attribute has to reach the input.
+  dataTour,
 }: {
   value: string
   onChange: (value: string) => void
   placeholder?: string
   label: string
   className?: string
+  dataTour?: string
 }) {
   return (
     <div className={cn('relative flex-[0_1_280px]', className)}>
@@ -58,6 +62,7 @@ export function ToolbarSearch({
       />
       <input
         type="search"
+        data-tour={dataTour}
         aria-label={label}
         value={value}
         onChange={(event) => onChange(event.target.value)}

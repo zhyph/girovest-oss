@@ -172,7 +172,13 @@
   --palette-dark-primary-foreground: #241c1b;
   --palette-dark-secondary: #3a2830;
   --palette-dark-secondary-foreground: #f3d9de;
-  --palette-dark-muted: #332725;
+  /*
+   * Lifted from #332725, which sat at 1.05:1 against --card and so made a
+   * neutral badge ("Reservado", "Cancelado") read as bare text with no pill
+   * behind it. Now 1.33:1 against card, matching light mode's 1.22:1 step,
+   * with --muted-foreground still 5.93:1 on top of it.
+   */
+  --palette-dark-muted: #453734;
   --palette-dark-muted-foreground: #c9b8b0;
   --palette-dark-accent: #3a2830;
   --palette-dark-accent-foreground: #f3d9de;

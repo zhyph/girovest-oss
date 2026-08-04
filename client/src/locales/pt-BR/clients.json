@@ -39,5 +39,17 @@
     "confirm": "Remover"
   },
   "empty": "Nenhum cliente cadastrado ainda.",
-  "noResults": "Nenhum cliente encontrado para essa busca."
+  "noResults": "Nenhum cliente encontrado para essa busca.",
+  "detail": {
+    "pickClient": "Selecione um cliente na lista para ver o cadastro e o histórico.",
+    "since": "Cliente desde {{date}}",
+    "contactAndDocuments": "Contato e documentos",
+    "rentalHistory": "O que já alugou",
+    "noHistory": "Nenhum aluguel registrado ainda.",
+    "moreActions": "Mais ações"
+  },
+  "columns": {
+    "email": "E-mail"
+  },
+  "newButton": "Novo cliente"
 }
