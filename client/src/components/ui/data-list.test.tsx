@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '../../i18n.ts'
 import { DataList, DataListEmpty, type DataListColumn, type DataListGroup } from './data-list.tsx'
@@ -103,6 +103,10 @@ describe('DataList', () => {
     // no way to tell a focused row from one the mouse happened to be over.
     expect(rowControl.className).toMatch(/focus-visible:outline-2/)
     expect(rowControl.className).toMatch(/focus-visible:outline-ring/)
+    // Without this the ring is present in the markup and invisible on screen:
+    // `outline-none` sets `--tw-outline-style: none`, and `outline-2` only
+    // sets a width plus `outline-style: var(--tw-outline-style)`.
+    expect(rowControl.className).toMatch(/focus-visible:outline-solid/)
     expect(rowControl.className).not.toMatch(/focus-visible:bg-/)
 
     await userEvent.tab()

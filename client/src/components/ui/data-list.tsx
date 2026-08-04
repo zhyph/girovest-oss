@@ -163,8 +163,16 @@ export function DataList<T>({
                             outline the selected row uses, in `ring` rather
                             than `primary` so focus and selection stay tellable
                             apart when a row is both.
+
+                            `outline-solid` is load-bearing, not decoration:
+                            Tailwind v4's `outline-none` sets
+                            `--tw-outline-style: none`, and `outline-2` only
+                            sets a WIDTH plus `outline-style: var(...)`. Pair
+                            them without re-declaring the style and the ring is
+                            in the markup, passes a className assertion, and
+                            paints nothing at all in a real browser.
                           */
-                          className="absolute inset-0 outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                          className="absolute inset-0 outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-solid focus-visible:outline-ring"
                         />
                       )}
                       {columns.map((column) => (
