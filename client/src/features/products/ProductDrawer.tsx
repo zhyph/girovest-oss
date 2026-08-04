@@ -65,6 +65,15 @@ export function ProductDrawer({
    */
   const [photos, setPhotos] = useState<string[]>(product?.photos ?? [])
   const [addAnotherAfterSave, setAddAnotherAfterSave] = useState(false)
+  /**
+   * Set the moment a NEW product's row is created, before its photos are
+   * uploaded. If the upload then fails (oversized batch, network drop), the
+   * drawer stays open with the row already committed server-side — without
+   * this, pressing "Salvar" again would call createProduct a second time and
+   * mint a second row with a second sequential code. Every retry after the
+   * first success patches this same row instead.
+   */
+  const [createdProduct, setCreatedProduct] = useState<Product | null>(null)
   const uploadPhotos = useUploadProductPhotos()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const {
@@ -138,9 +147,26 @@ export function ProductDrawer({
     })
   }
 
+  // Matches the server's own uploadPhotosSchema (signingValidation.ts) so a
+  // batch this large is chunked before it hits that limit, instead of the
+  // server rejecting it outright and the picker losing every photo at once.
+  const PHOTO_BATCH_MAX_COUNT = 20
+  // Leaves headroom under the route's 12 MB JSON body limit — several
+  // full-size compressed photos can individually pass the per-photo cap and
+  // still sum past the request's own ceiling.
+  const PHOTO_BATCH_MAX_BASE64_LENGTH = 8_000_000
+
   /**
    * Sends whatever was picked in this drawer and returns the piece's photos in
    * the order shown on screen.
+   *
+   * Split into chunks bounded by both count and combined length — a picker
+   * selection large enough to exceed either used to go in one request and
+   * fail as a single all-or-nothing batch, discarding every photo including
+   * ones well within either limit on their own. Each successful chunk is
+   * folded into local state immediately, so if a later chunk fails, only the
+   * photos IT carried are left pending — not the ones already safely on the
+   * server.
    *
    * The upload appends, so for a piece that had photos already the order it
    * produces is "old ones, then new ones" — which is only the intended order
@@ -148,12 +174,42 @@ export function ProductDrawer({
    * the normal save below, which is the single authority on order.
    */
   async function resolvePhotos(productId: string): Promise<string[]> {
-    const pending = photos.filter(isPendingPhoto)
-    if (pending.length === 0) return photos
-    const { photos: stored } = await uploadPhotos.mutateAsync({ id: productId, photos: pending })
-    const storedForPending = stored.slice(stored.length - pending.length)
-    let cursor = 0
-    return photos.map((entry) => (isPendingPhoto(entry) ? storedForPending[cursor++] : entry))
+    const pendingIndexes: number[] = []
+    photos.forEach((entry, index) => {
+      if (isPendingPhoto(entry)) pendingIndexes.push(index)
+    })
+    if (pendingIndexes.length === 0) return photos
+
+    const chunks: number[][] = []
+    let current: number[] = []
+    let currentLength = 0
+    for (const index of pendingIndexes) {
+      const entryLength = photos[index].length
+      const wouldOverflow =
+        current.length >= PHOTO_BATCH_MAX_COUNT || currentLength + entryLength > PHOTO_BATCH_MAX_BASE64_LENGTH
+      if (wouldOverflow && current.length > 0) {
+        chunks.push(current)
+        current = []
+        currentLength = 0
+      }
+      current.push(index)
+      currentLength += entryLength
+    }
+    if (current.length > 0) chunks.push(current)
+
+    let latest = photos
+    for (const chunkIndexes of chunks) {
+      const chunkPhotos = chunkIndexes.map((index) => latest[index])
+      const { photos: stored } = await uploadPhotos.mutateAsync({ id: productId, photos: chunkPhotos })
+      const storedForChunk = stored.slice(stored.length - chunkPhotos.length)
+      const next = [...latest]
+      chunkIndexes.forEach((index, position) => {
+        next[index] = storedForChunk[position]
+      })
+      latest = next
+      setPhotos(latest)
+    }
+    return latest
   }
 
   function showError(error: unknown) {
@@ -179,25 +235,29 @@ export function ProductDrawer({
       } else {
         // A piece has to exist before a photo can belong to it, so the row is
         // created first and the picked photos follow. Nothing is on screen but
-        // the two together, and a failure between them leaves a real piece
-        // with no photos rather than photos with no piece.
-        const hasPending = photos.some(isPendingPhoto)
-        const created = await createProduct.mutateAsync({
+        // the two together. createdProduct is set the instant the row exists —
+        // if the photo upload then fails, a retry patches that same row rather
+        // than creating a second one (see the state's own comment above).
+        const base = createdProduct ?? (await createProduct.mutateAsync({
           ...normalized,
           photos: photos.filter((entry) => !isPendingPhoto(entry)),
-        })
+        }))
+        if (createdProduct === null) setCreatedProduct(base)
+
+        const hasPending = photos.some(isPendingPhoto)
         // Resolved on its own line, NOT inside the optional call below: `f?.(x)`
         // does not evaluate `x` when `f` is nullish, and onCreated is optional —
         // inlining the upload there meant a piece created from Produtos (which
         // passes no callback in the photo case) silently kept none of the
         // photos that had just been picked for it.
         const createdWithPhotos = hasPending
-          ? { ...created, photos: await resolvePhotos(created.id) }
+          ? { ...base, photos: await resolvePhotos(base.id) }
           : // Left exactly as the server returned it when nothing was picked —
             // callers compare against that object.
-            created
+            base
         onCreated?.(createdWithPhotos)
         if (addAnotherAfterSave) {
+          setCreatedProduct(null)
           setPhotos([])
           reset({
             locationId: staff?.locationId ?? '',
