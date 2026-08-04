@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import '../../i18n.ts'
 import { DashboardPage } from './DashboardPage.tsx'
@@ -60,14 +60,17 @@ describe('DashboardPage', () => {
       isError: false,
     })
 
-    renderDashboard()
+    const { container } = renderDashboard()
 
-    expect(screen.getByText('Saindo hoje')).toBeInTheDocument()
+    // Scoped to the tiles: the movement list below them tags each row with the
+    // same words as a direction label, so an unscoped query matches twice.
+    const tiles = within(container.querySelector('.grid.grid-cols-4') as HTMLElement)
+    expect(tiles.getByText('Saindo hoje')).toBeInTheDocument()
     // Stat values render via CountUp, an animated counter (spring-based, not
     // instant) — findByText retries until the animation settles on 1/2.
-    expect(await screen.findByText('1')).toBeInTheDocument()
-    expect(screen.getByText('Atrasados')).toBeInTheDocument()
-    expect(await screen.findByText('2')).toBeInTheDocument()
+    expect(await tiles.findByText('1')).toBeInTheDocument()
+    expect(tiles.getByText('Atrasados')).toBeInTheDocument()
+    expect(await tiles.findByText('2')).toBeInTheDocument()
   })
 
   it('shows loading message when isLoading is true', () => {
@@ -198,6 +201,33 @@ describe('DashboardPage', () => {
     expect(screen.getByText('Saindo da higienização')).toBeInTheDocument()
     expect(screen.getByText('Vestido Longo')).toBeInTheDocument()
     expect(screen.getByText('06/08')).toBeInTheDocument()
+  })
+
+  it("CRITICAL: labels today's movement by direction, never by a piece's state", () => {
+    mockProductsAndClients()
+    vi.spyOn(useDashboardModule, 'useDashboard').mockReturnValue({
+      goingOutToday: [{ id: 'a1', productId: 'p1', clientId: 'c1', checkoutDate: '2026-08-04' }] as never,
+      dueBackToday: [{ id: 'a2', productId: 'p2', clientId: 'c2', dueDate: '2026-08-04' }] as never,
+      overdue: [] as never,
+      upcoming: [] as never,
+      receivablesThisWeek: { total: 0, count: 0 },
+      leavingMaintenance: { count: 0, items: [] },
+      isLoading: false,
+      isError: false,
+    })
+
+    renderDashboard()
+
+    const panel = screen.getByText('Movimentação de hoje').closest('div')!.parentElement as HTMLElement
+    // "Devolvido" is a real allocation state meaning the dress is back in the
+    // shop. A piece merely DUE back today is still at the client's house, and
+    // labelling it with that word — which is what reusing StatusBadge did —
+    // lied about the one thing this panel exists to report. Same for
+    // "Alugado" against a piece that has not left yet.
+    expect(within(panel).queryByText('Devolvido')).not.toBeInTheDocument()
+    expect(within(panel).queryByText('Alugado')).not.toBeInTheDocument()
+    expect(within(panel).getByText('Saindo hoje')).toBeInTheDocument()
+    expect(within(panel).getByText('Voltando hoje')).toBeInTheDocument()
   })
 
   it('shows the empty cleaning-window message when nothing is coming back', () => {

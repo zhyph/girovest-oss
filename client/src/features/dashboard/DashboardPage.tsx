@@ -1,10 +1,9 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
-import { AlertTriangle, Shirt } from 'lucide-react'
+import { AlertTriangle, ArrowDownLeft, ArrowUpRight, Shirt } from 'lucide-react'
 import { Button } from '../../components/ui/button.tsx'
 import { SectionLabel, ScreenTitle } from '../../components/ui/toolbar.tsx'
-import { StatusBadge } from '../../components/ui/status-badge.tsx'
 import { AuthenticatedPhoto } from '../../components/ui/authenticated-photo.tsx'
 import CountUp from '../../components/CountUp.tsx'
 import { cn } from '../../lib/cn.ts'
@@ -61,6 +60,27 @@ function StatTile({
         {display ?? <CountUp to={value} duration={0.6} />}
       </span>
     </div>
+  )
+}
+
+/**
+ * Which way a piece is moving today — NOT what state it is in.
+ *
+ * Deliberately not a `StatusBadge`. That component owns a single closed
+ * vocabulary of real states (Disponível / Reservado / Alugado / Em higienização
+ * / Devolvido …) so a word cannot mean two things in two screens, and direction
+ * is not one of them. Forcing it in there is what put "Devolvido" beside a
+ * dress that is still at the client's house and only due back this afternoon,
+ * on the app's own landing screen. A pill outline and an arrow, so it reads as
+ * a heading for the row rather than as the piece's status.
+ */
+function DirectionTag({ kind, label }: { kind: 'out' | 'back'; label: string }) {
+  const Arrow = kind === 'out' ? ArrowUpRight : ArrowDownLeft
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-border-strong px-2 py-0.5 text-xs font-medium whitespace-nowrap text-foreground-subtle">
+      <Arrow size={12} aria-hidden />
+      {label}
+    </span>
   )
 }
 
@@ -235,7 +255,10 @@ export function DashboardPage() {
                         <span className="truncate text-xs text-muted-foreground">{clientName}</span>
                       </span>
                       <span>
-                        <StatusBadge state={kind === 'out' ? 'checked_out' : 'returned'} />
+                        <DirectionTag
+                          kind={kind}
+                          label={kind === 'out' ? t('goingOutToday') : t('dueBackToday')}
+                        />
                       </span>
                     </div>
                   )
