@@ -15,6 +15,16 @@ import { useSectionTour } from '../onboarding/useSectionTour.ts'
 import { useProducts, PRODUCTS_KEY } from './useProducts.ts'
 import { ProductDrawer } from './ProductDrawer.tsx'
 import { AddPhotosSessionModal } from './AddPhotosSessionModal.tsx'
+import { ProductFacetMenu, ProductSortMenu } from './ProductBrowsingMenus.tsx'
+import {
+  DEFAULT_PRODUCT_SORT,
+  EMPTY_FACET_SELECTION,
+  deriveFacetOptions,
+  matchesFacetSelection,
+  sortProducts,
+  type ProductFacetSelection,
+  type ProductSort,
+} from './productBrowsing.ts'
 import type { Product, ProductFormValues } from './productSchemas.ts'
 
 /**
@@ -66,6 +76,8 @@ export function ProductsPage() {
   const [editing, setEditing] = useState<Product | null | undefined>(undefined)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<AvailabilityFilter>('all')
+  const [facets, setFacets] = useState<ProductFacetSelection>(EMPTY_FACET_SELECTION)
+  const [sort, setSort] = useState<ProductSort>(DEFAULT_PRODUCT_SORT)
   const [view, setView] = useState<'grid' | 'list'>('grid')
   const [addingPhotosRemotely, setAddingPhotosRemotely] = useState(false)
   const { data: products, isLoading } = useProducts()
@@ -88,20 +100,45 @@ export function ProductsPage() {
     )
   }, [products, search])
 
-  // Counts come from the searched set, not the filtered one, so a chip
-  // always says how many the current search would give you — a chip
+  // Category and size narrow the working set the way the search box does, not
+  // the way a status chip does, so they belong before the counts: a chip
+  // reading "Disponíveis 12" above a grid of two would be describing a set
+  // that is no longer on screen.
+  const refined = useMemo(
+    () => searched.filter((product) => matchesFacetSelection(product, facets)),
+    [searched, facets],
+  )
+
+  // Counts come from the refined set, not the status-filtered one, so a chip
+  // always says how many the current search and facets would give you — a chip
   // reading its own filtered total would always show its own count.
   const counts = useMemo(
     () => ({
-      all: searched.length,
-      available: searched.filter(FILTER_MATCHES.available).length,
-      rented: searched.filter(FILTER_MATCHES.rented).length,
-      maintenance: searched.filter(FILTER_MATCHES.maintenance).length,
+      all: refined.length,
+      available: refined.filter(FILTER_MATCHES.available).length,
+      rented: refined.filter(FILTER_MATCHES.rented).length,
+      maintenance: refined.filter(FILTER_MATCHES.maintenance).length,
     }),
-    [searched],
+    [refined],
   )
 
-  const visible = useMemo(() => searched.filter(FILTER_MATCHES[filter]), [searched, filter])
+  // Sorting comes last, on the set that is actually rendered, so it reaches
+  // the grid and the list alike and can never move a count.
+  const visible = useMemo(
+    () => sortProducts(refined.filter(FILTER_MATCHES[filter]), sort, locale),
+    [refined, filter, sort, locale],
+  )
+
+  // Derived from the whole catalogue rather than from `searched`: options that
+  // disappeared as you typed would leave you unable to widen the search again
+  // without first clearing the filter you can no longer see.
+  const facetOptions = useMemo(
+    () => ({
+      category: deriveFacetOptions(products ?? [], 'category', locale),
+      size: deriveFacetOptions(products ?? [], 'size', locale),
+    }),
+    [products, locale],
+  )
 
   const columns: DataListColumn<Product>[] = useMemo(
     () => [
@@ -187,11 +224,19 @@ export function ProductsPage() {
             dataTour="products.search"
           />
         }
-        filters={(['all', 'available', 'rented', 'maintenance'] as const).map((key) => (
-          <FilterChip key={key} active={filter === key} onClick={() => setFilter(key)} count={counts[key]}>
-            {t(`filters.${key}`)}
-          </FilterChip>
-        ))}
+        filters={
+          <>
+            {(['all', 'available', 'rented', 'maintenance'] as const).map((key) => (
+              <FilterChip key={key} active={filter === key} onClick={() => setFilter(key)} count={counts[key]}>
+                {t(`filters.${key}`)}
+              </FilterChip>
+            ))}
+            <ProductFacetMenu options={facetOptions} selection={facets} onChange={setFacets} />
+          </>
+        }
+        // Ordering is not a filter, so it sits outside the chip row even
+        // though it is built from the same trigger.
+        extra={<ProductSortMenu value={sort} onChange={setSort} />}
         actions={
           <>
             {/*

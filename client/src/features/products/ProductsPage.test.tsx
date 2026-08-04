@@ -297,6 +297,139 @@ describe('ProductsPage', () => {
     expect(screen.queryByText('Vestido Azul')).not.toBeInTheDocument()
   })
 
+  // The server hands the catalogue back newest first, and these three are in
+  // that order — so any assertion below that expects a different order is
+  // reading the new sort control, not the incoming array.
+  const catalogue = [
+    { ...product, id: 'p1', code: 12, name: 'Vestido Azul', category: 'casual', size: 'P', rentalPrice: 150 },
+    { ...product, id: 'p2', code: 3, name: 'Terno Grafite', category: 'Festa', size: 'M', rentalPrice: 400 },
+    { ...product, id: 'p3', code: 25, name: 'Bolero Marfim', category: 'festa', size: 'P', rentalPrice: 90 },
+  ]
+
+  /** Names of the rendered cards, in the order they appear on screen. */
+  function renderedNames() {
+    return screen
+      .getAllByText(/^(Vestido Azul|Terno Grafite|Bolero Marfim)$/)
+      .map((node) => node.textContent)
+  }
+
+  async function openMenu(name: RegExp) {
+    await userEvent.click(screen.getByRole('button', { name }))
+  }
+
+  it('narrows the catalogue to one category, folding the casing the shop typed', async () => {
+    vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: catalogue, isLoading: false } as never)
+    mockStaff()
+
+    renderWithQueryClient(<ProductsPage />)
+    await openMenu(/Categoria e tamanho/)
+
+    // "Festa" and "festa" are the same category typed by two people, so the
+    // menu offers it once and selecting it has to bring back both pieces.
+    expect(screen.getAllByRole('menuitemcheckbox', { name: /^[Ff]esta$/ })).toHaveLength(1)
+    await userEvent.click(screen.getByRole('menuitemcheckbox', { name: /^[Ff]esta$/ }))
+
+    expect(screen.getByText('Terno Grafite')).toBeInTheDocument()
+    expect(screen.getByText('Bolero Marfim')).toBeInTheDocument()
+    expect(screen.queryByText('Vestido Azul')).not.toBeInTheDocument()
+  })
+
+  it('narrows the catalogue by size, and combines size with category', async () => {
+    vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: catalogue, isLoading: false } as never)
+    mockStaff()
+
+    renderWithQueryClient(<ProductsPage />)
+    await openMenu(/Categoria e tamanho/)
+    await userEvent.click(screen.getByRole('menuitemcheckbox', { name: 'P' }))
+
+    expect(screen.getByText('Vestido Azul')).toBeInTheDocument()
+    expect(screen.getByText('Bolero Marfim')).toBeInTheDocument()
+    expect(screen.queryByText('Terno Grafite')).not.toBeInTheDocument()
+
+    // The menu stays open on a tick, so a second facet can be added without
+    // reopening it. Across facets the two accumulate: festa *and* size P.
+    await userEvent.click(screen.getByRole('menuitemcheckbox', { name: /^[Ff]esta$/ }))
+
+    expect(screen.getByText('Bolero Marfim')).toBeInTheDocument()
+    expect(screen.queryByText('Vestido Azul')).not.toBeInTheDocument()
+    expect(screen.queryByText('Terno Grafite')).not.toBeInTheDocument()
+  })
+
+  it('keeps the incoming order until a sort is picked, then reorders both views', async () => {
+    vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: catalogue, isLoading: false } as never)
+    mockStaff()
+
+    renderWithQueryClient(<ProductsPage />)
+
+    // The default must be the order the screen already had before this control
+    // existed, or adding it silently reshuffles every shop's catalogue.
+    expect(renderedNames()).toEqual(['Vestido Azul', 'Terno Grafite', 'Bolero Marfim'])
+
+    await openMenu(/Ordenar/)
+    await userEvent.click(screen.getByRole('menuitemradio', { name: 'Nome (A-Z)' }))
+    expect(renderedNames()).toEqual(['Bolero Marfim', 'Terno Grafite', 'Vestido Azul'])
+
+    await openMenu(/Ordenar/)
+    await userEvent.click(screen.getByRole('menuitemradio', { name: 'Código' }))
+    expect(renderedNames()).toEqual(['Terno Grafite', 'Vestido Azul', 'Bolero Marfim'])
+
+    // The list view renders from the same set, so it must carry the sort over.
+    await userEvent.click(screen.getByRole('button', { name: 'Lista' }))
+    expect(renderedNames()).toEqual(['Terno Grafite', 'Vestido Azul', 'Bolero Marfim'])
+
+    await openMenu(/Ordenar/)
+    await userEvent.click(screen.getByRole('menuitemradio', { name: 'Maior aluguel' }))
+    expect(renderedNames()).toEqual(['Terno Grafite', 'Vestido Azul', 'Bolero Marfim'])
+
+    await openMenu(/Ordenar/)
+    await userEvent.click(screen.getByRole('menuitemradio', { name: 'Menor aluguel' }))
+    expect(renderedNames()).toEqual(['Bolero Marfim', 'Vestido Azul', 'Terno Grafite'])
+  })
+
+  it('composes the category filter with the search box and the status chips', async () => {
+    const rented = catalogue.map((item) =>
+      item.id === 'p3' ? { ...item, availability: 'rented' as const } : item,
+    )
+    vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: rented, isLoading: false } as never)
+    mockStaff()
+
+    renderWithQueryClient(<ProductsPage />)
+    await openMenu(/Categoria e tamanho/)
+    await userEvent.click(screen.getByRole('menuitemcheckbox', { name: /^[Ff]esta$/ }))
+    await userEvent.keyboard('{Escape}')
+
+    // The chips count the faceted set, not the whole catalogue: a chip that
+    // still said 3 while two pieces were on screen would describe nothing.
+    expect(screen.getByRole('button', { name: /Todos/ })).toHaveTextContent('2')
+    expect(screen.getByRole('button', { name: /Disponíveis/ })).toHaveTextContent('1')
+    expect(screen.getByRole('button', { name: /Alugados/ })).toHaveTextContent('1')
+
+    await userEvent.click(screen.getByRole('button', { name: /Alugados/ }))
+    expect(screen.getByText('Bolero Marfim')).toBeInTheDocument()
+    expect(screen.queryByText('Terno Grafite')).not.toBeInTheDocument()
+
+    // And the search box narrows on top of both.
+    await userEvent.click(screen.getByRole('button', { name: /Todos/ }))
+    await userEvent.type(screen.getByPlaceholderText('Buscar por código, nome, categoria ou cor...'), 'Terno')
+
+    expect(screen.getByText('Terno Grafite')).toBeInTheDocument()
+    expect(screen.queryByText('Bolero Marfim')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Todos/ })).toHaveTextContent('1')
+  })
+
+  it('offers only the categories and sizes the shop actually has on file', async () => {
+    vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: catalogue, isLoading: false } as never)
+    mockStaff()
+
+    renderWithQueryClient(<ProductsPage />)
+    await openMenu(/Categoria e tamanho/)
+
+    // Sizes come back on the ladder the shop reads its rack in, not
+    // alphabetically, which would put M ahead of P.
+    const offered = screen.getAllByRole('menuitemcheckbox').map((node) => node.textContent)
+    expect(offered).toEqual(['casual', 'Festa', 'P', 'M'])
+  })
+
   it('does not give a retired piece an availability badge that says it is Disponível', () => {
     // `availability` is only meaningful while the piece is in the catalogue,
     // so the lifecycle status has to win when it is not active.

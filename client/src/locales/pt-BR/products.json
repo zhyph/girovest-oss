@@ -65,6 +65,19 @@
     "rented": "Alugados",
     "maintenance": "Manutenção"
   },
+  "facets": {
+    "trigger": "Categoria e tamanho",
+    "clear": "Limpar",
+    "empty": "Nenhuma categoria ou tamanho cadastrado ainda."
+  },
+  "sort": {
+    "trigger": "Ordenar",
+    "recent": "Mais recentes",
+    "code": "Código",
+    "name": "Nome (A-Z)",
+    "priceDesc": "Maior aluguel",
+    "priceAsc": "Menor aluguel"
+  },
   "views": {
     "grid": "Grade",
     "list": "Lista"
