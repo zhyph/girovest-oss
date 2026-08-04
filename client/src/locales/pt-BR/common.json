@@ -6,7 +6,9 @@
     "products": "Produtos",
     "contracts": "Contratos",
     "calendar": "Calendário",
-    "settings": "Configurações"
+    "settings": "Configurações",
+    "shortcuts": "Atalhos",
+    "newAllocation": "Nova alocação"
   },
   "actions": {
     "save": "Salvar",

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router'
+import { MemoryRouter, useLocation } from 'react-router'
 import '../i18n.ts'
 import { Sidebar } from './Sidebar.tsx'
 import * as useAuthModule from '../lib/useAuth.ts'
@@ -39,6 +39,13 @@ function mockMatchMedia() {
   }
 }
 
+// Surfaces the router's current URL so a navigation triggered by the rail
+// can be asserted on directly, rather than inferred from a spy.
+function LocationProbe() {
+  const location = useLocation()
+  return <div data-testid="location">{`${location.pathname}${location.search}`}</div>
+}
+
 describe('Sidebar', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
@@ -74,6 +81,42 @@ describe('Sidebar', () => {
     expect(screen.getByText('Painel').tagName).toBe('SPAN')
     expect(screen.getByText('Painel')).toHaveClass('hidden', 'group-hover:inline', 'group-focus-within:inline', 'lg:inline')
     expect(screen.getByText('Ana Owner')).toHaveClass('hidden', 'group-hover:inline', 'group-focus-within:inline', 'lg:inline')
+  })
+
+  it('renders the shop name once, with the product name as the quieter second line', () => {
+    mockLoadedStaff()
+
+    render(
+      <MemoryRouter>
+        <Sidebar />
+      </MemoryRouter>,
+    )
+
+    // The rail's two lines must say different things. The brand line
+    // already falls back to the location name, so rendering the location
+    // again underneath would print the same string twice.
+    const rail = screen.getByRole('navigation')
+    expect(within(rail).getAllByText('Loja Teste')).toHaveLength(1)
+    expect(within(rail).getByText('Girovest')).toBeInTheDocument()
+  })
+
+  it('navigates to the new-contract form from the rail shortcut', async () => {
+    mockLoadedStaff()
+
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <Sidebar />
+        <LocationProbe />
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByTestId('location')).toHaveTextContent('/')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Nova alocação' }))
+
+    // The deep link is what opens the dialog on the contracts screen, so
+    // the query param — not just the path — is the load-bearing part.
+    expect(screen.getByTestId('location')).toHaveTextContent('/contratos?novo=1')
   })
 
   it('opens the mobile drawer via the hamburger button', async () => {

@@ -2,7 +2,7 @@ import { useId, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronRight } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { Button } from '../../components/ui/button.tsx'
 import { cn } from '../../lib/cn.ts'
 import { Input } from '../../components/ui/input.tsx'
@@ -410,7 +410,23 @@ export function ContractsPage() {
   const { data, isLoading } = useContractsList({ page, search })
   const { data: products } = useProducts()
   const { data: clients } = useClients()
-  const [showForm, setShowForm] = useState(false)
+  // `?novo=1` is how the rail's "Nova alocação" shortcut opens this form
+  // from anywhere in the app. The param is the single source of truth
+  // while the form is up, so closing it (or navigating back) clears the
+  // URL too and a refresh doesn't silently reopen the form.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const showForm = searchParams.get('novo') === '1'
+  const setShowForm = (open: boolean) => {
+    setSearchParams(
+      (previous) => {
+        const next = new URLSearchParams(previous)
+        if (open) next.set('novo', '1')
+        else next.delete('novo')
+        return next
+      },
+      { replace: true },
+    )
+  }
   useSectionTour('contracts', !isLoading)
 
   const productNames = useMemo(
