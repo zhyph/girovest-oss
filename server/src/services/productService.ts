@@ -17,6 +17,7 @@ import {
   maintenanceBufferForProduct,
   toWindow,
 } from './occupancyQuery.js'
+import { removeOrphanedPhotoFiles } from './productPhotoTokenService.js'
 
 export type ProductStatus = 'active' | 'maintenance' | 'retired'
 
@@ -273,7 +274,7 @@ export async function getProduct(locationId: string, id: string): Promise<Produc
 }
 
 export async function updateProduct(locationId: string, id: string, data: UpdateProductInput): Promise<ProductDTO> {
-  await getProduct(locationId, id)
+  const existing = await getProduct(locationId, id)
   const row = await scopedDb(locationId).product.update({
     where: { id },
     data: {
@@ -281,6 +282,12 @@ export async function updateProduct(locationId: string, id: string, data: Update
       photos: data.photos ? JSON.stringify(data.photos) : undefined,
     } as any,
   })
+  // Only when photos was actually part of this update — an update touching
+  // unrelated fields must never treat "photos wasn't provided" as "photos is
+  // now empty" and delete every file on disk.
+  if (data.photos) {
+    await removeOrphanedPhotoFiles(existing.photos, data.photos)
+  }
   return toDTO(row, await availabilityFor(id), await hasHistory(id))
 }
 

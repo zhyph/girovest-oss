@@ -1,14 +1,17 @@
 import crypto from 'crypto'
 import fs from 'fs'
 import path from 'path'
+import { Prisma } from '../generated/prisma/client.js'
 import { prisma } from '../db/client.js'
 import { scopedDb } from '../db/scopedClient.js'
 import { AppError } from '../errors/AppError.js'
 import { ErrorCodes } from '../errors/errorCodes.js'
 import { productPhotoEvents } from '../events/productPhotoEvents.js'
+import { PHOTO_BASE64_MAX_LENGTH } from '../lib/signingValidation.js'
 import { createProduct, type CreateProductInput, type ProductDTO } from './productService.js'
 
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000
+const MAX_WRITE_CONFLICT_RETRIES = 5
 
 function photosDir(): string {
   const dir = process.env.PRODUCT_PHOTOS_DIR ?? './product-photos'
@@ -18,11 +21,23 @@ function photosDir(): string {
 
 const PHOTO_DATA_URL_PATTERN = /^data:image\/jpeg;base64,([A-Za-z0-9+/]+=*)$/
 
+// Filenames this service ever writes; also what the serving route requires
+// before touching the filesystem (routes/products.ts), and what
+// removeOrphanedPhotoFiles below requires before unlinking anything.
+export const PHOTO_FILENAME_PATTERN = /^[0-9a-f-]+\.jpg$/
+
 /**
- * Roughly 10 MB of decoded image per photo. Base64 costs a third on the wire,
- * which is what the route's own body limit accounts for.
+ * The largest a validly-shaped photo can decode to, derived from the
+ * schema's own base64-character cap (PHOTO_BASE64_MAX_LENGTH) rather than a
+ * separate number — base64 costs a third on the wire, so anything past this
+ * already failed schema validation before reaching here; this is a second,
+ * independent check on the actual decoded bytes.
  */
-const MAX_PHOTO_BYTES = 10 * 1024 * 1024
+const MAX_PHOTO_BYTES = Math.floor((PHOTO_BASE64_MAX_LENGTH * 3) / 4)
+
+function isJpegSignature(bytes: Buffer): boolean {
+  return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff
+}
 
 /**
  * Writes photos to disk and hands back the URL paths they are served from.
@@ -35,11 +50,17 @@ const MAX_PHOTO_BYTES = 10 * 1024 * 1024
  * panel, the SSE live update) reads that shape and nothing else. Two intake
  * paths writing two shapes is how the serving route would start needing to
  * know where a photo came from.
+ *
+ * Every photo in the batch is validated and decoded FIRST, and only written
+ * once the whole batch passes — a batch with one malformed entry among
+ * several valid ones used to leave the valid ones' files on disk with
+ * nothing in product.photos ever pointing at them, because the old version
+ * wrote as it validated instead of validating first.
  */
-export function storePhotoDataUrls(productId: string, photos: string[]): string[] {
+export async function storePhotoDataUrls(productId: string, photos: string[]): Promise<string[]> {
   const dir = photosDir()
-  const writtenPaths: string[] = []
-  for (const photo of photos) {
+
+  const decoded = photos.map((photo) => {
     const match = photo.match(PHOTO_DATA_URL_PATTERN)
     if (!match) {
       throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'Invalid photo payload')
@@ -48,39 +69,106 @@ export function storePhotoDataUrls(productId: string, photos: string[]): string[
     if (bytes.byteLength > MAX_PHOTO_BYTES) {
       throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'Photo is too large')
     }
-    const filename = `${crypto.randomUUID()}.jpg`
-    fs.writeFileSync(path.join(dir, filename), bytes)
-    writtenPaths.push(`/api/products/${productId}/photos/${filename}`)
+    // The data-URL prefix is caller-declared, not verified on its own — check
+    // the actual bytes carry a JPEG signature before writing anything that
+    // later gets served back with Content-Type: image/jpeg.
+    if (!isJpegSignature(bytes)) {
+      throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'Photo is not a valid JPEG')
+    }
+    return bytes
+  })
+
+  const writtenPaths: string[] = []
+  try {
+    for (const bytes of decoded) {
+      const filename = `${crypto.randomUUID()}.jpg`
+      await fs.promises.writeFile(path.join(dir, filename), bytes)
+      writtenPaths.push(`/api/products/${productId}/photos/${filename}`)
+    }
+  } catch (error) {
+    // Roll back whatever this batch already wrote rather than leaving
+    // orphans from a write that failed partway through (e.g. disk full).
+    await Promise.all(
+      writtenPaths.map((entry) => fs.promises.unlink(path.join(dir, entry.split('/').pop()!)).catch(() => {})),
+    )
+    throw error
   }
   return writtenPaths
 }
 
 /**
- * Appends already-decoded photos to a product and announces them, scoped to
- * one location. The desktop picker's entry point; submitPhotos below is the
- * phone's, and the two meet here so a photo behaves identically either way.
+ * Deletes photo files that no longer appear in a product's photo list — e.g.
+ * after the drawer's "Remover" button — so years of catalogue photo churn
+ * don't grow PRODUCT_PHOTOS_DIR without bound. Only unlinks entries matching
+ * this service's own served-photo shape; anything else is left alone rather
+ * than guessed at.
+ */
+export async function removeOrphanedPhotoFiles(previousPhotos: string[], nextPhotos: string[]): Promise<void> {
+  const next = new Set(nextPhotos)
+  const removed = previousPhotos.filter((entry) => !next.has(entry))
+  if (removed.length === 0) return
+  const dir = photosDir()
+  await Promise.all(
+    removed.map(async (entry) => {
+      const filename = entry.split('/').pop()
+      if (!filename || !PHOTO_FILENAME_PATTERN.test(filename)) return
+      await fs.promises.unlink(path.join(dir, filename)).catch(() => {})
+    }),
+  )
+}
+
+/**
+ * Appends photos to a product and announces them, scoped to one location.
+ * The desktop picker's entry point; submitPhotos below is the phone's, and
+ * the two meet here so a photo behaves identically either way.
+ *
+ * The read-modify-write of `product.photos` runs inside a serializable
+ * transaction with retry (mirroring contractService.ts's own numbering
+ * pattern): the phone intake and the desktop picker can now legitimately
+ * both add photos to the same product at once, and without this a second
+ * writer's read-before-the-first-writer's-update would silently drop the
+ * first writer's addition from the array.
  */
 export async function appendProductPhotos(
   locationId: string,
   productId: string,
   photos: string[],
 ): Promise<{ photos: string[] }> {
-  const product = await scopedDb(locationId).product.findUnique({ where: { id: productId } })
-  if (!product || product.locationId !== locationId) {
+  const initial = await scopedDb(locationId).product.findUnique({ where: { id: productId } })
+  if (!initial || initial.locationId !== locationId) {
     throw new AppError(ErrorCodes.NOT_FOUND, 404, `Product ${productId} not found`)
   }
 
-  const writtenPaths = storePhotoDataUrls(productId, photos)
-  const existingPhotos = JSON.parse(product.photos) as string[]
-  const updatedPhotos = [...existingPhotos, ...writtenPaths]
-  await scopedDb(locationId).product.update({
-    where: { id: productId },
-    data: { photos: JSON.stringify(updatedPhotos) },
-  })
+  const writtenPaths = await storePhotoDataUrls(productId, photos)
+  const useSerializable = process.env.DB_PROVIDER === 'postgresql'
 
-  productPhotoEvents.emit('photo', { productId, locationId, photos: updatedPhotos })
+  for (let attempt = 0; attempt < MAX_WRITE_CONFLICT_RETRIES; attempt++) {
+    try {
+      const updatedPhotos = await prisma.$transaction(
+        async (tx) => {
+          const product = await tx.product.findUnique({ where: { id: productId } })
+          if (!product || product.locationId !== locationId) {
+            throw new AppError(ErrorCodes.NOT_FOUND, 404, `Product ${productId} not found`)
+          }
+          const existingPhotos = JSON.parse(product.photos) as string[]
+          const next = [...existingPhotos, ...writtenPaths]
+          await tx.product.update({ where: { id: productId }, data: { photos: JSON.stringify(next) } })
+          return next
+        },
+        useSerializable ? { isolationLevel: Prisma.TransactionIsolationLevel.Serializable } : undefined,
+      )
 
-  return { photos: updatedPhotos }
+      productPhotoEvents.emit('photo', { productId, locationId, photos: updatedPhotos })
+      return { photos: updatedPhotos }
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && (error.code === 'P2034' || error.code === 'P2002')) {
+        continue
+      }
+      throw error
+    }
+  }
+
+  throw new AppError(ErrorCodes.VALIDATION_ERROR, 409, 'Could not save photos due to repeated write conflicts, please retry')
 }
 
 export async function issueProductPhotoSession(

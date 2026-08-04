@@ -33,14 +33,30 @@ export const submitSignatureSchema = z.object({
   idempotencyKey: idempotencyKeySchema,
 })
 
+// The phone page compresses to <=1600px JPEG at quality 0.7 before
+// submitting, which lands far below this cap; the cap bounds what a raw
+// POST against an internet-reachable path (relay, or the desktop's own
+// authenticated upload route) can make the shop process buffer and decode
+// per photo. Shared by both photo schemas below, and by
+// productPhotoTokenService's own decoded-byte check, so the string-length
+// bound and the decoded-byte bound describe the same limit instead of
+// drifting apart.
+export const PHOTO_BASE64_MAX_LENGTH = 2_000_000
+
 export const submitPhotosSchema = z.object({
   productId: z.string().min(1),
-  // The phone page compresses to <=1600px JPEG at quality 0.7 before
-  // submitting, which lands far below this cap; the cap bounds what a raw
-  // POST against the internet-reachable relay path can make the shop process
-  // buffer and write per photo. The whole batch is additionally bounded to
-  // 5 MB by the transport on both paths (express.json's limit on LAN, the
-  // Worker's content-length check on relay).
-  photos: z.array(z.string().min(1).max(2_000_000)).min(1).max(10),
+  // The whole batch is additionally bounded to 5 MB by the transport on both
+  // paths (express.json's limit on LAN, the Worker's content-length check on
+  // relay).
+  photos: z.array(z.string().min(1).max(PHOTO_BASE64_MAX_LENGTH)).min(1).max(10),
   idempotencyKey: idempotencyKeySchema,
+})
+
+// The desktop/web file picker's own intake, mounted on
+// POST /api/products/:id/photos — same per-photo bound as the phone's
+// submitPhotosSchema above (no `productId`, since the desktop route already
+// carries it in the URL), with a higher batch count since that route is not
+// bound by the phone/relay path's stricter transport limit.
+export const uploadPhotosSchema = z.object({
+  photos: z.array(z.string().min(1).max(PHOTO_BASE64_MAX_LENGTH)).min(1).max(20),
 })

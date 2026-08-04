@@ -8,6 +8,11 @@ import { prisma } from './db/client.js'
 import { issueSigningToken } from './services/signingService.js'
 import { issueProductPhotoSession } from './services/productPhotoTokenService.js'
 
+// A real (1x1) JPEG — storePhotoDataUrls checks the decoded bytes carry a
+// JPEG signature, which a placeholder string like 'abc' does not.
+const TINY_JPEG =
+  'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACP/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AVN//2Q=='
+
 let contractId: string
 let productId: string
 let locationId: string
@@ -214,7 +219,7 @@ describe('POST /product-photos/:token/submit', () => {
 
     const response = await request(signingApp)
       .post(`/product-photos/${token}/submit`)
-      .send({ productId, photos: ['data:image/jpeg;base64,abc'] })
+      .send({ productId, photos: [TINY_JPEG] })
 
     expect(response.status).toBe(200)
   })

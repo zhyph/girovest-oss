@@ -23,23 +23,25 @@ app.disable('x-powered-by')
 app.use(cors({ exposedHeaders: [RENEWED_TOKEN_HEADER] }))
 
 /**
- * One endpoint carries images; every other one carries a form's worth of
- * text, and the default 100 kB limit is the right ceiling for those.
- *
- * Scoped by an explicit path test rather than by mounting a wider parser on
- * `/api/products`, so raising the ceiling for photo upload cannot also raise
- * it for product create/update. body-parser marks the request as parsed, so
- * the general parser below simply skips a body this one already read.
+ * One route carries images and needs a much higher body limit than every
+ * other route's default 100 kB — but that route also sits behind
+ * `requireAuth`. Parsing (and therefore buffering) a large body BEFORE
+ * authentication would let an unauthenticated request force the server to
+ * buffer and JSON-parse up to the raised limit on every attempt, a large
+ * amplification over the default ceiling every other pre-auth path enforces.
+ * So this route's own higher-limit parser is mounted directly on it in
+ * routes/products.ts, AFTER `productsRouter.use(requireAuth)` — this
+ * middleware only keeps the DEFAULT parser below from running (and 413-ing)
+ * on that route ahead of time; it does no parsing of its own.
  */
 const PHOTO_UPLOAD_PATH = /^\/api\/products\/[^/]+\/photos\/?$/
-const photoUploadJson = express.json({ limit: '12mb' })
+const defaultJson = express.json()
 app.use((req, res, next) => {
   if (req.method === 'POST' && PHOTO_UPLOAD_PATH.test(req.path)) {
-    return photoUploadJson(req, res, next)
+    return next()
   }
-  next()
+  return defaultJson(req, res, next)
 })
-app.use(express.json())
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok' })

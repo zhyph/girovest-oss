@@ -286,7 +286,10 @@ describe('POST /:id/photos', () => {
     product write into an unbounded upload endpoint.
   */
   it('accepts a body far past the default limit here, and nowhere else', async () => {
-    const bigJpeg = `data:image/jpeg;base64,${Buffer.alloc(400 * 1024, 0).toString('base64')}`
+    const bigJpeg = `data:image/jpeg;base64,${Buffer.concat([
+      Buffer.from([0xff, 0xd8, 0xff]),
+      Buffer.alloc(400 * 1024, 0),
+    ]).toString('base64')}`
     const uploadRes = await request(app)
       .post(`/api/products/${productId}/photos`)
       .set('Authorization', `Bearer ${staffToken}`)
