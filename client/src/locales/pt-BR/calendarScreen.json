@@ -26,5 +26,20 @@
     "next": "Próximo",
     "month": "Mês",
     "showMore": "+{{count}} mais"
+  },
+  "controls": {
+    "previousMonth": "Mês anterior",
+    "nextMonth": "Próximo mês",
+    "today": "Hoje"
+  },
+  "views": {
+    "grid": "Grade",
+    "agenda": "Agenda"
+  },
+  "dayPanel": {
+    "pickDay": "Selecione um dia no calendário para ver o que sai e o que volta.",
+    "empty": "Nada programado para este dia.",
+    "summary_one": "{{count}} peça",
+    "summary_other": "{{count}} peças"
   }
 }

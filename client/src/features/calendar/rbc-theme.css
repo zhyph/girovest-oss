@@ -114,3 +114,13 @@
 .rbc-overlay-header {
   border-bottom-color: var(--border);
 }
+
+/* Selected day. The grid and the side panel are one surface: the day the
+   panel is describing has to be identifiable in the grid, or clicking
+   around the month loses your place. Outline rather than a fill, so it
+   does not compete with the status pills inside the cell. */
+.rbc-day-bg.rbc-day-selected {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+  background-color: var(--secondary);
+}

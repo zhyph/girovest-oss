@@ -4,7 +4,6 @@ import userEvent from '@testing-library/user-event'
 import '../../i18n.ts'
 import { MonthView } from './MonthView.tsx'
 import type { Allocation } from '../allocations/allocationSchemas.ts'
-import type { Product } from '../products/productSchemas.ts'
 
 function makeAllocation(overrides: Partial<Allocation> = {}): Allocation {
   return {
@@ -17,18 +16,10 @@ function makeAllocation(overrides: Partial<Allocation> = {}): Allocation {
   }
 }
 
-function makeProduct(overrides: Partial<Product> = {}): Product {
-  return {
-    id: 'p1', locationId: 'loc1', name: 'Vestido Azul', category: 'festa', size: 'M', color: 'azul',
-    rentalPrice: 250, depositAmount: 150,
-    status: 'active', availability: 'available', hasAllocationHistory: false,
-    createdAt: '2026-07-01T00:00:00.000Z',
-    ...overrides,
-  }
-}
 
-const products = new Map([['p1', makeProduct()]])
-const clientNames = new Map([['c1', 'Maria Silva']])
+// The grid renders event titles only; the product and client lookups it
+// used to need went with the "+N mais" dialog, which the day side panel
+// replaced.
 const productNames = new Map([['p1', 'Vestido Azul']])
 
 // jsdom has no layout engine, so every getBoundingClientRect() reports zeroes.
@@ -60,27 +51,47 @@ describe('MonthView', () => {
     vi.restoreAllMocks()
   })
 
-  it('renders the toolbar in pt-BR instead of the react-big-calendar English default', () => {
+  it('renders no period toolbar of its own — navigation belongs to the page control strip', () => {
     render(
       <MonthView
         allocations={[]}
         dateField="checkoutDate"
         onSelectDay={vi.fn()}
         productNames={new Map()}
-        products={new Map()}
-        clientNames={new Map()}
         date={new Date(2026, 6, 22)}
+        selectedDay={null}
         onNavigate={vi.fn()}
       />,
     )
 
-    expect(screen.getByRole('button', { name: 'Hoje' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Anterior' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Próximo' })).toBeInTheDocument()
+    // react-big-calendar's built-in Hoje/Anterior/Próximo toolbar was the
+    // third control surface doing the same job as the page's own strip and
+    // its renamed view button. The grid must not bring it back.
+    expect(screen.queryByRole('button', { name: 'Hoje' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Anterior' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Próximo' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Today' })).not.toBeInTheDocument()
+    // The grid itself still rendered.
+    expect(document.querySelector('.rbc-month-view')).toBeTruthy()
   })
 
-  it('jumps to the agenda view when a day number is clicked (onDrillDown, not just empty-cell onSelectSlot)', async () => {
+  it('marks the day the side panel is describing, so clicking around the month does not lose your place', () => {
+    render(
+      <MonthView
+        allocations={[]}
+        dateField="checkoutDate"
+        onSelectDay={vi.fn()}
+        productNames={new Map()}
+        date={new Date(2026, 6, 22)}
+        selectedDay={new Date(2026, 6, 22)}
+        onNavigate={vi.fn()}
+      />,
+    )
+
+    expect(document.querySelectorAll('.rbc-day-selected')).toHaveLength(1)
+  })
+
+  it('selects the day when a day number is clicked (onDrillDown, not just empty-cell onSelectSlot)', async () => {
     const onSelectDay = vi.fn()
     render(
       <MonthView
@@ -88,9 +99,8 @@ describe('MonthView', () => {
         dateField="checkoutDate"
         onSelectDay={onSelectDay}
         productNames={new Map()}
-        products={new Map()}
-        clientNames={new Map()}
         date={new Date(2026, 6, 22)}
+        selectedDay={null}
         onNavigate={vi.fn()}
       />,
     )
@@ -103,7 +113,7 @@ describe('MonthView', () => {
     expect(onSelectDay.mock.calls[0][0]).toBeInstanceOf(Date)
   })
 
-  it('opens the day-items panel (not Agenda) when "+N more" is clicked', async () => {
+  it('selects the day when "+N mais" is clicked, instead of opening a second overlay', async () => {
     mockLayoutHeights()
     const onSelectDay = vi.fn()
     render(
@@ -112,18 +122,19 @@ describe('MonthView', () => {
         dateField="checkoutDate"
         onSelectDay={onSelectDay}
         productNames={productNames}
-        products={products}
-        clientNames={clientNames}
         date={new Date(2026, 6, 22)}
+        selectedDay={null}
         onNavigate={vi.fn()}
       />,
     )
 
-    const showMoreLink = screen.getByRole('button', { name: '+4 mais' })
-    await userEvent.click(showMoreLink)
+    await userEvent.click(screen.getByRole('button', { name: '+4 mais' }))
 
-    expect(onSelectDay).not.toHaveBeenCalled()
-    expect(screen.getAllByText('Vestido Azul').length).toBeGreaterThan(0)
+    // The overflow affordance and the day affordance now lead to the same
+    // place — the side panel — rather than a dialog and a screen swap.
+    expect(onSelectDay).toHaveBeenCalledTimes(1)
+    expect(onSelectDay.mock.calls[0][0]).toBeInstanceOf(Date)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('renders the overflow link as "+N mais" instead of the react-big-calendar English default', () => {
@@ -134,9 +145,8 @@ describe('MonthView', () => {
         dateField="checkoutDate"
         onSelectDay={vi.fn()}
         productNames={productNames}
-        products={products}
-        clientNames={clientNames}
         date={new Date(2026, 6, 22)}
+        selectedDay={null}
         onNavigate={vi.fn()}
       />,
     )
