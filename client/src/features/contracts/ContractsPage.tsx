@@ -888,6 +888,7 @@ export function ContractsPage() {
           columns={columns}
           groups={weekGroups}
           rowKey={(contract) => contract.id}
+          rowLabel={(contract) => `#${contract.number} — ${clientsById.get(contract.clientId)?.name ?? ''}`.trim()}
           onSelectRow={(contract) => setSelectedId(contract.id)}
           selectedKey={selectedId}
           empty={<DataListEmpty title={search ? t('noResults') : t('empty')} />}

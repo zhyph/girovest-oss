@@ -39,20 +39,41 @@ describe('DataList', () => {
 
   it('marks the selected row so it stays identifiable while the detail panel is read', () => {
     const { rerender } = render(
-      <DataList columns={columns} groups={groups} rowKey={(row) => row.id} onSelectRow={vi.fn()} selectedKey={null} />,
+      <DataList
+        columns={columns}
+        groups={groups}
+        rowKey={(row) => row.id}
+        rowLabel={(row) => row.name}
+        onSelectRow={vi.fn()}
+        selectedKey={null}
+      />,
     )
     expect(screen.queryByRole('button', { current: true })).not.toBeInTheDocument()
 
     rerender(
-      <DataList columns={columns} groups={groups} rowKey={(row) => row.id} onSelectRow={vi.fn()} selectedKey="2" />,
+      <DataList
+        columns={columns}
+        groups={groups}
+        rowKey={(row) => row.id}
+        rowLabel={(row) => row.name}
+        onSelectRow={vi.fn()}
+        selectedKey="2"
+      />,
     )
-    const selected = screen.getByRole('button', { current: true })
-    expect(within(selected).getByText('Vestido midi champagne')).toBeInTheDocument()
+    expect(screen.getByRole('button', { current: true })).toHaveAccessibleName('Vestido midi champagne')
   })
 
   it('selects a row by click and by keyboard', async () => {
     const onSelectRow = vi.fn()
-    render(<DataList columns={columns} groups={groups} rowKey={(row) => row.id} onSelectRow={onSelectRow} />)
+    render(
+      <DataList
+        columns={columns}
+        groups={groups}
+        rowKey={(row) => row.id}
+        rowLabel={(row) => row.name}
+        onSelectRow={onSelectRow}
+      />,
+    )
 
     await userEvent.click(screen.getByText('Vestido longo marsala'))
     expect(onSelectRow).toHaveBeenCalledWith(expect.objectContaining({ id: '1' }))
@@ -60,20 +81,50 @@ describe('DataList', () => {
     // A row is a real control, not a click handler on a div: it has to be
     // reachable and actionable from the keyboard too.
     onSelectRow.mockClear()
-    const rows = screen.getAllByRole('button')
-    rows[2].focus()
+    screen.getByRole('button', { name: 'Bolero cetim marfim' }).focus()
     await userEvent.keyboard('{Enter}')
     expect(onSelectRow).toHaveBeenCalledWith(expect.objectContaining({ id: '3' }))
   })
 
+  it('CRITICAL: shows a real focus ring, not the hover tint, when a row is tabbed to', async () => {
+    render(
+      <DataList
+        columns={columns}
+        groups={groups}
+        rowKey={(row) => row.id}
+        rowLabel={(row) => row.name}
+        onSelectRow={vi.fn()}
+      />,
+    )
+
+    const rowControl = screen.getByRole('button', { name: 'Vestido longo marsala' })
+    // `outline-none` with nothing else is what shipped: the visible "focus"
+    // state was the same surface-sunken tint as hover, so a keyboard user had
+    // no way to tell a focused row from one the mouse happened to be over.
+    expect(rowControl.className).toMatch(/focus-visible:outline-2/)
+    expect(rowControl.className).toMatch(/focus-visible:outline-ring/)
+    expect(rowControl.className).not.toMatch(/focus-visible:bg-/)
+
+    await userEvent.tab()
+    expect(rowControl).toHaveFocus()
+  })
+
   it('is not zebra-striped — the hairline separates rows instead', () => {
-    render(<DataList columns={columns} groups={groups} rowKey={(row) => row.id} onSelectRow={vi.fn()} />)
+    const { container } = render(
+      <DataList
+        columns={columns}
+        groups={groups}
+        rowKey={(row) => row.id}
+        rowLabel={(row) => row.name}
+        onSelectRow={vi.fn()}
+      />,
+    )
 
     // Striping would consume the signal the split view needs for hover and
     // selection, so no row may carry a background of its own by position.
-    const rows = screen.getAllByRole('button')
+    const rows = Array.from(container.querySelectorAll('.border-hairline'))
+    expect(rows).toHaveLength(3)
     for (const row of rows) {
-      expect(row.className).toContain('border-hairline')
       expect(row.className).not.toMatch(/odd:bg-|even:bg-|nth/)
     }
   })
@@ -127,7 +178,15 @@ describe('RowActions', () => {
         ),
       },
     ]
-    render(<DataList columns={withActions} groups={groups} rowKey={(row) => row.id} onSelectRow={onSelectRow} />)
+    render(
+      <DataList
+        columns={withActions}
+        groups={groups}
+        rowKey={(row) => row.id}
+        rowLabel={(row) => row.name}
+        onSelectRow={onSelectRow}
+      />,
+    )
 
     await userEvent.click(screen.getAllByRole('button', { name: 'Ações' })[0])
 
@@ -136,5 +195,45 @@ describe('RowActions', () => {
     await userEvent.click(await screen.findByText('Excluir'))
     expect(onDelete).toHaveBeenCalledOnce()
     expect(onSelectRow).not.toHaveBeenCalled()
+  })
+
+  it('CRITICAL: leaves the ⋯ trigger reachable to assistive tech', async () => {
+    const withActions: DataListColumn<Row>[] = [
+      ...columns,
+      {
+        key: 'actions',
+        width: '34px',
+        cell: () => (
+          <RowActions label="Ações">
+            <DropdownMenuItem onSelect={vi.fn()}>Excluir</DropdownMenuItem>
+          </RowActions>
+        ),
+      },
+    ]
+    render(
+      <DataList
+        columns={withActions}
+        groups={groups}
+        rowKey={(row) => row.id}
+        rowLabel={(row) => row.name}
+        onSelectRow={vi.fn()}
+      />,
+    )
+
+    const trigger = screen.getAllByRole('button', { name: 'Ações' })[0]
+
+    // The row used to be `role="button"` with the trigger nested inside it.
+    // ARIA's children-presentational rule prunes everything inside a button
+    // from the accessibility tree, so the menu was simply not there for a
+    // screen-reader user — while every DOM-level query, including the test
+    // above this one, kept passing. Testing-library does not model pruning,
+    // so the check has to be the structural one: no interactive ancestor.
+    expect(trigger.parentElement?.closest('button, [role="button"], a, [role="link"]')).toBeNull()
+
+    // And it is its own tab stop, alongside the row's own control.
+    await userEvent.tab()
+    expect(screen.getByRole('button', { name: 'Vestido longo marsala' })).toHaveFocus()
+    await userEvent.tab()
+    expect(trigger).toHaveFocus()
   })
 })

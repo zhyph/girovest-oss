@@ -127,9 +127,10 @@ describe('ClientsPage', () => {
     renderWithQueryClient(<ClientsPage />)
     await userEvent.click(screen.getByText('Beatriz Costa'))
 
-    const selected = screen.getByRole('button', { current: true })
-    expect(selected).toHaveTextContent('Beatriz Costa')
-    expect(selected).not.toHaveTextContent('Maria Silva')
+    // The row's own control is an overlay button named after the row (the
+    // row container itself is no longer a `role="button"`, so its `⋯` menu
+    // stays reachable), so the selection marker lives on that button.
+    expect(screen.getByRole('button', { current: true })).toHaveAccessibleName('Beatriz Costa')
   })
 
   it('groups the list alphabetically with a sticky letter heading', () => {
@@ -222,12 +223,12 @@ describe('ClientsPage', () => {
     expect(header).not.toHaveTextContent('E-mail')
 
     // The later checkout wins, not the later contract row.
-    const maria = screen.getByText('Maria Silva').closest('[role="button"]') as HTMLElement
+    const maria = screen.getByText('Maria Silva').closest('.border-hairline') as HTMLElement
     expect(within(maria).getByText('Vestido Curto Rosa')).toBeInTheDocument()
     expect(within(maria).queryByText('Vestido Longo Verde')).not.toBeInTheDocument()
     expect(within(maria).getByText('2')).toBeInTheDocument()
 
-    const beatriz = screen.getByText('Beatriz Costa').closest('[role="button"]') as HTMLElement
+    const beatriz = screen.getByText('Beatriz Costa').closest('.border-hairline') as HTMLElement
     expect(within(beatriz).getByText('Nunca alugou')).toBeInTheDocument()
     expect(within(beatriz).getByText('0')).toBeInTheDocument()
   })

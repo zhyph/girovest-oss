@@ -54,6 +54,7 @@ export function DataList<T>({
   columns,
   groups,
   rowKey,
+  rowLabel,
   onSelectRow,
   selectedKey,
   empty,
@@ -63,6 +64,13 @@ export function DataList<T>({
   columns: DataListColumn<T>[]
   groups: DataListGroup<T>[]
   rowKey: (row: T) => string
+  /**
+   * What a screen reader announces for the row's own action, e.g. "Maria
+   * Silva" or "Contrato #3". Required in practice whenever `onSelectRow` is
+   * given: the control that opens a row is an overlay covering it (see the
+   * row markup below), so it has no text of its own to be named by.
+   */
+  rowLabel?: (row: T) => string
   onSelectRow?: (row: T) => void
   selectedKey?: string | null
   empty?: ReactNode
@@ -112,33 +120,63 @@ export function DataList<T>({
                   const selected = selectedKey === key
                   const interactive = Boolean(onSelectRow)
                   return (
+                    /*
+                      The row container is deliberately NOT `role="button"`.
+                      Under ARIA's children-presentational rule everything
+                      inside a `button` is pruned from the accessibility tree,
+                      which took the row's own `⋯` action menu with it — a
+                      screen-reader user could not reach Editar, Excluir or
+                      Cancelar contrato at all, on any list in the app.
+
+                      Instead the row is a plain container that handles the
+                      click, plus a bare overlay button stretched across it
+                      that supplies the keyboard and screen-reader semantics:
+                      one tab stop, a real accessible name, a real focus ring.
+                      The button carries no handler of its own — Enter and
+                      Space fire a click that bubbles to this container, the
+                      same path a mouse click takes — so there is exactly one
+                      selection code path, and the cells (and the `⋯` trigger
+                      among them) remain ordinary, independently focusable
+                      content in the accessibility tree.
+                    */
                     <div
                       key={key}
-                      role={interactive ? 'button' : undefined}
-                      tabIndex={interactive ? 0 : undefined}
-                      aria-current={selected ? true : undefined}
                       onClick={interactive ? () => onSelectRow?.(row) : undefined}
-                      onKeyDown={
-                        interactive
-                          ? (event) => {
-                              if (event.key === 'Enter' || event.key === ' ') {
-                                event.preventDefault()
-                                onSelectRow?.(row)
-                              }
-                            }
-                          : undefined
-                      }
                       className={cn(
-                        'grid items-center gap-3 border-b border-hairline px-4 text-left outline-none',
-                        interactive && 'cursor-pointer hover:bg-surface-sunken focus-visible:bg-surface-sunken',
+                        'relative grid items-center gap-3 border-b border-hairline px-4 text-left',
+                        interactive && 'cursor-pointer hover:bg-surface-sunken',
                         selected && 'bg-secondary outline-2 -outline-offset-2 outline-primary',
                       )}
                       style={{ gridTemplateColumns: template, minHeight: 38 }}
                     >
+                      {interactive && (
+                        <button
+                          type="button"
+                          aria-label={rowLabel?.(row)}
+                          aria-current={selected ? true : undefined}
+                          /*
+                            A real focus ring, not a tint. The row previously
+                            carried `outline-none` unconditionally and showed
+                            focus as the hover background — about a 1:1
+                            difference against the resting row, so a keyboard
+                            user could not tell where they were. Same 2px inset
+                            outline the selected row uses, in `ring` rather
+                            than `primary` so focus and selection stay tellable
+                            apart when a row is both.
+                          */
+                          className="absolute inset-0 outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                        />
+                      )}
                       {columns.map((column) => (
                         <div
                           key={column.key}
-                          className={cn('flex min-w-0 items-center', ALIGN_CLASS[column.align ?? 'left'])}
+                          className={cn(
+                            'flex min-w-0 items-center',
+                            ALIGN_CLASS[column.align ?? 'left'],
+                            // Positioned, so the cells paint (and take clicks)
+                            // above the overlay button that sits behind them.
+                            interactive && 'relative',
+                          )}
                         >
                           {column.cell(row)}
                         </div>

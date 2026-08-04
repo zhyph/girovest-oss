@@ -323,6 +323,7 @@ export function ProductsPage() {
             columns={columns}
             groups={[{ key: 'all', label: undefined, rows: visible }]}
             rowKey={(product) => product.id}
+            rowLabel={(product) => (product.code ? `${product.code} — ${product.name}` : product.name)}
             onSelectRow={(product) => setEditing(product)}
             empty={emptyState}
           />

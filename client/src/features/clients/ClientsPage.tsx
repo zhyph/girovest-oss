@@ -211,6 +211,7 @@ export function ClientsPage() {
           columns={columns}
           groups={groups}
           rowKey={(client) => client.id}
+          rowLabel={(client) => client.name}
           onSelectRow={(client) => setSelectedId(client.id)}
           selectedKey={selectedId}
           empty={
