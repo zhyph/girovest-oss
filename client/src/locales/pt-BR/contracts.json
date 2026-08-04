@@ -29,7 +29,8 @@
   "installments": {
     "title": "Parcelas",
     "add": "Adicionar parcela",
-    "remove": "Remover parcela"
+    "remove": "Remover parcela",
+    "footerHint": "As parcelas somam o total das peças."
   },
   "clientReadiness": {
     "missing": "Faltam campos obrigatórios: {{fields}}",
@@ -119,5 +120,10 @@
     "settled": "Contrato quitado.",
     "none": "Nenhuma parcela cadastrada neste contrato.",
     "paidCount": "{{paid}} de {{total}} pagas"
+  },
+  "newContractSubtitle": "Cliente, evento e peças em uma tela só.",
+  "saveContract": "Salvar contrato",
+  "sections": {
+    "clientAndEvent": "Cliente e evento"
   }
 }

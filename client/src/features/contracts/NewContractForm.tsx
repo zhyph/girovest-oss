@@ -7,9 +7,19 @@ import { Button } from '../../components/ui/button.tsx'
 import { CurrencyInput } from '../../components/ui/currency-input.tsx'
 import { DateInput } from '../../components/ui/date-input.tsx'
 import { Select } from '../../components/ui/select.tsx'
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose, SheetBody } from '../../components/ui/sheet.tsx'
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+  DialogClose,
+  DialogBody,
+  DialogActions,
+} from '../../components/ui/dialog.tsx'
 import { ConfirmDialog } from '../../components/ui/confirm-dialog.tsx'
 import { RequiredMark } from '../../components/ui/required-mark.tsx'
+import { SectionLabel } from '../../components/ui/toolbar.tsx'
+import { cn } from '../../lib/cn.ts'
 import { showErrorToast } from '../../lib/toast.ts'
 import { useLocale } from '../../lib/LocaleContext.tsx'
 import { formatCurrency, getLocaleConfig } from '../../lib/locale.ts'
@@ -58,7 +68,7 @@ function ItemRow({
   const availability = useProductAvailability(productId, checkoutDate, dueDate)
 
   return (
-    <div className="flex flex-col gap-2 rounded-md border border-border p-2">
+    <div className="flex flex-col gap-2 border-b border-hairline bg-card p-2.5 last:border-b-0">
       <div className="flex items-end gap-2">
         <label className="flex flex-1 flex-col gap-1 text-sm">
           <span>{t('fields.product')}<RequiredMark /></span>
@@ -227,16 +237,46 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
 
   return (
     <>
-    <Sheet open onOpenChange={(next) => !next && discardGuard.requestClose()}>
-      <SheetContent className="w-[36rem]" aria-describedby={undefined}>
-        <SheetHeader>
-          <SheetTitle>{t('newContract')}</SheetTitle>
-          <SheetClose aria-label={t('common:actions.close', { ns: 'common' })}>
-            <X size={18} />
-          </SheetClose>
-        </SheetHeader>
-        <SheetBody>
-        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3">
+    <Dialog open onOpenChange={(next) => !next && discardGuard.requestClose()}>
+      {/*
+        One dialog, two columns — the format chosen in the design study.
+        This form is filled in several times a day by the same person, so
+        everything stays visible and reachable by Tab: nothing is hidden
+        behind wizard steps that would cost four extra clicks on every
+        contract, forever, and would block the thing the shop actually does
+        — going back two steps because the client changed her mind about a
+        piece.
+
+        The study's one exception: past four pieces the dialog widens to
+        page width and keeps the same fields in the same places. One
+        format, two sizes — never two different forms, which is how the
+        contract flow reached its previous state.
+      */}
+      <DialogContent
+        showCloseButton={false}
+        className={cn(
+          'flex max-h-[calc(100vh-5rem)] flex-col gap-0 overflow-hidden p-0',
+          items.fields.length > 4 ? 'sm:max-w-[68rem]' : 'sm:max-w-[46rem]',
+        )}
+      >
+        <div className="flex flex-shrink-0 items-start justify-between gap-4 px-5 pt-4 pb-3.5">
+          <div className="flex flex-col gap-0.5">
+            <DialogTitle>{t('newContract')}</DialogTitle>
+            <DialogDescription className="text-meta text-muted-foreground">
+              {t('newContractSubtitle')}
+            </DialogDescription>
+          </div>
+          <DialogClose
+            aria-label={t('common:actions.close', { ns: 'common' })}
+            className="inline-flex size-7 items-center justify-center rounded-control text-muted-foreground hover:bg-surface-sunken hover:text-foreground"
+          >
+            <X size={16} />
+          </DialogClose>
+        </div>
+        <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
+        <DialogBody className="grid grid-cols-2 gap-5 px-5 pb-4">
+          <div className="flex flex-col gap-3.5">
+          <SectionLabel>{t('sections.clientAndEvent')}</SectionLabel>
           <label className="flex flex-col gap-1 text-sm">
             <span>{t('fields.client')}<RequiredMark /></span>
             <Controller
@@ -286,47 +326,6 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
               </span>
             )}
           </label>
-          <div className="flex flex-col gap-2">
-            <span className="text-sm font-medium">{t('items.title')}</span>
-            {items.fields.map((field, index) => (
-              <ItemRow
-                key={field.id}
-                index={index}
-                control={control}
-                activeProducts={activeProducts}
-                setValue={setValue}
-                onRemove={() => items.remove(index)}
-                showRemove={items.fields.length > 1}
-                onCreateProduct={(idx, name) => setCreatingProduct({ index: idx, name })}
-                productIdError={
-                  errors.items?.[index]?.productId ? t('validation.productRequired') : undefined
-                }
-                checkoutDateError={
-                  errors.items?.[index]?.checkoutDate
-                    ? t(errors.items[index]?.checkoutDate?.type === 'custom' ? 'validation.checkoutDateInvalid' : 'validation.checkoutDateRequired')
-                    : undefined
-                }
-                dueDateError={
-                  errors.items?.[index]?.dueDate
-                    ? t(errors.items[index]?.dueDate?.type === 'custom' ? 'validation.dueDateInvalid' : 'validation.dueDateRequired')
-                    : undefined
-                }
-              />
-            ))}
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => items.append({ productId: '', checkoutDate: '', dueDate: '', priceCharged: 0 })}
-            >
-              {t('items.add')}
-            </Button>
-            <div className="flex justify-end text-sm">
-              <span className="text-muted-foreground">
-                {t('items.total')}:{' '}
-                <span className="font-medium text-foreground">{formatCurrency(itemsTotal, locale, currency)}</span>
-              </span>
-            </div>
-          </div>
           <label className="flex flex-col gap-1 text-sm">
             <span>{t('fields.paymentMethod')}<RequiredMark /></span>
             {/*
@@ -357,10 +356,55 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
             />
             {errors.paymentMethod && <span className="text-xs text-destructive">{t('validation.paymentMethodRequired')}</span>}
           </label>
+          </div>
+
+          <div className="flex flex-col gap-3.5">
           <div className="flex flex-col gap-2">
-            <span className="text-sm font-medium">{t('installments.title')}</span>
+            <SectionLabel>{t('items.title')}</SectionLabel>
+            <div className="overflow-hidden rounded-panel border border-border">
+            {items.fields.map((field, index) => (
+              <ItemRow
+                key={field.id}
+                index={index}
+                control={control}
+                activeProducts={activeProducts}
+                setValue={setValue}
+                onRemove={() => items.remove(index)}
+                showRemove={items.fields.length > 1}
+                onCreateProduct={(idx, name) => setCreatingProduct({ index: idx, name })}
+                productIdError={
+                  errors.items?.[index]?.productId ? t('validation.productRequired') : undefined
+                }
+                checkoutDateError={
+                  errors.items?.[index]?.checkoutDate
+                    ? t(errors.items[index]?.checkoutDate?.type === 'custom' ? 'validation.checkoutDateInvalid' : 'validation.checkoutDateRequired')
+                    : undefined
+                }
+                dueDateError={
+                  errors.items?.[index]?.dueDate
+                    ? t(errors.items[index]?.dueDate?.type === 'custom' ? 'validation.dueDateInvalid' : 'validation.dueDateRequired')
+                    : undefined
+                }
+              />
+            ))}
+            <button
+              type="button"
+              onClick={() => items.append({ productId: '', checkoutDate: '', dueDate: '', priceCharged: 0 })}
+              className="flex w-full items-center gap-2 bg-surface-sunken px-2.5 py-2 text-left text-[13px] font-medium text-primary hover:bg-secondary"
+            >
+              {t('items.add')}
+            </button>
+            </div>
+            <div className="flex items-baseline justify-between gap-3 px-0.5">
+              <span className="text-meta text-muted-foreground">{t('items.total')}</span>
+              <span className="tabular text-[15px] font-semibold">{formatCurrency(itemsTotal, locale, currency)}</span>
+            </div>
+          </div>
+          <div className="flex flex-col gap-2">
+            <SectionLabel>{t('installments.title')}</SectionLabel>
+            <div className="overflow-hidden rounded-panel border border-border">
             {installments.fields.map((field, index) => (
-              <div key={field.id} className="flex items-end gap-2">
+              <div key={field.id} className="flex items-end gap-2 border-b border-hairline bg-card p-2.5 last:border-b-0">
                 <label className="flex flex-1 flex-col gap-1 text-sm">
                   {t('fields.installmentDueDate')}
                   <Controller
@@ -406,22 +450,28 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
                 </Button>
               </div>
             ))}
-            <Button
+            <button
               type="button"
-              variant="secondary"
               onClick={() => installments.append({ dueDate: '', amount: 0 })}
+              className="flex w-full items-center gap-2 bg-surface-sunken px-2.5 py-2 text-left text-[13px] font-medium text-primary hover:bg-secondary"
             >
               {t('installments.add')}
-            </Button>
+            </button>
+            </div>
           </div>
-          <div className="mt-2 flex justify-end gap-2">
+          </div>
+        </DialogBody>
+        <DialogActions className="justify-between">
+          <span className="text-meta text-muted-foreground">{t('installments.footerHint')}</span>
+          <div className="flex gap-2">
             <Button type="button" variant="secondary" onClick={discardGuard.requestClose}>
               {t('common:actions.cancel', { ns: 'common' })}
             </Button>
             <Button type="submit" disabled={createContract.isPending}>
-              {t('common:actions.save', { ns: 'common' })}
+              {t('saveContract')}
             </Button>
           </div>
+        </DialogActions>
         </form>
         <ConfirmDialog
           open={discardGuard.isConfirmingDiscard}
@@ -444,9 +494,8 @@ export function NewContractForm({ onClose }: { onClose: () => void }) {
           onConfirm={confirmSubmitAnyway}
           onCancel={() => setPendingSubmitValues(null)}
         />
-        </SheetBody>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
     {completingClient && <ClientDrawer client={completingClient} onClose={() => setCompletingClient(null)} />}
     {creatingClientName !== null && (
       <ClientDrawer

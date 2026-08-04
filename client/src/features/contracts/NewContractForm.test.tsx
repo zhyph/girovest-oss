@@ -150,7 +150,7 @@ describe('NewContractForm', () => {
     renderWithToast(<NewContractForm onClose={onClose} />)
 
     await pickClient(/Maria Completa/)
-    await userEvent.click(document.querySelector('[data-slot="sheet-overlay"]')!)
+    await userEvent.click(document.querySelector('[data-slot="dialog-overlay"]')!)
 
     expect(screen.getByText('Descartar alterações?')).toBeInTheDocument()
     expect(onClose).not.toHaveBeenCalled()
@@ -212,7 +212,7 @@ describe('NewContractForm', () => {
     await userEvent.type(screen.getByLabelText(/retirada/i), '02102026')
     await userEvent.type(screen.getByLabelText(/devolução/i), '05102026')
     await userEvent.selectOptions(screen.getByLabelText(/forma de pagamento/i), 'PIX')
-    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar contrato' }))
 
     expect(createImpl).toHaveBeenCalledOnce()
     expect(createImpl.mock.calls[0][0].paymentMethod).toBe('PIX')
@@ -233,7 +233,7 @@ describe('NewContractForm', () => {
     await userEvent.type(screen.getByLabelText(/retirada/i), '02102026')
     await userEvent.type(screen.getByLabelText(/devolução/i), '05102026')
     await userEvent.selectOptions(screen.getByLabelText(/forma de pagamento/i), 'PIX')
-    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar contrato' }))
 
     expect(createImpl).not.toHaveBeenCalled()
     expect(screen.getByText(/salvar contrato mesmo assim/i)).toBeInTheDocument()
@@ -255,7 +255,7 @@ describe('NewContractForm', () => {
     await userEvent.type(screen.getByLabelText(/retirada/i), '02102026')
     await userEvent.type(screen.getByLabelText(/devolução/i), '05102026')
     await userEvent.selectOptions(screen.getByLabelText(/forma de pagamento/i), 'PIX')
-    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar contrato' }))
 
     expect(createImpl).not.toHaveBeenCalled()
     expect(screen.getByText('Produto é obrigatório')).toBeInTheDocument()
@@ -268,7 +268,7 @@ describe('NewContractForm', () => {
     vi.spyOn(useContractsModule, 'useCreateContract').mockReturnValue({ mutateAsync: createImpl, isPending: false } as never)
     renderWithToast(<NewContractForm onClose={vi.fn()} />)
 
-    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar contrato' }))
 
     // RHF's shouldFocusError walks mounted fields for a focusable ref and
     // stops at the first invalid one — clientId is declared before
@@ -455,7 +455,7 @@ describe('inline client and product creation together', () => {
     await userEvent.type(screen.getByLabelText(/retirada/i), '02102026')
     await userEvent.type(screen.getByLabelText(/devolução/i), '05102026')
     await userEvent.selectOptions(screen.getByLabelText(/forma de pagamento/i), 'PIX')
-    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar contrato' }))
 
     // The just-created client has no CPF/RG/address on file, so the
     // client-readiness gate intercepts the first Salvar with a confirmation
@@ -488,6 +488,45 @@ describe('pricing', () => {
     await userEvent.clear(priceField)
     await userEvent.type(priceField, '8000')
 
-    expect(screen.getByText(/total das peças/i).parentElement).toHaveTextContent('R$ 80,00')
+    // Exact string, not a substring regex: the dialog footer also carries
+    // the hint "As parcelas somam o total das peças.", which a loose match
+    // would find first.
+    expect(screen.getByText('Total das peças').parentElement).toHaveTextContent('R$ 80,00')
+  })
+})
+
+describe('dialog format', () => {
+  it('presents one dialog with both columns visible, not a wizard', async () => {
+    mockHooks()
+    renderWithToast(<NewContractForm onClose={vi.fn()} />)
+
+    // The study rejected step-by-step precisely because it hides fields:
+    // client, event, pieces and instalments must all be reachable at once.
+    expect(screen.getByText('Cliente e evento')).toBeInTheDocument()
+    expect(screen.getByText('Peças')).toBeInTheDocument()
+    expect(screen.getByText('Parcelas')).toBeInTheDocument()
+    expect(screen.getByLabelText(/cliente/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/forma de pagamento/i)).toBeInTheDocument()
+
+    // No step affordances of any kind.
+    expect(screen.queryByRole('button', { name: /próximo|avançar|voltar/i })).not.toBeInTheDocument()
+  })
+
+  it('widens to page width once the contract passes four pieces, keeping the same fields', async () => {
+    mockHooks()
+    renderWithToast(<NewContractForm onClose={vi.fn()} />)
+
+    const panel = () => screen.getByRole('dialog')
+    expect(panel().className).toContain('sm:max-w-[46rem]')
+
+    // One format, two sizes — the study's single exception.
+    for (let i = 0; i < 4; i += 1) {
+      await userEvent.click(screen.getByRole('button', { name: /adicionar peça/i }))
+    }
+
+    expect(panel().className).toContain('sm:max-w-[68rem]')
+    // The fields did not change, only the width.
+    expect(screen.getByText('Cliente e evento')).toBeInTheDocument()
+    expect(screen.getByText('Parcelas')).toBeInTheDocument()
   })
 })
