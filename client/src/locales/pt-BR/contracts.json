@@ -24,13 +24,19 @@
     "title": "Peças",
     "add": "Adicionar peça",
     "remove": "Remover peça",
-    "total": "Total das peças"
+    "total": "Total das peças",
+    "count_one": "{{count}} peça",
+    "count_other": "{{count}} peças"
   },
   "installments": {
     "title": "Parcelas",
     "add": "Adicionar parcela",
     "remove": "Remover parcela",
-    "footerHint": "As parcelas somam o total das peças."
+    "count_one": "{{count}} parcela",
+    "count_other": "{{count}} parcelas",
+    "summary": "em {{count}}× de {{amount}}",
+    "summaryMixed": "em {{count}}× · {{amount}} no total",
+    "noneDefined": "sem parcelas definidas"
   },
   "clientReadiness": {
     "missing": "Faltam campos obrigatórios: {{fields}}",

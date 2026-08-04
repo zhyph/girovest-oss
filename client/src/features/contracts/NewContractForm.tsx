@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm, Controller, useFieldArray, useWatch, type Path } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
@@ -158,6 +158,20 @@ function ItemRow({
   )
 }
 
+/**
+ * The even split the form suggests for each instalment: the pieces' total
+ * divided by however many instalments there currently are. Rounded to cents,
+ * because a suggestion that lands on 83.33333333333333 is one the staff member
+ * has to retype rather than accept.
+ *
+ * Exported for its own test: this is arithmetic the shop's money depends on,
+ * and it should not need a rendered dialog to be checked.
+ */
+export function suggestedInstallmentAmount(itemsTotal: number, installmentCount: number): number {
+  if (installmentCount <= 0) return 0
+  return Math.round((itemsTotal / installmentCount) * 100) / 100
+}
+
 function useWatchField(
   control: ReturnType<typeof useForm<NewContractFormValues>>['control'],
   name: Path<NewContractFormValues>,
@@ -194,6 +208,7 @@ export function NewContractForm({
     control,
     watch,
     setValue,
+    getValues,
     formState: { errors, isDirty },
   } = useForm<NewContractFormValues>({
     resolver: zodResolver(newContractSchema),
@@ -208,6 +223,20 @@ export function NewContractForm({
 
   const items = useFieldArray({ control, name: 'items' })
   const installments = useFieldArray({ control, name: 'installments' })
+  /**
+   * Which instalment amounts the staff member has typed into, positionally.
+   *
+   * The even split is a SUGGESTION, not a rule: a client who pays R$500 now
+   * and the rest in two goes is an ordinary Saturday, and the form must not
+   * undo that the moment a third instalment is added. So a row that has been
+   * edited by hand is left alone forever after, and only untouched rows pick
+   * up the recomputed suggestion.
+   *
+   * Kept alongside the field array rather than inside the form values because
+   * it is not part of the contract — it never reaches the server, and adding
+   * it to the schema would mean teaching the payload about the UI's memory.
+   */
+  const [touchedAmounts, setTouchedAmounts] = useState<boolean[]>([])
   // `isDirty` compares against defaultValues, and the preselected client IS
   // a default value, so an untouched dialog opened from Clientes stays clean
   // and closes without a discard prompt.
@@ -250,6 +279,50 @@ export function NewContractForm({
   const itemsTotal = (watchedItems ?? []).reduce((sum, item) => sum + (Number(item?.priceCharged) || 0), 0)
   const currency = getLocaleConfig(locale).currency
   const paymentMethods = getPaymentMethods(locale)
+  const installmentCount = installments.fields.length
+  const suggestedAmount = suggestedInstallmentAmount(itemsTotal, installmentCount)
+  const watchedInstallments = watch('installments')
+  const installmentAmounts = (watchedInstallments ?? []).map((installment) => Number(installment?.amount) || 0)
+  // "em 3× de R$150" is only true while the three are actually equal. Once a
+  // row has been typed over by hand — which the whole touched-tracking exists
+  // to allow — the footer reports the sum instead of a per-instalment figure
+  // that no instalment carries.
+  const installmentsAreEven =
+    installmentAmounts.length > 0 && installmentAmounts.every((amount) => amount === installmentAmounts[0])
+  const installmentsSum = installmentAmounts.reduce((sum, amount) => sum + amount, 0)
+
+  // Re-suggests whenever either side of the division moves: a piece added or
+  // removed (or repriced) changes the total, an instalment added or removed
+  // changes the divisor. Untouched rows only — see touchedAmounts.
+  useEffect(() => {
+    if (installmentCount === 0) return
+    for (let index = 0; index < installmentCount; index += 1) {
+      if (touchedAmounts[index]) continue
+      // Guarded so the effect cannot re-enter itself: setValue re-renders, and
+      // an unconditional write would then re-run this on every pass.
+      if (getValues(`installments.${index}.amount`) === suggestedAmount) continue
+      setValue(`installments.${index}.amount`, suggestedAmount, { shouldDirty: true })
+    }
+  }, [installmentCount, suggestedAmount, touchedAmounts, getValues, setValue])
+
+  function addInstallment() {
+    installments.append({ dueDate: '', amount: suggestedInstallmentAmount(itemsTotal, installmentCount + 1) })
+    setTouchedAmounts((current) => [...current, false])
+  }
+
+  function removeInstallment(index: number) {
+    installments.remove(index)
+    setTouchedAmounts((current) => current.filter((_, position) => position !== index))
+  }
+
+  function markAmountTouched(index: number) {
+    setTouchedAmounts((current) => {
+      if (current[index]) return current
+      const next = [...current]
+      next[index] = true
+      return next
+    })
+  }
 
   return (
     <>
@@ -411,10 +484,6 @@ export function NewContractForm({
               {t('items.add')}
             </button>
             </div>
-            <div className="flex items-baseline justify-between gap-3 px-0.5">
-              <span className="text-meta text-muted-foreground">{t('items.total')}</span>
-              <span className="tabular text-[15px] font-semibold">{formatCurrency(itemsTotal, locale, currency)}</span>
-            </div>
           </div>
           <div className="flex flex-col gap-2">
             <SectionLabel>{t('installments.title')}</SectionLabel>
@@ -451,7 +520,17 @@ export function NewContractForm({
                     name={`installments.${index}.amount`}
                     control={control}
                     render={({ field: amountField }) => (
-                      <CurrencyInput value={amountField.value} onChange={amountField.onChange} aria-label={t('fields.installmentAmount')} />
+                      <CurrencyInput
+                        value={amountField.value}
+                        onChange={(next) => {
+                          // Only a real edit marks the row: the even-split
+                          // suggestion is written with setValue, which never
+                          // comes through here.
+                          markAmountTouched(index)
+                          amountField.onChange(next)
+                        }}
+                        aria-label={t('fields.installmentAmount')}
+                      />
                     )}
                   />
                 </label>
@@ -459,7 +538,7 @@ export function NewContractForm({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  onClick={() => installments.remove(index)}
+                  onClick={() => removeInstallment(index)}
                   aria-label={t('installments.remove')}
                 >
                   <X size={16} />
@@ -468,7 +547,7 @@ export function NewContractForm({
             ))}
             <button
               type="button"
-              onClick={() => installments.append({ dueDate: '', amount: 0 })}
+              onClick={addInstallment}
               className="flex w-full items-center gap-2 bg-surface-sunken px-2.5 py-2 text-left text-[13px] font-medium text-primary hover:bg-secondary"
             >
               {t('installments.add')}
@@ -478,7 +557,34 @@ export function NewContractForm({
           </div>
         </DialogBody>
         <DialogActions className="justify-between">
-          <span className="text-meta text-muted-foreground">{t('installments.footerHint')}</span>
+          {/*
+            The footer answers "how is this being paid?" beside the total it
+            is being paid against. A contract with no instalments is not an
+            error — plenty are paid in one go on the day — but it is worth
+            saying out loud before saving, so it reads as a warning rather
+            than as a number.
+          */}
+          <div className="flex min-w-0 items-baseline gap-2">
+            <span className="text-meta text-muted-foreground">{t('items.total')}</span>
+            <span className="tabular text-[15px] font-semibold">{formatCurrency(itemsTotal, locale, currency)}</span>
+            {installmentCount === 0 ? (
+              <span className="rounded-badge border border-warning-border bg-warning px-1.5 py-0.5 text-meta text-warning-foreground">
+                {t('installments.noneDefined')}
+              </span>
+            ) : (
+              <span className="text-meta text-muted-foreground">
+                {installmentsAreEven
+                  ? t('installments.summary', {
+                      count: installmentCount,
+                      amount: formatCurrency(installmentAmounts[0], locale, currency),
+                    })
+                  : t('installments.summaryMixed', {
+                      count: installmentCount,
+                      amount: formatCurrency(installmentsSum, locale, currency),
+                    })}
+              </span>
+            )}
+          </div>
           <div className="flex gap-2">
             <Button type="button" variant="secondary" onClick={discardGuard.requestClose}>
               {t('common:actions.cancel', { ns: 'common' })}

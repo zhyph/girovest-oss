@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import '../../i18n.ts'
-import { NewContractForm } from './NewContractForm.tsx'
+import { NewContractForm, suggestedInstallmentAmount } from './NewContractForm.tsx'
 import * as useClientsModule from '../clients/useClients.ts'
 import * as useProductsModule from '../products/useProducts.ts'
 import * as useAllocationsModule from '../allocations/useAllocations.ts'
@@ -567,5 +567,123 @@ describe('opened for a client already on screen', () => {
     renderWithToast(<NewContractForm onClose={vi.fn()} />)
 
     expect(await screen.findByLabelText(/cliente/i)).not.toHaveTextContent('Maria Completa')
+  })
+})
+
+// Intl currency output separates the symbol with a NON-BREAKING space, so a
+// hand-typed "R$ 100,00" never equals it in a value assertion (toHaveTextContent
+// normalises whitespace and hides this; toHaveValue does not).
+const money = (value: number) =>
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
+
+describe('installment suggestion', () => {
+  it('divides the pieces total evenly by however many instalments there are', () => {
+    expect(suggestedInstallmentAmount(300, 3)).toBe(100)
+    expect(suggestedInstallmentAmount(100, 3)).toBe(33.33)
+    // No instalments is not a division by zero — it is simply no suggestion.
+    expect(suggestedInstallmentAmount(300, 0)).toBe(0)
+  })
+
+  it('prefills a new instalment with the even split instead of zero', async () => {
+    mockHooks()
+    renderWithToast(<NewContractForm onClose={vi.fn()} />)
+    await pickProduct(/Vestido Azul/)
+
+    await userEvent.click(screen.getByRole('button', { name: /adicionar parcela/i }))
+    expect(screen.getByLabelText(/valor da parcela/i)).toHaveValue(money(100))
+
+    // Adding a second re-suggests over the new divisor, on both rows.
+    await userEvent.click(screen.getByRole('button', { name: /adicionar parcela/i }))
+    const amounts = screen.getAllByLabelText(/valor da parcela/i)
+    expect(amounts[0]).toHaveValue(money(50))
+    expect(amounts[1]).toHaveValue(money(50))
+  })
+
+  it('re-suggests when a piece is added, because the total moved', async () => {
+    mockHooks()
+    renderWithToast(<NewContractForm onClose={vi.fn()} />)
+    await pickProduct(/Vestido Azul/)
+    await userEvent.click(screen.getByRole('button', { name: /adicionar parcela/i }))
+    expect(screen.getByLabelText(/valor da parcela/i)).toHaveValue(money(100))
+
+    await userEvent.click(screen.getByRole('button', { name: /adicionar peça/i }))
+    const productFields = screen.getAllByLabelText(/produto/i)
+    await userEvent.click(productFields[1])
+    await userEvent.click(await screen.findByRole('option', { name: /Vestido Azul/ }))
+
+    expect(screen.getByLabelText(/valor da parcela/i)).toHaveValue(money(200))
+  })
+
+  /*
+    The requirement the mockup itself does not state, and the reason the even
+    split is tracked per row at all. "R$500 agora e o resto em duas vezes" is
+    an ordinary arrangement in this shop. Recomputing over every row would
+    silently wipe the 500 the moment the third instalment was added — with no
+    error, no prompt, and nothing on screen to say it happened.
+  */
+  it('CRITICAL: never overwrites an amount the staff member typed', async () => {
+    mockHooks()
+    renderWithToast(<NewContractForm onClose={vi.fn()} />)
+    await pickProduct(/Vestido Azul/)
+
+    await userEvent.click(screen.getByRole('button', { name: /adicionar parcela/i }))
+    await userEvent.click(screen.getByRole('button', { name: /adicionar parcela/i }))
+
+    const typed = screen.getAllByLabelText(/valor da parcela/i)[0]
+    await userEvent.clear(typed)
+    await userEvent.type(typed, '8000')
+    expect(typed).toHaveValue(money(80))
+
+    await userEvent.click(screen.getByRole('button', { name: /adicionar parcela/i }))
+
+    const amounts = screen.getAllByLabelText(/valor da parcela/i)
+    expect(amounts[0]).toHaveValue(money(80))
+    // The two rows nobody touched still take the new suggestion.
+    expect(amounts[1]).toHaveValue(money(33.33))
+    expect(amounts[2]).toHaveValue(money(33.33))
+  })
+
+  it('forgets the edited row once it is removed, so its successor is suggested again', async () => {
+    mockHooks()
+    renderWithToast(<NewContractForm onClose={vi.fn()} />)
+    await pickProduct(/Vestido Azul/)
+    await userEvent.click(screen.getByRole('button', { name: /adicionar parcela/i }))
+
+    const typed = screen.getByLabelText(/valor da parcela/i)
+    await userEvent.clear(typed)
+    await userEvent.type(typed, '8000')
+    await userEvent.click(screen.getByRole('button', { name: /remover parcela/i }))
+    await userEvent.click(screen.getByRole('button', { name: /adicionar parcela/i }))
+
+    expect(screen.getByLabelText(/valor da parcela/i)).toHaveValue(money(100))
+  })
+
+  it('says so, in warning ink, when a contract has no instalments at all', async () => {
+    mockHooks()
+    renderWithToast(<NewContractForm onClose={vi.fn()} />)
+    await pickProduct(/Vestido Azul/)
+
+    expect(screen.getByText('sem parcelas definidas')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: /adicionar parcela/i }))
+    await userEvent.click(screen.getByRole('button', { name: /adicionar parcela/i }))
+
+    expect(screen.queryByText('sem parcelas definidas')).not.toBeInTheDocument()
+    expect(screen.getByText('em 2× de R$ 50,00')).toBeInTheDocument()
+  })
+
+  it('reports the sum rather than a per-instalment figure once the rows differ', async () => {
+    mockHooks()
+    renderWithToast(<NewContractForm onClose={vi.fn()} />)
+    await pickProduct(/Vestido Azul/)
+    await userEvent.click(screen.getByRole('button', { name: /adicionar parcela/i }))
+    await userEvent.click(screen.getByRole('button', { name: /adicionar parcela/i }))
+
+    const typed = screen.getAllByLabelText(/valor da parcela/i)[0]
+    await userEvent.clear(typed)
+    await userEvent.type(typed, '8000')
+
+    // 80 + 50: "em 2× de R$ 50,00" would be a claim neither row supports.
+    expect(screen.getByText('em 2× · R$ 130,00 no total')).toBeInTheDocument()
   })
 })
