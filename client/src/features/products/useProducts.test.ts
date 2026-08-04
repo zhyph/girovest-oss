@@ -9,6 +9,7 @@ import type { Product } from './productSchemas.ts'
 const created: Product = {
   id: 'p-new', locationId: 'l1', name: 'Vestido Novo', category: 'festa', size: 'M', color: 'rosa',
   rentalPrice: 200, depositAmount: 100, photos: [], status: 'active', availability: 'available',
+  code: 1,
   hasAllocationHistory: false, createdAt: '2026-07-31',
 }
 

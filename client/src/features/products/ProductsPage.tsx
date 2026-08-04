@@ -78,6 +78,10 @@ export function ProductsPage() {
     if (!query) return products ?? []
     return (products ?? []).filter(
       (product) =>
+        // Exact match on the code, not `includes`: typing 3 must not drag in
+        // every piece numbered 13, 30, 31... The code is the one field staff
+        // type when they already know exactly which piece they want.
+        String(product.code ?? '') === query ||
         product.name.toLowerCase().includes(query) ||
         product.category.toLowerCase().includes(query) ||
         product.color.toLowerCase().includes(query),
@@ -105,6 +109,15 @@ export function ProductsPage() {
         key: 'photo',
         width: '40px',
         cell: (product) => <ProductThumbnail product={product} className="size-8" />,
+      },
+      {
+        key: 'code',
+        header: t('columns.code'),
+        width: '52px',
+        align: 'right',
+        cell: (product) => (
+          <span className="tabular text-[13px] text-muted-foreground">{product.code ?? '—'}</span>
+        ),
       },
       {
         key: 'name',
@@ -235,7 +248,19 @@ export function ProductsPage() {
                   </span>
                 </span>
                 <span className="flex min-w-0 flex-col gap-0.5 px-2.5 pt-2 pb-2.5">
-                  <span className="truncate text-[13px] font-semibold">{product.name}</span>
+                  {/*
+                    The code leads the name rather than sitting under it: in a
+                    grid this dense the shop scans for a number first, and a
+                    third line per card would cost a row of photos.
+                  */}
+                  <span className="flex min-w-0 items-baseline gap-1.5">
+                    {product.code != null && (
+                      <span className="tabular flex-shrink-0 text-[11px] text-foreground-subtle">
+                        {product.code}
+                      </span>
+                    )}
+                    <span className="truncate text-[13px] font-semibold">{product.name}</span>
+                  </span>
                   <span className="flex items-baseline justify-between gap-2">
                     <span className="min-w-0 truncate text-xs text-muted-foreground">
                       {product.size} · {product.color}

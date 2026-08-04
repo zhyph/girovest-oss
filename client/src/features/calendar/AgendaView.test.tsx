@@ -36,7 +36,7 @@ function makeProduct(overrides: Partial<Product> = {}): Product {
   return {
     id: 'p1', locationId: 'loc1', name: 'Vestido Azul', category: 'festa', size: 'M', color: 'azul',
     rentalPrice: 250, depositAmount: 150,
-    status: 'active', availability: 'available', hasAllocationHistory: false,
+    status: 'active', availability: 'available', code: 1, hasAllocationHistory: false,
     createdAt: '2026-07-01T00:00:00.000Z',
     ...overrides,
   }

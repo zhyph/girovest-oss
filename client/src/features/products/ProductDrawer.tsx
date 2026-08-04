@@ -153,7 +153,14 @@ export function ProductDrawer({
   const suggestionsFor = (field: 'category' | 'size' | 'color') =>
     (allProducts ?? []).map((item) => item[field]).filter((entry): entry is string => Boolean(entry))
 
-  const drawerTitle = product ? t('editTitle') : t('newTitle')
+  // The code identifies the piece the way the shop says it out loud, so it
+  // belongs where the piece is named, not buried in a field list. A new
+  // product has none yet — the server assigns it on create.
+  const drawerTitle = product
+    ? product.code == null
+      ? t('editTitle')
+      : `${t('editTitle')} · ${t('codePrefix')}${product.code}`
+    : t('newTitle')
 
   return (
     <Sheet open onOpenChange={(next) => !next && discardGuard.requestClose()}>

@@ -26,6 +26,12 @@ export function ProductDetailModal({
       <DialogContent showCloseButton={false} className="max-w-lg">
         <DialogTitle className="mb-3 text-base font-semibold text-foreground">{product.name}</DialogTitle>
         <dl className="grid grid-cols-2 gap-2 text-sm">
+          {product.code != null && (
+            <div>
+              <dt className="text-xs text-muted-foreground">{t('fields.code')}</dt>
+              <dd className="tabular">{product.code}</dd>
+            </div>
+          )}
           <div>
             <dt className="text-xs text-muted-foreground">{t('fields.category')}</dt>
             <dd>{product.category}</dd>

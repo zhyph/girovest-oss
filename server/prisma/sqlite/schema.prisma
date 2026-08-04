@@ -72,6 +72,12 @@ model Client {
 model Product {
   id            String   @id @default(uuid())
   locationId    String
+  /// Short per-shop reference the staff say out loud ("peça 38"), assigned
+  /// sequentially exactly like Contract.number. Nullable only so the column
+  /// could be added to shops that already had a catalogue: every piece gets
+  /// one at creation, and productBackfill fills the pre-existing rows at
+  /// startup. Treat a null as "not backfilled yet", never as "has no code".
+  code          Int?
   name          String
   description   String?
   category      String
@@ -85,6 +91,8 @@ model Product {
 
   location    Location     @relation(fields: [locationId], references: [id])
   allocations Allocation[]
+
+  @@unique([locationId, code])
 }
 
 model Allocation {

@@ -6,8 +6,8 @@ import { ProductCombobox } from './ProductCombobox.tsx'
 import type { Product } from './productSchemas.ts'
 
 const products: Product[] = [
-  { id: 'p1', locationId: 'l1', name: 'Vestido Azul', category: 'festa', size: 'M', color: 'azul', rentalPrice: 100, depositAmount: 50, photos: [], status: 'active', availability: 'available', hasAllocationHistory: false, createdAt: '2026-01-01' },
-  { id: 'p2', locationId: 'l1', name: 'Vestido Azul', category: 'festa', size: 'P', color: 'azul-claro', rentalPrice: 90, depositAmount: 50, photos: [], status: 'active', availability: 'available', hasAllocationHistory: false, createdAt: '2026-01-01' },
+  { id: 'p1', locationId: 'l1', name: 'Vestido Azul', category: 'festa', size: 'M', color: 'azul', rentalPrice: 100, depositAmount: 50, photos: [], status: 'active', availability: 'available', code: 1, hasAllocationHistory: false, createdAt: '2026-01-01' },
+  { id: 'p2', locationId: 'l1', name: 'Vestido Azul', category: 'festa', size: 'P', color: 'azul-claro', rentalPrice: 90, depositAmount: 50, photos: [], status: 'active', availability: 'available', code: 1, hasAllocationHistory: false, createdAt: '2026-01-01' },
 ]
 
 describe('ProductCombobox', () => {

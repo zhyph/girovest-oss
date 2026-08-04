@@ -1,3 +1,4 @@
+import { Prisma } from '../generated/prisma/client.js'
 import { prisma } from '../db/client.js'
 import { scopedDb } from '../db/scopedClient.js'
 import { AppError } from '../errors/AppError.js'
@@ -22,6 +23,8 @@ export type ProductStatus = 'active' | 'maintenance' | 'retired'
 export interface ProductDTO {
   id: string
   locationId: string
+  /** Sequential per-shop reference; null only until the startup backfill runs. */
+  code: number | null
   name: string
   description: string | null
   category: string
@@ -63,6 +66,7 @@ export interface UpdateProductInput {
 interface ProductRow {
   id: string
   locationId: string
+  code: number | null
   name: string
   description: string | null
   category: string
@@ -151,22 +155,70 @@ async function historyByProductId(productIds: string[]): Promise<Set<string>> {
   return result
 }
 
+/**
+ * Deliberately identical to contractService's contract-numbering loop, down
+ * to the retried Prisma error codes: read the highest code for the location,
+ * add one, and let the `@@unique([locationId, code])` constraint — not the
+ * read — be what actually decides the race. Two staff adding a piece at the
+ * same second both compute the same next code; the loser gets P2002 (or
+ * P2034 under Postgres' Serializable isolation) and retries with a fresh
+ * read instead of failing the create.
+ */
+const MAX_CODE_CONFLICT_RETRIES = 5
+
 export async function createProduct(data: CreateProductInput): Promise<ProductDTO> {
-  // ast-grep-ignore: no-unscoped-location-model — Non-HTTP caller (photo token flow); locationId is explicit param.
-  const row = await prisma.product.create({
-    data: {
-      locationId: data.locationId,
-      name: data.name,
-      description: data.description,
-      category: data.category,
-      size: data.size,
-      color: data.color,
-      rentalPrice: data.rentalPrice,
-      depositAmount: data.depositAmount,
-      photos: JSON.stringify(data.photos ?? []),
-    },
-  })
-  return toDTO(row, 'available', false)
+  const useSerializable = process.env.DB_PROVIDER === 'postgresql'
+
+  for (let attempt = 0; attempt < MAX_CODE_CONFLICT_RETRIES; attempt++) {
+    try {
+      const row = await prisma.$transaction(
+        async (tx) => {
+          // `code: { not: null }` is not decoration: Postgres sorts NULLs
+          // FIRST on a DESC ordering, so without it the highest code read
+          // back from a shop that still has un-backfilled pieces would be
+          // null, restarting the sequence at 1 and colliding with every
+          // existing piece.
+          // ast-grep-ignore: no-unscoped-location-model — Already filters by where: { locationId }; the $transaction callback has no scopedDb equivalent.
+          const last = await tx.product.findFirst({
+            where: { locationId: data.locationId, code: { not: null } },
+            orderBy: { code: 'desc' },
+            select: { code: true },
+          })
+          // ast-grep-ignore: no-unscoped-location-model — Non-HTTP caller (photo token flow); locationId is explicit param.
+          return tx.product.create({
+            data: {
+              locationId: data.locationId,
+              code: (last?.code ?? 0) + 1,
+              name: data.name,
+              description: data.description,
+              category: data.category,
+              size: data.size,
+              color: data.color,
+              rentalPrice: data.rentalPrice,
+              depositAmount: data.depositAmount,
+              photos: JSON.stringify(data.photos ?? []),
+            },
+          })
+        },
+        useSerializable ? { isolationLevel: Prisma.TransactionIsolationLevel.Serializable } : undefined,
+      )
+      return toDTO(row, 'available', false)
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        (error.code === 'P2034' || error.code === 'P2002')
+      ) {
+        continue
+      }
+      throw error
+    }
+  }
+
+  throw new AppError(
+    ErrorCodes.VALIDATION_ERROR,
+    409,
+    'Could not assign a product code due to repeated write conflicts, please retry',
+  )
 }
 
 export async function listProducts(locationId: string): Promise<ProductDTO[]> {

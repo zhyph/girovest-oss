@@ -2,8 +2,9 @@
   "title": "Produtos",
   "newTitle": "Novo produto",
   "editTitle": "Editar produto",
-  "searchPlaceholder": "Buscar por nome, categoria ou cor...",
+  "searchPlaceholder": "Buscar por código, nome, categoria ou cor...",
   "fields": {
+    "code": "Código",
     "name": "Nome",
     "category": "Categoria",
     "size": "Tamanho",
@@ -69,7 +70,9 @@
     "list": "Lista"
   },
   "columns": {
+    "code": "Nº",
     "rentalPrice": "Aluguel",
     "size": "Tam."
-  }
+  },
+  "codePrefix": "Nº "
 }

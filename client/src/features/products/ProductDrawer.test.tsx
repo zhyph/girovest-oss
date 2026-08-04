@@ -10,6 +10,7 @@ import { Toaster } from '../../components/ui/sonner.tsx'
 const product = {
   id: 'p1', locationId: 'l1', name: 'Vestido Azul', category: 'casual', size: 'P', color: 'azul',
   rentalPrice: 150, depositAmount: 50, status: 'active' as const, availability: 'available' as const,
+  code: 1,
   hasAllocationHistory: false,
   createdAt: '2026-01-01',
 }
@@ -246,7 +247,8 @@ describe('ProductDrawer', () => {
     // (itself now a proper dialog) stays open rather than also closing.
     await userEvent.keyboard('{Escape}')
     expect(screen.queryByText('Excluir Vestido Azul?')).not.toBeInTheDocument()
-    expect(screen.getByRole('dialog', { name: 'Editar produto' })).toBeInTheDocument()
+    // The drawer title now carries the piece's code alongside the heading.
+    expect(screen.getByRole('dialog', { name: 'Editar produto · Nº 1' })).toBeInTheDocument()
     expect(deleteImpl).not.toHaveBeenCalled()
   })
 
@@ -282,7 +284,7 @@ describe('ProductDrawer', () => {
 
   it('hides Excluir when the product has allocation history, per the drawer spec', () => {
     mockProductHooks(vi.fn())
-    renderWithToast(<ProductDrawer product={{ ...product, hasAllocationHistory: true }} onClose={vi.fn()} />)
+    renderWithToast(<ProductDrawer product={{ ...product, code: 1, hasAllocationHistory: true }} onClose={vi.fn()} />)
     expect(screen.queryByRole('button', { name: 'Excluir' })).not.toBeInTheDocument()
   })
 
@@ -357,6 +359,7 @@ describe('ProductDrawer', () => {
     const createdProduct = {
       id: 'p2', locationId: 'l1', name: 'Vestido Verde', category: 'festa', size: 'M', color: 'verde',
       rentalPrice: 150, depositAmount: 0, status: 'active' as const, availability: 'available' as const,
+      code: 1,
       hasAllocationHistory: false, createdAt: '2026-01-02',
     }
     const createImpl = vi.fn().mockResolvedValue(createdProduct)

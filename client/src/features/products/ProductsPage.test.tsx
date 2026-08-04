@@ -9,7 +9,7 @@ import * as useAuthModule from '../../lib/useAuth.ts'
 import { Toaster } from '../../components/ui/sonner.tsx'
 
 const product = {
-  id: 'p1', locationId: 'l1', name: 'Vestido Azul', category: 'casual', size: 'P', color: 'azul',
+  id: 'p1', locationId: 'l1', code: 12, name: 'Vestido Azul', category: 'casual', size: 'P', color: 'azul',
   rentalPrice: 150, depositAmount: 50, status: 'active' as const, availability: 'available' as const,
   hasAllocationHistory: false,
   createdAt: '2026-01-01',
@@ -88,10 +88,26 @@ describe('ProductsPage', () => {
     expect(screen.getByText('Vestido Azul')).toBeInTheDocument()
     expect(screen.getByText('Vestido Rosa')).toBeInTheDocument()
 
-    await userEvent.type(screen.getByPlaceholderText('Buscar por nome, categoria ou cor...'), 'festa')
+    await userEvent.type(screen.getByPlaceholderText('Buscar por código, nome, categoria ou cor...'), 'festa')
 
     expect(screen.queryByText('Vestido Azul')).not.toBeInTheDocument()
     expect(screen.getByText('Vestido Rosa')).toBeInTheDocument()
+  })
+
+  it('shows each piece\'s code in the grid and finds it by exact code', async () => {
+    const other = { ...product, id: 'p2', code: 120, name: 'Vestido Rosa' }
+    vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [product, other], isLoading: false } as never)
+    mockStaff()
+
+    renderWithQueryClient(<ProductsPage />)
+    expect(screen.getByText('12')).toBeInTheDocument()
+    expect(screen.getByText('120')).toBeInTheDocument()
+
+    await userEvent.type(screen.getByPlaceholderText('Buscar por código, nome, categoria ou cor...'), '12')
+
+    // Exact match, not substring: searching 12 must not also return 120.
+    expect(screen.getByText('Vestido Azul')).toBeInTheDocument()
+    expect(screen.queryByText('Vestido Rosa')).not.toBeInTheDocument()
   })
 
   it('shows a no-results message when the search matches nothing', async () => {
@@ -99,7 +115,7 @@ describe('ProductsPage', () => {
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' }, isLoadingStaff: false, isErrorStaff: false, refetchStaff: vi.fn(), login: vi.fn(), logout: vi.fn(), isLoggedIn: true })
 
     renderWithQueryClient(<ProductsPage />)
-    await userEvent.type(screen.getByPlaceholderText('Buscar por nome, categoria ou cor...'), 'zzz')
+    await userEvent.type(screen.getByPlaceholderText('Buscar por código, nome, categoria ou cor...'), 'zzz')
 
     expect(screen.getByText('Nenhum produto encontrado para essa busca.')).toBeInTheDocument()
   })

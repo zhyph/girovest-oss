@@ -1,4 +1,5 @@
-import { describe, it, expect, afterEach, beforeEach, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect, vi, afterEach, beforeEach, beforeAll, afterAll } from 'vitest'
+import { Prisma } from '../generated/prisma/client.js'
 import { prisma } from '../db/client.js'
 import { AppError } from '../errors/AppError.js'
 import {
@@ -391,5 +392,152 @@ describe.sequential('listLeavingMaintenance', () => {
     await prisma.product.update({ where: { id: retiredId }, data: { status: 'retired' } })
 
     expect(await listLeavingMaintenance(locationId, 2, ASOF)).toEqual({ count: 0, items: [] })
+  })
+})
+
+describe.sequential('product codes', () => {
+  function input(name: string, ownerLocationId = locationId) {
+    return {
+      locationId: ownerLocationId,
+      name,
+      category: 'Festa',
+      size: 'M',
+      color: 'Azul',
+      rentalPrice: 100,
+      depositAmount: 50,
+    }
+  }
+
+  it('assigns sequential codes per location, starting at 1', async () => {
+    const first = await createProduct(input('Primeiro'))
+    const second = await createProduct(input('Segundo'))
+
+    expect(first.code).toBe(1)
+    expect(second.code).toBe(2)
+  })
+
+  it('numbers each shop independently', async () => {
+    await createProduct(input('Da loja 1'))
+    const elsewhere = await createProduct(input('Da loja 2', otherLocationId))
+
+    expect(elsewhere.code).toBe(1)
+  })
+
+  it('assigns unique sequential codes to concurrent creates in the same location', async () => {
+    // NOTE: this passes even with the retry loop deleted — better-sqlite3
+    // serializes transactions, so the two attempts never actually collide
+    // under the test provider. It is kept as a shape check only; the test
+    // below is the one that actually holds the retry down.
+    const results = await Promise.allSettled([
+      createProduct(input('Simultâneo A')),
+      createProduct(input('Simultâneo B')),
+    ])
+    const fulfilled = results.filter(
+      (r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof createProduct>>> => r.status === 'fulfilled',
+    )
+
+    expect(fulfilled).toHaveLength(2)
+    expect(fulfilled.map((r) => r.value.code).sort((a, b) => (a ?? 0) - (b ?? 0))).toEqual([1, 2])
+  })
+
+  it('CRITICAL: re-reads and takes the next free code when a racer wins the unique constraint', async () => {
+    // The real race, forced: the first attempt loses to another staff member
+    // who claimed code 1 in between the read and the write. Deleting the
+    // retry loop makes this throw; keeping it but reusing the code computed
+    // on the first attempt makes it come back as 1 instead of 2. Both are
+    // failures this catches, and neither is caught by the Promise.allSettled
+    // test above.
+    const realTransaction = prisma.$transaction.bind(prisma)
+    let attempts = 0
+    const spy = vi.spyOn(prisma, '$transaction').mockImplementation((async (...args: unknown[]) => {
+      attempts += 1
+      if (attempts === 1) {
+        await prisma.product.create({
+          data: {
+            locationId, name: 'Rival', code: 1, category: 'Festa', size: 'M', color: 'Azul',
+            rentalPrice: 100, depositAmount: 50,
+          },
+        })
+        throw new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+          code: 'P2002',
+          clientVersion: 'test',
+        })
+      }
+      return (realTransaction as (...a: never[]) => unknown)(...(args as never[]))
+    }) as never)
+
+    try {
+      const created = await createProduct(input('Perdeu a corrida'))
+      expect(attempts).toBe(2)
+      expect(created.code).toBe(2)
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
+  it('gives up with a 409 rather than looping forever on unending write conflicts', async () => {
+    const spy = vi.spyOn(prisma, '$transaction').mockImplementation((() =>
+      Promise.reject(
+        new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+          code: 'P2002',
+          clientVersion: 'test',
+        }),
+      )) as never)
+
+    try {
+      await expect(createProduct(input('Sem sorte'))).rejects.toMatchObject({ status: 409 })
+      expect(spy).toHaveBeenCalledTimes(5)
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
+  it('does not swallow an unrelated database error as a write conflict', async () => {
+    const spy = vi.spyOn(prisma, '$transaction').mockImplementation((() =>
+      Promise.reject(new Error('disk is on fire'))) as never)
+
+    try {
+      await expect(createProduct(input('Erro real'))).rejects.toThrow('disk is on fire')
+      // One attempt, not five: only P2002/P2034 are retryable.
+      expect(spy).toHaveBeenCalledTimes(1)
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
+  it('keeps counting past pieces that were backfilled rather than created', async () => {
+    // The un-backfilled shape: a row with a null code. Postgres sorts NULLs
+    // first on a DESC ordering, so a `findFirst` without the `not: null`
+    // guard would read null here and restart the sequence at 1.
+    await prisma.product.create({
+      data: {
+        locationId, name: 'Antigo', code: 4, category: 'Festa', size: 'M', color: 'Azul',
+        rentalPrice: 100, depositAmount: 50,
+      },
+    })
+    await prisma.product.create({
+      data: {
+        locationId, name: 'Sem código', code: null, category: 'Festa', size: 'M', color: 'Azul',
+        rentalPrice: 100, depositAmount: 50,
+      },
+    })
+
+    expect((await createProduct(input('Novo'))).code).toBe(5)
+  })
+
+  it('reports the code on reads, not only on the create response', async () => {
+    const created = await createProduct(input('Vestido'))
+
+    expect((await getProduct(locationId, created.id)).code).toBe(created.code)
+    expect((await listProducts(locationId))[0].code).toBe(created.code)
+    expect((await listProductsForLocation(locationId, {}))[0].code).toBe(created.code)
+  })
+
+  it('never changes an existing code on update', async () => {
+    const created = await createProduct(input('Vestido'))
+
+    const updated = await updateProduct(locationId, created.id, { name: 'Vestido renomeado' })
+
+    expect(updated.code).toBe(created.code)
   })
 })
