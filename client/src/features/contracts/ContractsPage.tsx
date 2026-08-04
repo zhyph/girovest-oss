@@ -8,15 +8,20 @@ import { cn } from '../../lib/cn.ts'
 import { Input } from '../../components/ui/input.tsx'
 import { CurrencyInput } from '../../components/ui/currency-input.tsx'
 import { Dialog, DialogContent, DialogTitle } from '../../components/ui/dialog.tsx'
+import { Toolbar, ToolbarSearch, ScreenTitle, SectionLabel } from '../../components/ui/toolbar.tsx'
+import { DataList, DataListEmpty, type DataListColumn } from '../../components/ui/data-list.tsx'
+import { StatusBadge, type EntityState } from '../../components/ui/status-badge.tsx'
+import { AuthenticatedPhoto } from '../../components/ui/authenticated-photo.tsx'
+import { formatCurrency, getLocaleConfig } from '../../lib/locale.ts'
 import { ConfirmDialog } from '../../components/ui/confirm-dialog.tsx'
 import { parseDateOnly, formatDate } from '../../lib/date.ts'
-import { formatCurrency, getLocaleConfig } from '../../lib/locale.ts'
 import { useLocale } from '../../lib/LocaleContext.tsx'
 import { showErrorToast } from '../../lib/toast.ts'
 import { useUnsavedChangesGuard } from '../../lib/useUnsavedChangesGuard.ts'
 import { useSectionTour } from '../onboarding/useSectionTour.ts'
 import { useClients } from '../clients/useClients.ts'
 import { useProducts } from '../products/useProducts.ts'
+import type { Product } from '../products/productSchemas.ts'
 import {
   useCheckOutAllocation,
   useReturnAllocation,
@@ -27,6 +32,29 @@ import { useContractsList, useCancelContract, useSetInstallmentPaid, CONTRACTS_K
 import type { Contract } from './contractSchemas.ts'
 import { NewContractForm } from './NewContractForm.tsx'
 import { SignRemotelyModal } from './SignRemotelyModal.tsx'
+
+/**
+ * A contract's single visible state, derived from its pieces. The list
+ * previously showed no state at all at contract level — you had to open a
+ * card and read its allocations to know whether anything was overdue.
+ * Precedence is worst-first: one late piece makes the contract late.
+ */
+export function contractState(contract: Contract, today = new Date()): EntityState {
+  const live = contract.allocations.filter((allocation) => allocation.status !== 'cancelled')
+  if (live.length === 0) return 'cancelled'
+  const isLate = (allocation: (typeof live)[number]) =>
+    allocation.status === 'checked_out' && parseDateOnly(allocation.dueDate) < today
+  if (live.some(isLate)) return 'overdue'
+  if (live.some((allocation) => allocation.status === 'checked_out')) return 'checked_out'
+  if (live.every((allocation) => allocation.status === 'returned')) return 'returned'
+  return 'reserved'
+}
+
+function contractTotal(contract: Contract): number {
+  return contract.allocations
+    .filter((allocation) => allocation.status !== 'cancelled')
+    .reduce((sum, allocation) => sum + allocation.priceCharged, 0)
+}
 
 function resolveErrorCode(error: unknown): string {
   return (error as { code?: string })?.code ?? 'UNKNOWN'
@@ -414,6 +442,127 @@ function ContractSignAction({ contract }: { contract: Contract }) {
   )
 }
 
+/**
+ * The contract, read rather than operated. The list used to render every
+ * contract as a card carrying Imprimir, Assinar and Cancelar in its header,
+ * Check-out and Cancelar on each piece, and Marcar como pago on each
+ * instalment — a three-piece contract with six instalments put sixteen
+ * buttons on screen at once, all competing. Only the selected contract
+ * shows its actions now, and the per-piece ones live in the row's own menu.
+ */
+function ContractDetailPanel({
+  contract,
+  clientName,
+  productNames,
+  products,
+}: {
+  contract: Contract | null
+  clientName: string
+  productNames: Map<string, string>
+  products: Map<string, Product>
+}) {
+  const { t } = useTranslation('contracts')
+  const { locale } = useLocale()
+  const currency = getLocaleConfig(locale).currency
+
+  if (!contract) {
+    return (
+      <div className="p-5">
+        <p className="text-meta text-muted-foreground">{t('detail.pickContract')}</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col">
+      {/*
+        Identity above, actions below. Side by side, three full-width
+        actions (Imprimir, Assinar remotamente, Cancelar contrato) left the
+        520px panel nothing for the client's name, which collapsed into a
+        three-line sliver — only visible once a contract had all three.
+      */}
+      <div className="flex flex-col gap-3 border-b border-border px-5 py-4">
+        <div className="flex min-w-0 flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-xs text-foreground-subtle">#{contract.number}</span>
+            <StatusBadge state={contractState(contract)} />
+          </div>
+          <span className="text-heading">{clientName}</span>
+          <span className="text-meta text-muted-foreground">
+            {t('fields.eventDate')}{' '}
+            {formatDate(parseDateOnly(contract.eventDate), locale, {
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric',
+            })}
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Link
+            to={`/contratos/${contract.id}/imprimir`}
+            className="inline-flex h-7.5 items-center justify-center rounded-control border border-border-strong bg-surface px-3 text-[13px] font-medium text-foreground hover:bg-surface-sunken"
+          >
+            {t('print.action')}
+          </Link>
+          <ContractSignAction contract={contract} />
+          <ContractCancelAction contract={contract} />
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2.5 border-b border-border px-5 py-4">
+        <SectionLabel>{t('items.title')}</SectionLabel>
+        <div className="overflow-hidden rounded-panel border border-border">
+          {contract.allocations.map((allocation) => {
+            const photo = products.get(allocation.productId)?.photos?.[0]
+            return (
+              <div
+                key={allocation.id}
+                className="grid grid-cols-[56px_1fr_88px_28px] items-center gap-3 border-b border-hairline bg-card p-2.5 last:border-b-0"
+              >
+                {photo ? (
+                  <AuthenticatedPhoto
+                    url={photo}
+                    alt=""
+                    className="size-14 rounded-badge border border-border object-cover"
+                  />
+                ) : (
+                  <span className="size-14 rounded-badge border border-border bg-surface-sunken" />
+                )}
+                <span className="flex min-w-0 flex-col gap-0.5">
+                  <span className="truncate text-[13.5px] font-semibold">
+                    {productNames.get(allocation.productId) ?? allocation.productId}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {formatDate(parseDateOnly(allocation.checkoutDate), locale, { day: '2-digit', month: '2-digit' })} –{' '}
+                    {formatDate(parseDateOnly(allocation.dueDate), locale, { day: '2-digit', month: '2-digit' })}
+                  </span>
+                  <span>
+                    <StatusBadge state={allocation.status as EntityState} />
+                  </span>
+                </span>
+                <span className="tabular text-right text-[13.5px]">
+                  {formatCurrency(allocation.priceCharged, locale, currency)}
+                </span>
+                <RowActions allocation={allocation} />
+              </div>
+            )
+          })}
+          <div className="flex items-center justify-between gap-3 bg-surface-sunken px-3 py-2.5">
+            <span className="text-meta text-muted-foreground">{t('items.total')}</span>
+            <span className="tabular text-body font-semibold">
+              {formatCurrency(contractTotal(contract), locale, currency)}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="px-5 py-4">
+        <ContractPayments contract={contract} />
+      </div>
+    </div>
+  )
+}
+
 export function ContractsPage() {
   const { t } = useTranslation('contracts')
   const { locale } = useLocale()
@@ -449,6 +598,12 @@ export function ContractsPage() {
     () => new Map((clients ?? []).map((client) => [client.id, client.name])),
     [clients],
   )
+  const productsById = useMemo(
+    () => new Map((products ?? []).map((product) => [product.id, product])),
+    [products],
+  )
+  const currency = getLocaleConfig(locale).currency
+  const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const contracts = data?.contracts
   const pageSize = data?.pageSize ?? 20
@@ -462,106 +617,139 @@ export function ContractsPage() {
 
   if (isLoading) return <div>{t('title')}</div>
 
+  const columns: DataListColumn<Contract>[] = [
+    {
+      key: 'number',
+      header: t('columns.number'),
+      width: '64px',
+      cell: (contract) => <span className="font-mono text-xs text-foreground-subtle">#{contract.number}</span>,
+    },
+    {
+      key: 'pieces',
+      header: t('columns.pieces'),
+      width: '112px',
+      cell: (contract) => (
+        // Stacked thumbnails: the point is to recognise what is out on a
+        // contract without opening it.
+        <span className="flex items-center">
+          {contract.allocations.slice(0, 3).map((allocation, index) => {
+            const photo = productsById.get(allocation.productId)?.photos?.[0]
+            return photo ? (
+              <AuthenticatedPhoto
+                key={allocation.id}
+                url={photo}
+                alt=""
+                className="size-7 rounded-badge border-2 border-surface object-cover"
+                {...(index > 0 ? { style: { marginLeft: -8 } } : {})}
+              />
+            ) : (
+              <span
+                key={allocation.id}
+                className="size-7 rounded-badge border-2 border-surface bg-surface-sunken"
+                style={index > 0 ? { marginLeft: -8 } : undefined}
+              />
+            )
+          })}
+          {contract.allocations.length > 3 && (
+            <span
+              className="inline-flex size-7 items-center justify-center rounded-badge border-2 border-surface bg-border font-mono text-[10px] text-muted-foreground"
+              style={{ marginLeft: -8 }}
+            >
+              +{contract.allocations.length - 3}
+            </span>
+          )}
+        </span>
+      ),
+    },
+    {
+      key: 'client',
+      header: t('columns.client'),
+      width: '1.5fr',
+      cell: (contract) => (
+        <span className="flex min-w-0 flex-col">
+          <span className="truncate text-body font-semibold">
+            {clientNames.get(contract.clientId) ?? contract.clientId}
+          </span>
+          <span className="truncate text-xs text-foreground-subtle">
+            {formatDate(parseDateOnly(contract.eventDate), locale, {
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric',
+            })}
+          </span>
+        </span>
+      ),
+    },
+    {
+      key: 'state',
+      header: t('columns.state'),
+      width: '1fr',
+      cell: (contract) => <StatusBadge state={contractState(contract)} />,
+    },
+    {
+      key: 'value',
+      header: t('columns.value'),
+      width: '108px',
+      align: 'right',
+      cell: (contract) => (
+        <span className="tabular text-body">{formatCurrency(contractTotal(contract), locale, currency)}</span>
+      ),
+    },
+  ]
+
+  const selected = contracts?.find((contract) => contract.id === selectedId) ?? null
+
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="mb-4 flex flex-shrink-0 items-center justify-between">
-        <h1 className="text-xl font-semibold">{t('title')}</h1>
-        <Button onClick={() => setShowForm(true)} data-tour="contracts.create">
-          {t('newContract')}
-        </Button>
-      </div>
-      {(search || (data?.total ?? 0) > 0) && (
-        <Input
-          value={search}
-          onChange={(event) => handleSearchChange(event.target.value)}
-          placeholder={t('searchPlaceholder')}
-          className="mb-3 flex-shrink-0"
-          aria-label={t('searchPlaceholder')}
-          data-tour="contracts.search"
+      <ScreenTitle>{t('title')}</ScreenTitle>
+      <Toolbar
+        search={
+          <ToolbarSearch
+            value={search}
+            onChange={handleSearchChange}
+            placeholder={t('searchPlaceholder')}
+            label={t('searchPlaceholder')}
+            dataTour="contracts.search"
+          />
+        }
+        actions={
+          <Button onClick={() => setShowForm(true)} data-tour="contracts.create">
+            {t('newContract')}
+          </Button>
+        }
+      />
+
+      <div className="flex min-h-0 flex-1 border-t border-border-strong" data-tour="contracts.card">
+        <DataList
+          columns={columns}
+          groups={[{ key: 'all', label: undefined, rows: contracts ?? [] }]}
+          rowKey={(contract) => contract.id}
+          onSelectRow={(contract) => setSelectedId(contract.id)}
+          selectedKey={selectedId}
+          empty={<DataListEmpty title={search ? t('noResults') : t('empty')} />}
+          pagination={
+            totalPages > 1
+              ? {
+                  label: t('pagination.pageOf', { page: currentPage, total: totalPages }),
+                  onPrevious: () => setPage(currentPage - 1),
+                  onNext: () => setPage(currentPage + 1),
+                  hasPrevious: currentPage > 1,
+                  hasNext: currentPage < totalPages,
+                  dataTour: 'contracts.pagination',
+                }
+              : undefined
+          }
         />
-      )}
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {contracts && contracts.length === 0 && (
-          <p className="text-muted-foreground">{search ? t('noResults') : t('empty')}</p>
-        )}
-        <div className="flex flex-col gap-3">
-          {contracts?.map((contract, index) => (
-            <div
-              key={contract.id}
-              className="rounded-md border border-border p-3"
-              data-tour={index === 0 ? 'contracts.card' : undefined}
-            >
-              <div className="mb-2 flex items-center justify-between">
-                <div className="flex flex-col">
-                  <span className="font-medium">
-                    #{contract.number} — <span>{clientNames.get(contract.clientId) ?? contract.clientId}</span>
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {formatDate(parseDateOnly(contract.eventDate), locale, { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Link
-                    to={`/contratos/${contract.id}/imprimir`}
-                    className="inline-flex h-8 items-center justify-center rounded-md border border-border bg-card px-3 text-sm font-medium text-foreground transition-colors hover:border-ring hover:bg-secondary"
-                  >
-                    {t('print.action')}
-                  </Link>
-                  <ContractSignAction contract={contract} />
-                  <ContractCancelAction contract={contract} />
-                </div>
-              </div>
-              <div className="flex flex-col gap-1">
-                {contract.allocations.map((allocation) => (
-                  <div
-                    key={allocation.id}
-                    className="flex items-center justify-between gap-3 rounded-md border border-border p-2 text-sm"
-                  >
-                    <div className="flex min-w-0 flex-col gap-0.5">
-                      <span className="truncate font-medium">
-                        {productNames.get(allocation.productId) ?? allocation.productId}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {formatDate(parseDateOnly(allocation.checkoutDate), locale, { day: '2-digit', month: '2-digit', year: 'numeric' })} –{' '}
-                        {formatDate(parseDateOnly(allocation.dueDate), locale, { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                      </span>
-                    </div>
-                    <div className="shrink-0">
-                      <RowActions allocation={allocation} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <ContractPayments contract={contract} />
-            </div>
-          ))}
-        </div>
+
+        <aside className="min-h-0 w-130 flex-shrink-0 overflow-y-auto border-l border-border-strong">
+          <ContractDetailPanel
+            contract={selected}
+            clientName={selected ? (clientNames.get(selected.clientId) ?? selected.clientId) : ''}
+            productNames={productNames}
+            products={productsById}
+          />
+        </aside>
       </div>
-      {totalPages > 1 && (
-        <div className="flex flex-shrink-0 items-center justify-between text-sm" data-tour="contracts.pagination">
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            disabled={currentPage <= 1}
-            onClick={() => setPage(currentPage - 1)}
-          >
-            {t('pagination.previous')}
-          </Button>
-          <span className="text-muted-foreground">
-            {t('pagination.pageOf', { page: currentPage, total: totalPages })}
-          </span>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            disabled={currentPage >= totalPages}
-            onClick={() => setPage(currentPage + 1)}
-          >
-            {t('pagination.next')}
-          </Button>
-        </div>
-      )}
       {showForm && <NewContractForm onClose={() => setShowForm(false)} />}
     </div>
   )

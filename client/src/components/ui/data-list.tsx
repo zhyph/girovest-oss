@@ -27,6 +27,8 @@ export type DataListPagination = {
   onNext: () => void
   hasPrevious: boolean
   hasNext: boolean
+  /** Onboarding-tour anchor for the pagination strip. */
+  dataTour?: string
 }
 
 const ALIGN_CLASS = {
@@ -149,7 +151,10 @@ export function DataList<T>({
       </div>
 
       {pagination && (
-        <div className="flex h-10 flex-shrink-0 items-center justify-between gap-3 border-t border-border-strong bg-surface px-4">
+        <div
+          data-tour={pagination.dataTour}
+          className="flex h-10 flex-shrink-0 items-center justify-between gap-3 border-t border-border-strong bg-surface px-4"
+        >
           <span className="tabular text-meta text-muted-foreground">{pagination.label}</span>
           <div className="flex gap-1.5">
             <button

@@ -125,5 +125,15 @@
   "saveContract": "Salvar contrato",
   "sections": {
     "clientAndEvent": "Cliente e evento"
+  },
+  "columns": {
+    "number": "Nº",
+    "pieces": "Peças",
+    "client": "Cliente",
+    "state": "Situação",
+    "value": "Valor"
+  },
+  "detail": {
+    "pickContract": "Selecione um contrato na lista para ver as peças e os pagamentos."
   }
 }
