@@ -8,18 +8,9 @@ import { AuthenticatedPhoto } from '../../components/ui/authenticated-photo.tsx'
 import { formatDate, parseDateOnly } from '../../lib/date.ts'
 import { useLocale } from '../../lib/LocaleContext.tsx'
 import { formatCurrency, getLocaleConfig } from '../../lib/locale.ts'
-import { useContractsList } from '../contracts/useContracts.ts'
 import { useProducts } from '../products/useProducts.ts'
+import type { Contract } from '../contracts/contractSchemas.ts'
 import type { Client } from './clientSchemas.ts'
-
-// How many of the client's contracts the history section reaches back
-// through. There is no per-client contracts endpoint, so this reuses the
-// list search (which matches on client name) and then keeps only the rows
-// whose clientId is an exact match — two clients with similar names cannot
-// bleed into each other. The bound means a very long-standing client's
-// oldest contracts may fall outside the window; it never shows anything
-// that is not theirs.
-const HISTORY_SEARCH_PAGE_SIZE = 50
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
@@ -32,20 +23,21 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 
 export function ClientDetailPanel({
   client,
+  contracts,
   onEdit,
   onDelete,
+  onNewContract,
 }: {
   client: Client | null
+  /** Every contract of the location; this panel keeps only the client's own. */
+  contracts: Contract[]
   onEdit: (client: Client) => void
   onDelete?: (client: Client) => void
+  onNewContract?: (client: Client) => void
 }) {
   const { t } = useTranslation('clients')
   const { locale } = useLocale()
   const currency = getLocaleConfig(locale).currency
-  const { data: contractsPage } = useContractsList({
-    search: client?.name ?? '',
-    pageSize: HISTORY_SEARCH_PAGE_SIZE,
-  })
   const { data: products } = useProducts()
 
   const productsById = useMemo(
@@ -53,23 +45,31 @@ export function ClientDetailPanel({
     [products],
   )
 
-  const history = useMemo(() => {
-    if (!client) return []
-    return (contractsPage?.contracts ?? [])
-      .filter((contract) => contract.clientId === client.id)
-      .flatMap((contract) =>
-        contract.allocations.map((allocation) => ({
-          key: allocation.id,
-          contractNumber: contract.number,
-          product: productsById.get(allocation.productId),
-          productId: allocation.productId,
-          date: allocation.checkoutDate,
-          status: allocation.status as EntityState,
-          price: allocation.priceCharged,
-        })),
-      )
-      .sort((a, b) => b.date.localeCompare(a.date))
-  }, [client, contractsPage, productsById])
+  // Matched on clientId, never on name: the list this comes from is shared
+  // with the Contratos screen, and two clients with similar names must not
+  // bleed into each other's history.
+  const clientContracts = useMemo(
+    () => (client ? contracts.filter((contract) => contract.clientId === client.id) : []),
+    [client, contracts],
+  )
+
+  const history = useMemo(
+    () =>
+      clientContracts
+        .flatMap((contract) =>
+          contract.allocations.map((allocation) => ({
+            key: allocation.id,
+            contractNumber: contract.number,
+            product: productsById.get(allocation.productId),
+            productId: allocation.productId,
+            date: allocation.checkoutDate,
+            status: allocation.status as EntityState,
+            price: allocation.priceCharged,
+          })),
+        )
+        .sort((a, b) => b.date.localeCompare(a.date)),
+    [clientContracts, productsById],
+  )
 
   if (!client) {
     return (
@@ -85,9 +85,20 @@ export function ClientDetailPanel({
         <div className="flex min-w-0 flex-col gap-0.5">
           <span className="text-heading">{client.name}</span>
           <span className="text-meta text-muted-foreground">
-            {t('detail.since', {
-              date: formatDate(parseDateOnly(client.createdAt), locale, { month: 'long', year: 'numeric' }),
-            })}
+            {/*
+              Falls back to the bare "Cliente desde" while no contract has
+              arrived at all, which is both the loading state and a shop with
+              no contracts yet. Printing "0 contratos" against an in-flight
+              query would be a claim the panel cannot yet stand behind.
+            */}
+            {contracts.length === 0
+              ? t('detail.since', {
+                  date: formatDate(parseDateOnly(client.createdAt), locale, { month: 'long', year: 'numeric' }),
+                })
+              : t('detail.sinceWithContracts', {
+                  date: formatDate(parseDateOnly(client.createdAt), locale, { month: 'long', year: 'numeric' }),
+                  count: clientContracts.length,
+                })}
           </span>
         </div>
         <div className="flex flex-shrink-0 gap-1.5">
@@ -131,7 +142,19 @@ export function ClientDetailPanel({
       )}
 
       <div className="flex flex-col gap-2.5 px-5 py-4">
-        <SectionLabel>{t('detail.rentalHistory')}</SectionLabel>
+        {/*
+          The shortcut sits on this heading rather than the panel header
+          because this is where the question "does she need another one?"
+          actually gets asked.
+        */}
+        <div className="flex items-center justify-between gap-3">
+          <SectionLabel>{t('detail.rentalHistory')}</SectionLabel>
+          {onNewContract && (
+            <Button variant="secondary" size="sm" onClick={() => onNewContract(client)}>
+              {t('detail.newContract')}
+            </Button>
+          )}
+        </div>
         {history.length === 0 ? (
           <p className="text-meta text-muted-foreground">{t('detail.noHistory')}</p>
         ) : (

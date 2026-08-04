@@ -43,13 +43,22 @@
   "detail": {
     "pickClient": "Selecione um cliente na lista para ver o cadastro e o histórico.",
     "since": "Cliente desde {{date}}",
+    "sinceWithContracts_one": "Cliente desde {{date}} · {{count}} contrato",
+    "sinceWithContracts_other": "Cliente desde {{date}} · {{count}} contratos",
     "contactAndDocuments": "Contato e documentos",
     "rentalHistory": "O que já alugou",
     "noHistory": "Nenhum aluguel registrado ainda.",
+    "newContract": "Novo contrato",
     "moreActions": "Mais ações"
   },
   "columns": {
-    "email": "E-mail"
+    "email": "E-mail",
+    "lastRental": "Último aluguel",
+    "contracts": "Contratos",
+    "neverRented": "Nunca alugou"
+  },
+  "pagination": {
+    "pageOf": "{{page}} / {{total}}"
   },
   "newButton": "Novo cliente"
 }
