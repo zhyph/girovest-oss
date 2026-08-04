@@ -1,12 +1,13 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQueryClient } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router'
 import { Shirt } from 'lucide-react'
 import { Button } from '../../components/ui/button.tsx'
 import { Toolbar, ToolbarSearch, ScreenTitle, FilterChip } from '../../components/ui/toolbar.tsx'
 import { DataList, DataListEmpty, type DataListColumn } from '../../components/ui/data-list.tsx'
 import { RowActions, DropdownMenuItem } from '../../components/ui/dropdown-menu.tsx'
-import { StatusBadge, type EntityState } from '../../components/ui/status-badge.tsx'
+import { StatusBadge } from '../../components/ui/status-badge.tsx'
 import { AuthenticatedPhoto } from '../../components/ui/authenticated-photo.tsx'
 import { cn } from '../../lib/cn.ts'
 import { formatCurrency, getLocaleConfig } from '../../lib/locale.ts'
@@ -16,6 +17,8 @@ import { useProducts, PRODUCTS_KEY } from './useProducts.ts'
 import { ProductDrawer } from './ProductDrawer.tsx'
 import { AddPhotosSessionModal } from './AddPhotosSessionModal.tsx'
 import { ProductFacetMenu, ProductSortMenu } from './ProductBrowsingMenus.tsx'
+import { useProductZoom, PhotoZoomButton } from './ProductZoomDialog.tsx'
+import { productState } from './productState.ts'
 import {
   DEFAULT_PRODUCT_SORT,
   EMPTY_FACET_SELECTION,
@@ -27,14 +30,7 @@ import {
 } from './productBrowsing.ts'
 import type { Product, ProductFormValues } from './productSchemas.ts'
 
-/**
- * A product's visible state. `availability` only means anything while the
- * piece is in the catalogue at all, so the lifecycle status wins when it is
- * not active — otherwise a retired piece would read as "Disponível".
- */
-export function productState(product: Product): EntityState {
-  return product.status === 'active' ? product.availability : product.status
-}
+export { productState }
 
 function ProductThumbnail({ product, className }: { product: Product; className?: string }) {
   const firstPhoto = product.photos?.[0]
@@ -83,7 +79,28 @@ export function ProductsPage() {
   const { data: products, isLoading } = useProducts()
   // In-memory only, never persisted: cleared on page reload, updated only by a successful create.
   const [lastCreatedDefaults, setLastCreatedDefaults] = useState<Partial<ProductFormValues> | null>(null)
+  const { openZoom, zoomDialog } = useProductZoom()
   useSectionTour('products', !isLoading)
+
+  // `?peca=<id>` is how the zoom panel's "Abrir ficha do produto" reaches the
+  // one product record this app has, from Contratos, Clientes or Calendário.
+  // Consumed once and cleared from the URL, so a refresh (or a back
+  // navigation) does not silently reopen the drawer over the catalogue.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const requestedProductId = searchParams.get('peca')
+  useEffect(() => {
+    if (!requestedProductId || !products) return
+    const requested = products.find((product) => product.id === requestedProductId)
+    if (requested) setEditing(requested)
+    setSearchParams(
+      (previous) => {
+        const next = new URLSearchParams(previous)
+        next.delete('peca')
+        return next
+      },
+      { replace: true },
+    )
+  }, [requestedProductId, products, setSearchParams])
 
   const searched = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -145,7 +162,11 @@ export function ProductsPage() {
       {
         key: 'photo',
         width: '40px',
-        cell: (product) => <ProductThumbnail product={product} className="size-8" />,
+        cell: (product) => (
+          <PhotoZoomButton product={product} onZoom={openZoom}>
+            <ProductThumbnail product={product} className="size-8" />
+          </PhotoZoomButton>
+        ),
       },
       {
         key: 'code',
@@ -195,7 +216,7 @@ export function ProductsPage() {
         ),
       },
     ],
-    [t, locale, currency],
+    [t, locale, currency, openZoom],
   )
 
   if (isLoading) return <div>{t('title')}</div>
@@ -280,19 +301,29 @@ export function ProductsPage() {
           // by name, so the photo is the row.
           <div className="grid min-h-0 flex-1 auto-rows-max content-start gap-3.5 overflow-y-auto p-5 [grid-template-columns:repeat(auto-fill,minmax(180px,1fr))]">
             {visible.map((product) => (
-              <button
+              // The card is a container with two controls rather than one
+              // button: the photo zooms (the mockup's "click any photo"
+              // affordance, and what a catalogue is browsed by), the caption
+              // opens the piece's own record. A single button could only ever
+              // do one of the two, and nesting one inside the other is not
+              // valid markup.
+              <div
                 key={product.id}
-                type="button"
-                onClick={() => setEditing(product)}
                 className="flex flex-col overflow-hidden rounded-panel border border-border bg-card text-left transition-shadow hover:border-input hover:shadow-panel"
               >
-                <span className="relative block h-46 bg-surface-sunken">
-                  <ProductThumbnail product={product} className="size-full rounded-none border-0" />
-                  <span className="absolute top-1.5 left-1.5">
-                    <StatusBadge state={productState(product)} />
+                <PhotoZoomButton product={product} onZoom={openZoom} className="rounded-none">
+                  <span className="relative block h-46 bg-surface-sunken">
+                    <ProductThumbnail product={product} className="size-full rounded-none border-0" />
+                    <span className="absolute top-1.5 left-1.5">
+                      <StatusBadge state={productState(product)} />
+                    </span>
                   </span>
-                </span>
-                <span className="flex min-w-0 flex-col gap-0.5 px-2.5 pt-2 pb-2.5">
+                </PhotoZoomButton>
+                <button
+                  type="button"
+                  onClick={() => setEditing(product)}
+                  className="flex min-w-0 flex-col gap-0.5 px-2.5 pt-2 pb-2.5 text-left"
+                >
                   {/*
                     The code leads the name rather than sitting under it: in a
                     grid this dense the shop scans for a number first, and a
@@ -314,8 +345,8 @@ export function ProductsPage() {
                       {formatCurrency(product.rentalPrice, locale, currency)}
                     </span>
                   </span>
-                </span>
-              </button>
+                </button>
+              </div>
             ))}
           </div>
         ) : (
@@ -358,6 +389,7 @@ export function ProductsPage() {
           void queryClient.invalidateQueries({ queryKey: PRODUCTS_KEY })
         }}
       />
+      {zoomDialog}
     </div>
   )
 }

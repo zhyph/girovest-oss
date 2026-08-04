@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../../components/ui/button.tsx'
 import { AuthenticatedPhoto } from '../../components/ui/authenticated-photo.tsx'
-import { ProductDetailModal } from '../products/ProductDetailModal.tsx'
+import { useProductZoom } from '../products/ProductZoomDialog.tsx'
 import { cn } from '../../lib/cn.ts'
 import { formatDate } from '../../lib/date.ts'
 import { useLocale } from '../../lib/LocaleContext.tsx'
@@ -31,7 +31,7 @@ export function CalendarDayItemsList({
   const { t } = useTranslation('calendarScreen')
   const { locale } = useLocale()
   const [page, setPage] = useState(0)
-  const [detailProduct, setDetailProduct] = useState<Product | null>(null)
+  const { openZoom, zoomDialog } = useProductZoom()
 
   const totalPages = Math.max(1, Math.ceil(entries.length / pageSize))
   const currentPage = Math.min(page, Math.max(0, totalPages - 1))
@@ -50,7 +50,7 @@ export function CalendarDayItemsList({
             <button
               key={entry.key}
               type="button"
-              onClick={() => product && setDetailProduct(product)}
+              onClick={() => product && openZoom(product)}
               className="flex items-center justify-between gap-2 rounded-md border border-border p-2 text-left text-sm hover:bg-secondary"
             >
               <div className="flex items-center gap-2">
@@ -103,7 +103,7 @@ export function CalendarDayItemsList({
           </Button>
         </div>
       )}
-      <ProductDetailModal product={detailProduct} open={detailProduct !== null} onClose={() => setDetailProduct(null)} />
+      {zoomDialog}
     </div>
   )
 }

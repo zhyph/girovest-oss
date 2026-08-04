@@ -24,6 +24,7 @@ import { useSectionTour } from '../onboarding/useSectionTour.ts'
 import { useClients } from '../clients/useClients.ts'
 import type { Client } from '../clients/clientSchemas.ts'
 import { useProducts } from '../products/useProducts.ts'
+import { useProductZoom, PhotoZoomButton } from '../products/ProductZoomDialog.tsx'
 import type { Product } from '../products/productSchemas.ts'
 import {
   useCheckOutAllocation,
@@ -599,6 +600,7 @@ function ContractDetailPanel({
   const { t } = useTranslation('contracts')
   const { locale } = useLocale()
   const currency = getLocaleConfig(locale).currency
+  const { openZoom, zoomDialog } = useProductZoom()
 
   if (!contract) {
     return (
@@ -648,11 +650,13 @@ function ContractDetailPanel({
                 className="grid grid-cols-[56px_1fr_88px_28px] items-center gap-3 border-b border-hairline bg-card p-2.5 last:border-b-0"
               >
                 {photo ? (
-                  <AuthenticatedPhoto
-                    url={photo}
-                    alt=""
-                    className="size-14 rounded-badge border border-border object-cover"
-                  />
+                  <PhotoZoomButton product={products.get(allocation.productId)} onZoom={openZoom}>
+                    <AuthenticatedPhoto
+                      url={photo}
+                      alt=""
+                      className="size-14 rounded-badge border border-border object-cover"
+                    />
+                  </PhotoZoomButton>
                 ) : (
                   <span className="size-14 rounded-badge border border-border bg-surface-sunken" />
                 )}
@@ -687,6 +691,7 @@ function ContractDetailPanel({
       <div className="px-5 py-4">
         <ContractPayments contract={contract} />
       </div>
+      {zoomDialog}
     </div>
   )
 }

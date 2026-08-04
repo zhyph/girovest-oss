@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router'
 import '../../i18n.ts'
 import { CalendarDayItemsList } from './CalendarDayItemsList.tsx'
 import { buildEntries, type CalendarEntry } from './calendarEntries.ts'
@@ -87,16 +88,20 @@ describe('CalendarDayItemsList', () => {
     expect(screen.getByText('1 / 3')).toBeInTheDocument()
   })
 
-  it('opens ProductDetailModal with the right product when a row is clicked', async () => {
+  it('opens the photo zoom panel with the right product when a row is clicked', async () => {
+    // MemoryRouter: the zoom's "Abrir ficha do produto" routes to Produtos.
     render(
-      <CalendarDayItemsList
-        entries={outEntries(makeAllocation())}
-        products={products}
-        clientNames={clientNames}
-      />,
+      <MemoryRouter>
+        <CalendarDayItemsList
+          entries={outEntries(makeAllocation())}
+          products={products}
+          clientNames={clientNames}
+        />
+      </MemoryRouter>,
     )
     await userEvent.click(screen.getByText('Vestido Azul'))
     expect(screen.getByText('festa')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Abrir ficha do produto' })).toBeInTheDocument()
   })
 
   it('renders without crashing and hides pagination controls when there are no allocations', () => {

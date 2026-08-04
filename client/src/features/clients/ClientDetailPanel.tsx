@@ -9,6 +9,7 @@ import { formatDate, parseDateOnly } from '../../lib/date.ts'
 import { useLocale } from '../../lib/LocaleContext.tsx'
 import { formatCurrency, getLocaleConfig } from '../../lib/locale.ts'
 import { useProducts } from '../products/useProducts.ts'
+import { useProductZoom, PhotoZoomButton } from '../products/ProductZoomDialog.tsx'
 import type { Contract } from '../contracts/contractSchemas.ts'
 import type { Client } from './clientSchemas.ts'
 
@@ -39,6 +40,7 @@ export function ClientDetailPanel({
   const { locale } = useLocale()
   const currency = getLocaleConfig(locale).currency
   const { data: products } = useProducts()
+  const { openZoom, zoomDialog } = useProductZoom()
 
   const productsById = useMemo(
     () => new Map((products ?? []).map((product) => [product.id, product])),
@@ -172,11 +174,13 @@ export function ClientDetailPanel({
                     anything.
                   */}
                   {photo ? (
-                    <AuthenticatedPhoto
-                      url={photo}
-                      alt={entry.product?.name ?? ''}
-                      className="size-11 rounded-badge border border-border object-cover"
-                    />
+                    <PhotoZoomButton product={entry.product} onZoom={openZoom}>
+                      <AuthenticatedPhoto
+                        url={photo}
+                        alt={entry.product?.name ?? ''}
+                        className="size-11 rounded-badge border border-border object-cover"
+                      />
+                    </PhotoZoomButton>
                   ) : (
                     <span className="size-11 rounded-badge border border-border bg-surface-sunken" />
                   )}
@@ -205,6 +209,7 @@ export function ClientDetailPanel({
           </div>
         )}
       </div>
+      {zoomDialog}
     </div>
   )
 }

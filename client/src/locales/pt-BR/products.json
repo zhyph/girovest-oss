@@ -20,6 +20,15 @@
     "add": "Adicionar",
     "remove": "Remover"
   },
+  "zoom": {
+    "openFor": "Ampliar foto de {{name}}",
+    "previousPhoto": "Foto anterior",
+    "nextPhoto": "Próxima foto",
+    "photoCounter": "{{index}} / {{total}}",
+    "arrowHint": "Use ← → para ver as outras fotos.",
+    "situation": "Situação",
+    "openRecord": "Abrir ficha do produto"
+  },
   "status": {
     "active": "Disponível",
     "maintenance": "Manutenção",
