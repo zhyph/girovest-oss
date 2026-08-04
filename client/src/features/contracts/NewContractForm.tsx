@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useForm, Controller, useFieldArray, useWatch, type Path } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
@@ -164,17 +164,29 @@ function ItemRow({
 }
 
 /**
- * The even split the form suggests for each instalment: the pieces' total
- * divided by however many instalments there currently are. Rounded to cents,
- * because a suggestion that lands on 83.33333333333333 is one the staff member
- * has to retype rather than accept.
+ * The even split the form suggests across every instalment: the pieces'
+ * total divided by however many instalments there currently are, in whole
+ * cents, with any leftover cent handed to the first rows rather than lost.
+ *
+ * Rounding each row independently (`total / count` per row) can drift the
+ * suggested amounts away from the total — 100 / 3 rounds to 33.33 three
+ * times, which sums to 99.99, not 100 — and a contract whose instalments
+ * never add up to its total either shows a nonzero "Em aberto" once every
+ * instalment is paid, or can never reach zero at all. Distributing the
+ * remainder in cents keeps `sum(amounts) === itemsTotal` exactly.
  *
  * Exported for its own test: this is arithmetic the shop's money depends on,
  * and it should not need a rendered dialog to be checked.
  */
-export function suggestedInstallmentAmount(itemsTotal: number, installmentCount: number): number {
-  if (installmentCount <= 0) return 0
-  return Math.round((itemsTotal / installmentCount) * 100) / 100
+export function suggestedInstallmentAmounts(itemsTotal: number, installmentCount: number): number[] {
+  if (installmentCount <= 0) return []
+  const totalCents = Math.round(itemsTotal * 100)
+  const baseCents = Math.floor(totalCents / installmentCount)
+  const remainderCents = totalCents - baseCents * installmentCount
+  return Array.from(
+    { length: installmentCount },
+    (_, index) => (baseCents + (index < remainderCents ? 1 : 0)) / 100,
+  )
 }
 
 function useWatchField(
@@ -285,7 +297,13 @@ export function NewContractForm({
   const currency = getLocaleConfig(locale).currency
   const paymentMethods = getPaymentMethods(locale)
   const installmentCount = installments.fields.length
-  const suggestedAmount = suggestedInstallmentAmount(itemsTotal, installmentCount)
+  // Memoized so this array's identity only changes when its inputs do —
+  // the effect below depends on it, and a fresh array every render would
+  // fire that effect on every keystroke elsewhere in the form.
+  const suggestedAmounts = useMemo(
+    () => suggestedInstallmentAmounts(itemsTotal, installmentCount),
+    [itemsTotal, installmentCount],
+  )
   const watchedInstallments = watch('installments')
   const installmentAmounts = (watchedInstallments ?? []).map((installment) => Number(installment?.amount) || 0)
   // "em 3× de R$150" is only true while the three are actually equal. Once a
@@ -303,15 +321,17 @@ export function NewContractForm({
     if (installmentCount === 0) return
     for (let index = 0; index < installmentCount; index += 1) {
       if (touchedAmounts[index]) continue
+      const suggested = suggestedAmounts[index]
       // Guarded so the effect cannot re-enter itself: setValue re-renders, and
       // an unconditional write would then re-run this on every pass.
-      if (getValues(`installments.${index}.amount`) === suggestedAmount) continue
-      setValue(`installments.${index}.amount`, suggestedAmount, { shouldDirty: true })
+      if (getValues(`installments.${index}.amount`) === suggested) continue
+      setValue(`installments.${index}.amount`, suggested, { shouldDirty: true })
     }
-  }, [installmentCount, suggestedAmount, touchedAmounts, getValues, setValue])
+  }, [installmentCount, suggestedAmounts, touchedAmounts, getValues, setValue])
 
   function addInstallment() {
-    installments.append({ dueDate: '', amount: suggestedInstallmentAmount(itemsTotal, installmentCount + 1) })
+    const nextSuggestions = suggestedInstallmentAmounts(itemsTotal, installmentCount + 1)
+    installments.append({ dueDate: '', amount: nextSuggestions[installmentCount] })
     setTouchedAmounts((current) => [...current, false])
   }
 

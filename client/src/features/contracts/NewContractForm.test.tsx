@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import '../../i18n.ts'
-import { NewContractForm, suggestedInstallmentAmount } from './NewContractForm.tsx'
+import { NewContractForm, suggestedInstallmentAmounts } from './NewContractForm.tsx'
 import * as useClientsModule from '../clients/useClients.ts'
 import * as useProductsModule from '../products/useProducts.ts'
 import * as useAllocationsModule from '../allocations/useAllocations.ts'
@@ -622,10 +622,27 @@ const money = (value: number) =>
 
 describe('installment suggestion', () => {
   it('divides the pieces total evenly by however many instalments there are', () => {
-    expect(suggestedInstallmentAmount(300, 3)).toBe(100)
-    expect(suggestedInstallmentAmount(100, 3)).toBe(33.33)
+    expect(suggestedInstallmentAmounts(300, 3)).toEqual([100, 100, 100])
     // No instalments is not a division by zero — it is simply no suggestion.
-    expect(suggestedInstallmentAmount(300, 0)).toBe(0)
+    expect(suggestedInstallmentAmounts(300, 0)).toEqual([])
+  })
+
+  it('always sums to exactly the total, distributing the remainder cent instead of losing or inventing it', () => {
+    // 100 / 3 rounds to 33.33 on every row independently, which sums to
+    // 99.99 — this is the bug: assert the SUM, not a per-row figure.
+    const threeWay = suggestedInstallmentAmounts(100, 3)
+    expect(threeWay.reduce((sum, amount) => sum + amount, 0)).toBeCloseTo(100, 2)
+    expect(threeWay).toEqual([33.34, 33.33, 33.33])
+
+    // 100 / 7 rounds to 14.29 on every row independently, which sums to
+    // 100.03 — the opposite drift, same bug.
+    const sevenWay = suggestedInstallmentAmounts(100, 7)
+    expect(sevenWay.reduce((sum, amount) => sum + amount, 0)).toBeCloseTo(100, 2)
+    expect(sevenWay).toEqual([14.29, 14.29, 14.29, 14.29, 14.28, 14.28, 14.28])
+
+    // 350 / 3 rounds to 116.67 on every row, which sums to 350.01.
+    const unevenLarger = suggestedInstallmentAmounts(350, 3)
+    expect(unevenLarger.reduce((sum, amount) => sum + amount, 0)).toBeCloseTo(350, 2)
   })
 
   it('prefills a new instalment with the even split instead of zero', async () => {
