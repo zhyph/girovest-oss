@@ -43,6 +43,23 @@ export function useDeleteProduct() {
   })
 }
 
+/**
+ * Uploads picked photos to a product that already exists. Sends the same
+ * JSON-of-data-URLs the phone intake page sends, so both paths land through
+ * one writer on the server.
+ */
+export function useUploadProductPhotos() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, photos }: { id: string; photos: string[] }) =>
+      apiFetch<{ photos: string[] }>(`/api/products/${id}/photos`, {
+        method: 'POST',
+        body: JSON.stringify({ photos }),
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: PRODUCTS_KEY }),
+  })
+}
+
 export function useIssueProductPhotoSession() {
   return useMutation({
     mutationFn: () => apiFetch<PhotoTokenResponse>('/api/products/photo-session', { method: 'POST' }),

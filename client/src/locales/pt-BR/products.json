@@ -16,9 +16,16 @@
     "photos": "Fotos"
   },
   "photos": {
-    "urlPlaceholder": "URL da foto",
-    "add": "Adicionar",
-    "remove": "Remover"
+    "add": "Escolher fotos",
+    "remove": "Remover",
+    "moveUp": "Mover para cima",
+    "moveDown": "Mover para baixo",
+    "empty": "Nenhuma foto ainda.",
+    "hint": "Até 10 MB por foto.",
+    "pending": "Enviada ao salvar",
+    "tooLarge": "{{name}}: arquivo grande demais (máximo 10 MB).",
+    "invalidType": "{{name}}: só é possível enviar imagens.",
+    "readFailed": "Não foi possível ler {{name}}."
   },
   "zoom": {
     "openFor": "Ampliar foto de {{name}}",

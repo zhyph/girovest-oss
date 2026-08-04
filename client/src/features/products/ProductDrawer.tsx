@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
-import { X } from 'lucide-react'
+import { ChevronDown, ChevronUp, X } from 'lucide-react'
 import { Button } from '../../components/ui/button.tsx'
 import { Input } from '../../components/ui/input.tsx'
 import { CurrencyInput } from '../../components/ui/currency-input.tsx'
@@ -16,8 +16,15 @@ import { showErrorToast } from '../../lib/toast.ts'
 import { useAuth } from '../../lib/useAuth.ts'
 import { useUnsavedChangesGuard } from '../../lib/useUnsavedChangesGuard.ts'
 import { AuthenticatedPhoto } from '../../components/ui/authenticated-photo.tsx'
+import { fileToJpegDataUrl, isPendingPhoto, MAX_PHOTO_FILE_BYTES } from '../../lib/imageFile.ts'
 import { productSchema, type Product, type ProductFormValues, type ProductStatus } from './productSchemas.ts'
-import { useCreateProduct, useUpdateProduct, useDeleteProduct, useProducts } from './useProducts.ts'
+import {
+  useCreateProduct,
+  useUpdateProduct,
+  useDeleteProduct,
+  useProducts,
+  useUploadProductPhotos,
+} from './useProducts.ts'
 
 const STATUS_OPTIONS: ProductStatus[] = ['active', 'maintenance', 'retired']
 
@@ -48,9 +55,18 @@ export function ProductDrawer({
   const { data: allProducts } = useProducts()
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [status, setStatus] = useState<ProductStatus>(product?.status ?? 'active')
+  /**
+   * The piece's photos in the order they will be stored, holding two kinds of
+   * entry: paths already on the server (`/api/products/...`) and photos picked
+   * in this drawer but not yet sent (`data:image/jpeg;...`). Keeping both in
+   * one ordered array is what makes reordering and removing work the same
+   * either way — and what lets a photo be picked and then thought better of
+   * without anything having been written.
+   */
   const [photos, setPhotos] = useState<string[]>(product?.photos ?? [])
-  const [newPhotoUrl, setNewPhotoUrl] = useState('')
   const [addAnotherAfterSave, setAddAnotherAfterSave] = useState(false)
+  const uploadPhotos = useUploadProductPhotos()
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const {
     register,
     handleSubmit,
@@ -71,26 +87,73 @@ export function ProductDrawer({
     },
   })
 
-  // status, photos and newPhotoUrl live outside react-hook-form, so isDirty
-  // alone under-reports: without this the user could still lose an added photo.
+  // status and photos live outside react-hook-form, so isDirty alone
+  // under-reports: without this the user could still lose an added photo.
   const initialPhotos = product?.photos ?? []
   const hasUnsavedChanges =
     isDirty ||
     status !== (product?.status ?? 'active') ||
     photos.length !== initialPhotos.length ||
-    photos.some((url, index) => url !== initialPhotos[index]) ||
-    newPhotoUrl.trim() !== ''
+    photos.some((url, index) => url !== initialPhotos[index])
   const discardGuard = useUnsavedChangesGuard({ isDirty: hasUnsavedChanges, onConfirmDiscard: onClose })
 
-  function addPhoto() {
-    const url = newPhotoUrl.trim()
-    if (!url) return
-    setPhotos((current) => [...current, url])
-    setNewPhotoUrl('')
+  async function addPickedPhotos(files: FileList | null) {
+    if (!files || files.length === 0) return
+    const converted: string[] = []
+    for (const file of Array.from(files)) {
+      if (!file.type.startsWith('image/')) {
+        showErrorToast(t('photos.invalidType', { name: file.name }))
+        continue
+      }
+      // Checked before decoding: a 60 MB raw photo should be refused by name,
+      // not after the browser has spent a second and a half loading it.
+      if (file.size > MAX_PHOTO_FILE_BYTES) {
+        showErrorToast(t('photos.tooLarge', { name: file.name }))
+        continue
+      }
+      try {
+        converted.push(await fileToJpegDataUrl(file))
+      } catch {
+        showErrorToast(t('photos.readFailed', { name: file.name }))
+      }
+    }
+    if (converted.length > 0) {
+      setPhotos((current) => [...current, ...converted])
+    }
+    // Cleared so picking the same file twice in a row still fires a change.
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   function removePhoto(index: number) {
     setPhotos((current) => current.filter((_, i) => i !== index))
+  }
+
+  function movePhoto(index: number, delta: number) {
+    setPhotos((current) => {
+      const target = index + delta
+      if (target < 0 || target >= current.length) return current
+      const next = [...current]
+      ;[next[index], next[target]] = [next[target], next[index]]
+      return next
+    })
+  }
+
+  /**
+   * Sends whatever was picked in this drawer and returns the piece's photos in
+   * the order shown on screen.
+   *
+   * The upload appends, so for a piece that had photos already the order it
+   * produces is "old ones, then new ones" — which is only the intended order
+   * if nothing was reordered. The resolved array is therefore written again by
+   * the normal save below, which is the single authority on order.
+   */
+  async function resolvePhotos(productId: string): Promise<string[]> {
+    const pending = photos.filter(isPendingPhoto)
+    if (pending.length === 0) return photos
+    const { photos: stored } = await uploadPhotos.mutateAsync({ id: productId, photos: pending })
+    const storedForPending = stored.slice(stored.length - pending.length)
+    let cursor = 0
+    return photos.map((entry) => (isPendingPhoto(entry) ? storedForPending[cursor++] : entry))
   }
 
   function showError(error: unknown) {
@@ -110,11 +173,30 @@ export function ProductDrawer({
     }
     try {
       if (product) {
-        await updateProduct.mutateAsync({ id: product.id, values: { ...normalized, status, photos } })
+        const resolvedPhotos = await resolvePhotos(product.id)
+        await updateProduct.mutateAsync({ id: product.id, values: { ...normalized, status, photos: resolvedPhotos } })
         onClose()
       } else {
-        const created = await createProduct.mutateAsync({ ...normalized, photos })
-        onCreated?.(created)
+        // A piece has to exist before a photo can belong to it, so the row is
+        // created first and the picked photos follow. Nothing is on screen but
+        // the two together, and a failure between them leaves a real piece
+        // with no photos rather than photos with no piece.
+        const hasPending = photos.some(isPendingPhoto)
+        const created = await createProduct.mutateAsync({
+          ...normalized,
+          photos: photos.filter((entry) => !isPendingPhoto(entry)),
+        })
+        // Resolved on its own line, NOT inside the optional call below: `f?.(x)`
+        // does not evaluate `x` when `f` is nullish, and onCreated is optional —
+        // inlining the upload there meant a piece created from Produtos (which
+        // passes no callback in the photo case) silently kept none of the
+        // photos that had just been picked for it.
+        const createdWithPhotos = hasPending
+          ? { ...created, photos: await resolvePhotos(created.id) }
+          : // Left exactly as the server returned it when nothing was picked —
+            // callers compare against that object.
+            created
+        onCreated?.(createdWithPhotos)
         if (addAnotherAfterSave) {
           setPhotos([])
           reset({
@@ -299,22 +381,63 @@ export function ProductDrawer({
         )}
         <div className="flex flex-col gap-1 text-sm">
           {t('fields.photos')}
-          <div className="flex gap-2">
-            <Input
-              value={newPhotoUrl}
-              onChange={(event) => setNewPhotoUrl(event.target.value)}
-              placeholder={t('photos.urlPlaceholder')}
-            />
-            <Button type="button" variant="secondary" onClick={addPhoto}>
+          {/*
+            A real file picker, not a URL field. Nobody in the shop has a URL
+            for a dress they just photographed — the previous input could only
+            be used by someone who had already uploaded the file somewhere
+            else, which is not a thing this app ever offered. The native input
+            stays out of the layout and is driven by a button styled like
+            every other control here.
+          */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="sr-only"
+            aria-label={t('photos.add')}
+            onChange={(event) => void addPickedPhotos(event.target.files)}
+          />
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="secondary" onClick={() => fileInputRef.current?.click()}>
               {t('photos.add')}
             </Button>
+            <span className="text-xs text-muted-foreground">{t('photos.hint')}</span>
           </div>
-          {photos.length > 0 && (
+          {photos.length === 0 ? (
+            <span className="mt-1 text-xs text-muted-foreground">{t('photos.empty')}</span>
+          ) : (
             <ul className="mt-1 flex flex-col gap-1">
               {photos.map((url, index) => (
-                <li key={url + index} className="flex items-center gap-2 text-xs">
+                <li key={url.slice(0, 64) + index} className="flex items-center gap-2 text-xs">
                   <PhotoThumbnail url={url} />
-                  <span className="flex-1 truncate text-muted-foreground">{url}</span>
+                  <span className="flex-1 truncate text-muted-foreground">
+                    {isPendingPhoto(url) ? t('photos.pending') : url}
+                  </span>
+                  {/*
+                    Order matters: the first photo is the one every list, card
+                    and calendar cell in the app shows for this piece.
+                  */}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label={t('photos.moveUp')}
+                    disabled={index === 0}
+                    onClick={() => movePhoto(index, -1)}
+                  >
+                    <ChevronUp size={14} />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label={t('photos.moveDown')}
+                    disabled={index === photos.length - 1}
+                    onClick={() => movePhoto(index, 1)}
+                  >
+                    <ChevronDown size={14} />
+                  </Button>
                   <Button type="button" variant="ghost" size="sm" onClick={() => removePhoto(index)}>
                     {t('photos.remove')}
                   </Button>
