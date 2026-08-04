@@ -1,0 +1,140 @@
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import '../../i18n.ts'
+import { DataList, DataListEmpty, type DataListColumn, type DataListGroup } from './data-list.tsx'
+import { RowActions, DropdownMenuItem } from './dropdown-menu.tsx'
+
+type Row = { id: string; name: string; price: string }
+
+const columns: DataListColumn<Row>[] = [
+  { key: 'name', header: 'Produto', width: '1.6fr', cell: (row) => <span>{row.name}</span> },
+  { key: 'price', header: 'Aluguel', width: '108px', align: 'right', cell: (row) => <span>{row.price}</span> },
+]
+
+const groups: DataListGroup<Row>[] = [
+  {
+    key: 'a',
+    label: 'A',
+    meta: '2',
+    rows: [
+      { id: '1', name: 'Vestido longo marsala', price: '890,00' },
+      { id: '2', name: 'Vestido midi champagne', price: '740,00' },
+    ],
+  },
+  { key: 'b', label: 'B', rows: [{ id: '3', name: 'Bolero cetim marfim', price: '590,00' }] },
+]
+
+describe('DataList', () => {
+  it('renders the column headers, group headers and every row', () => {
+    render(<DataList columns={columns} groups={groups} rowKey={(row) => row.id} />)
+
+    expect(screen.getByText('Produto')).toBeInTheDocument()
+    expect(screen.getByText('Aluguel')).toBeInTheDocument()
+    expect(screen.getByText('A')).toBeInTheDocument()
+    expect(screen.getByText('B')).toBeInTheDocument()
+    expect(screen.getByText('Vestido longo marsala')).toBeInTheDocument()
+    expect(screen.getByText('Bolero cetim marfim')).toBeInTheDocument()
+  })
+
+  it('marks the selected row so it stays identifiable while the detail panel is read', () => {
+    const { rerender } = render(
+      <DataList columns={columns} groups={groups} rowKey={(row) => row.id} onSelectRow={vi.fn()} selectedKey={null} />,
+    )
+    expect(screen.queryByRole('button', { current: true })).not.toBeInTheDocument()
+
+    rerender(
+      <DataList columns={columns} groups={groups} rowKey={(row) => row.id} onSelectRow={vi.fn()} selectedKey="2" />,
+    )
+    const selected = screen.getByRole('button', { current: true })
+    expect(within(selected).getByText('Vestido midi champagne')).toBeInTheDocument()
+  })
+
+  it('selects a row by click and by keyboard', async () => {
+    const onSelectRow = vi.fn()
+    render(<DataList columns={columns} groups={groups} rowKey={(row) => row.id} onSelectRow={onSelectRow} />)
+
+    await userEvent.click(screen.getByText('Vestido longo marsala'))
+    expect(onSelectRow).toHaveBeenCalledWith(expect.objectContaining({ id: '1' }))
+
+    // A row is a real control, not a click handler on a div: it has to be
+    // reachable and actionable from the keyboard too.
+    onSelectRow.mockClear()
+    const rows = screen.getAllByRole('button')
+    rows[2].focus()
+    await userEvent.keyboard('{Enter}')
+    expect(onSelectRow).toHaveBeenCalledWith(expect.objectContaining({ id: '3' }))
+  })
+
+  it('is not zebra-striped — the hairline separates rows instead', () => {
+    render(<DataList columns={columns} groups={groups} rowKey={(row) => row.id} onSelectRow={vi.fn()} />)
+
+    // Striping would consume the signal the split view needs for hover and
+    // selection, so no row may carry a background of its own by position.
+    const rows = screen.getAllByRole('button')
+    for (const row of rows) {
+      expect(row.className).toContain('border-hairline')
+      expect(row.className).not.toMatch(/odd:bg-|even:bg-|nth/)
+    }
+  })
+
+  it('shows the empty state instead of headers-over-nothing when every group is empty', () => {
+    render(
+      <DataList
+        columns={columns}
+        groups={[{ key: 'a', label: 'A', rows: [] }]}
+        rowKey={(row) => row.id}
+        empty={<DataListEmpty title="Nenhum cliente encontrado para essa busca." hint="Limpe a busca." />}
+      />,
+    )
+
+    expect(screen.getByText('Nenhum cliente encontrado para essa busca.')).toBeInTheDocument()
+    expect(screen.queryByText('Vestido longo marsala')).not.toBeInTheDocument()
+  })
+
+  it('disables the pagination edge it is already at', async () => {
+    const onPrevious = vi.fn()
+    const onNext = vi.fn()
+    render(
+      <DataList
+        columns={columns}
+        groups={groups}
+        rowKey={(row) => row.id}
+        pagination={{ label: '1–3 de 3', onPrevious, onNext, hasPrevious: false, hasNext: true }}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Anterior' })).toBeDisabled()
+    await userEvent.click(screen.getByRole('button', { name: 'Próximo' }))
+    expect(onNext).toHaveBeenCalledOnce()
+    expect(onPrevious).not.toHaveBeenCalled()
+  })
+})
+
+describe('RowActions', () => {
+  it('keeps per-row actions behind one affordance and does not select the row when opened', async () => {
+    const onSelectRow = vi.fn()
+    const onDelete = vi.fn()
+    const withActions: DataListColumn<Row>[] = [
+      ...columns,
+      {
+        key: 'actions',
+        width: '34px',
+        cell: () => (
+          <RowActions label="Ações">
+            <DropdownMenuItem onSelect={onDelete}>Excluir</DropdownMenuItem>
+          </RowActions>
+        ),
+      },
+    ]
+    render(<DataList columns={withActions} groups={groups} rowKey={(row) => row.id} onSelectRow={onSelectRow} />)
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Ações' })[0])
+
+    // Opening the menu must not also open the detail panel for that row.
+    expect(onSelectRow).not.toHaveBeenCalled()
+    await userEvent.click(await screen.findByText('Excluir'))
+    expect(onDelete).toHaveBeenCalledOnce()
+    expect(onSelectRow).not.toHaveBeenCalled()
+  })
+})

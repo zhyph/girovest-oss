@@ -44,5 +44,23 @@
     "message": "As alterações que você fez não foram salvas e serão perdidas.",
     "confirm": "Descartar",
     "cancel": "Continuar editando"
+  },
+  "states": {
+    "available": "Disponível",
+    "reserved": "Reservado",
+    "rented": "Alugado",
+    "maintenance": "Em higienização",
+    "checked_out": "Alugado",
+    "returned": "Devolvido",
+    "cancelled": "Cancelado",
+    "overdue": "Atrasado",
+    "paid": "Quitado",
+    "open": "Em aberto",
+    "signed": "Assinado"
+  },
+  "pagination": {
+    "previous": "Anterior",
+    "next": "Próximo",
+    "range": "{{from}}–{{to}} de {{total}}"
   }
 }

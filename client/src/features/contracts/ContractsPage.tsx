@@ -7,7 +7,7 @@ import { Button } from '../../components/ui/button.tsx'
 import { cn } from '../../lib/cn.ts'
 import { Input } from '../../components/ui/input.tsx'
 import { CurrencyInput } from '../../components/ui/currency-input.tsx'
-import { Modal } from '../../components/ui/modal.tsx'
+import { Dialog, DialogContent, DialogTitle } from '../../components/ui/dialog.tsx'
 import { ConfirmDialog } from '../../components/ui/confirm-dialog.tsx'
 import { parseDateOnly, formatDate } from '../../lib/date.ts'
 import { formatCurrency, getLocaleConfig } from '../../lib/locale.ts'
@@ -131,7 +131,12 @@ export function RowActions({ allocation }: { allocation: Allocation }) {
             {t('actions.cancel')}
           </Button>
         </div>
-        <Modal open={showCheckOutDialog} onClose={checkOutGuard.requestClose} title={t('checkOutDialog.title')}>
+        <Dialog
+          open={showCheckOutDialog}
+          onOpenChange={(nextOpen) => !nextOpen && checkOutGuard.requestClose()}
+        >
+          <DialogContent showCloseButton={false} className="max-w-sm gap-0 p-5">
+            <DialogTitle className="mb-3 text-heading">{t('checkOutDialog.title')}</DialogTitle>
           <div className="flex flex-col gap-3">
             <label className="flex flex-col gap-1 text-sm">
               {t('fields.conditionNotesOut')}
@@ -160,8 +165,11 @@ export function RowActions({ allocation }: { allocation: Allocation }) {
               onCancel={checkOutGuard.cancelDiscard}
             />
           </div>
-        </Modal>
-        <Modal open={showEarlyConfirm} onClose={() => setShowEarlyConfirm(false)} title={t('checkOutDialog.earlyTitle')}>
+          </DialogContent>
+        </Dialog>
+        <Dialog open={showEarlyConfirm} onOpenChange={(nextOpen) => !nextOpen && setShowEarlyConfirm(false)}>
+          <DialogContent showCloseButton={false} className="max-w-sm gap-0 p-5">
+            <DialogTitle className="mb-3 text-heading">{t('checkOutDialog.earlyTitle')}</DialogTitle>
           <p className="mb-4 text-sm text-foreground">
             {t('checkOutDialog.earlyMessage', {
               date: formatDate(parseDateOnly(allocation.checkoutDate), locale, {
@@ -179,7 +187,8 @@ export function RowActions({ allocation }: { allocation: Allocation }) {
               {t('checkOutDialog.earlyConfirm')}
             </Button>
           </div>
-        </Modal>
+          </DialogContent>
+        </Dialog>
         <ConfirmDialog
           open={showCancelConfirm}
           title={t('common:confirmCancelAllocation.title', { ns: 'common' })}
@@ -199,7 +208,9 @@ export function RowActions({ allocation }: { allocation: Allocation }) {
         <Button size="sm" onClick={() => setShowReturnDialog(true)} disabled={returnAllocation.isPending}>
           {t('actions.return')}
         </Button>
-        <Modal open={showReturnDialog} onClose={returnGuard.requestClose} title={t('returnDialog.title')}>
+        <Dialog open={showReturnDialog} onOpenChange={(nextOpen) => !nextOpen && returnGuard.requestClose()}>
+          <DialogContent showCloseButton={false} className="max-w-sm gap-0 p-5">
+            <DialogTitle className="mb-3 text-heading">{t('returnDialog.title')}</DialogTitle>
           <div className="flex flex-col gap-3">
             <label className="flex flex-col gap-1 text-sm">
               {t('fields.conditionNotesIn')}
@@ -228,7 +239,8 @@ export function RowActions({ allocation }: { allocation: Allocation }) {
               onCancel={returnGuard.cancelDiscard}
             />
           </div>
-        </Modal>
+          </DialogContent>
+        </Dialog>
       </div>
     )
   }
