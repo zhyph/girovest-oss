@@ -75,7 +75,17 @@ export function contractWeekGroup(contract: Contract, today: Date): ContractWeek
 
 const WEEK_GROUP_ORDER: ContractWeekGroup[] = ['thisWeek', 'upcoming', 'past']
 
-function contractTotal(contract: Contract): number {
+/**
+ * What the contract is worth today: its pieces' charged prices, minus the ones
+ * that were cancelled.
+ *
+ * The single definition of a contract's total — the row's figure and the
+ * detail panel's money tiles both come through here. They disagreed once, and
+ * a contract showed two different Totals depending on where you looked; worse,
+ * the higher of the two counted cancelled pieces, so the outstanding balance
+ * told the shop to chase a client for a dress it never sent out.
+ */
+export function contractTotal(contract: Contract): number {
   return contract.allocations
     .filter((allocation) => allocation.status !== 'cancelled')
     .reduce((sum, allocation) => sum + allocation.priceCharged, 0)
@@ -320,10 +330,10 @@ function ContractPayments({ contract }: { contract: Contract }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const listId = useId()
 
-  // The contract is worth what its pieces were charged at; installments are
-  // just how the client agreed to pay it. They do not always add up to the
+  // The contract is worth what its live pieces were charged at; installments
+  // are just how the client agreed to pay it. They do not always add up to the
   // same number, so the outstanding balance is measured against the pieces.
-  const total = contract.allocations.reduce((sum, allocation) => sum + allocation.priceCharged, 0)
+  const total = contractTotal(contract)
   const paid = contract.installments.reduce(
     (sum, installment) => (installment.paid ? sum + installment.amount : sum),
     0,

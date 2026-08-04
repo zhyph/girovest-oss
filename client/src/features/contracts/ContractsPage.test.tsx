@@ -475,6 +475,44 @@ describe('payments summary', () => {
     expect(screen.getByText('0 de 1 pagas')).toBeInTheDocument()
   })
 
+  it('CRITICAL: leaves cancelled pieces out of the total the shop is owed', async () => {
+    // One piece went out at 380, a second was cancelled before it ever left.
+    // The list row already excluded the cancelled 500; the panel's own total
+    // did not, so the same contract read 380 in one place and 880 in the
+    // other — and the 880 turned into an "Em aberto" the shop would have
+    // chased the client for.
+    mockHooks({
+      contracts: [
+        {
+          ...contract,
+          allocations: [
+            ...contract.allocations,
+            {
+              ...contract.allocations[0],
+              id: 'a2', productId: 'p2', status: 'cancelled' as const, priceCharged: 500,
+            },
+          ],
+          // The client already paid for the piece that actually went out.
+          installments: [
+            { id: 'i1', contractId: 'ct1', dueDate: '2026-09-20', amount: 380, paid: true, paidAt: '2026-09-20' },
+          ],
+        },
+      ],
+    })
+    await renderAndSelect(<ContractsPage />)
+
+    const panel = document.querySelector('aside') as HTMLElement
+    const figureUnder = (label: string) =>
+      within(within(panel).getByText(label).parentElement as HTMLElement)
+        .getByText(/R\$/)
+        .textContent?.replace(/ /g, ' ')
+
+    expect(figureUnder('Total')).toBe('R$ 380,00')
+    // Counting the cancelled 500 left the contract reading R$ 500,00 still to
+    // collect on a dress that never left the shop.
+    expect(figureUnder('Em aberto')).toBe('R$ 0,00')
+  })
+
   it('keeps the instalment rows collapsed so a 12x contract cannot swamp the list', async () => {
     mockHooks({
       contracts: [
