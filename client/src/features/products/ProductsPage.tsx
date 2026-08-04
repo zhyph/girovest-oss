@@ -30,8 +30,6 @@ import {
 } from './productBrowsing.ts'
 import type { Product, ProductFormValues } from './productSchemas.ts'
 
-export { productState }
-
 function ProductThumbnail({ product, className }: { product: Product; className?: string }) {
   const firstPhoto = product.photos?.[0]
   if (!firstPhoto) {

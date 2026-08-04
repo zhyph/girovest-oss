@@ -7,3 +7,4 @@ generated/
 .env
 .env.test.local
 product-photos/
+*.tsbuildinfo
