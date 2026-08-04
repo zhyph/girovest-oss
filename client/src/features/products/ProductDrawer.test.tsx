@@ -394,11 +394,17 @@ describe('ProductDrawer', () => {
 
   it('removes a photo from the list', async () => {
     mockProductHooks(vi.fn())
-    renderWithToast(<ProductDrawer product={{ ...product, photos: ['https://example.com/a.jpg'] }} onClose={vi.fn()} />)
+    renderWithToast(
+      <ProductDrawer
+        product={{ ...product, photos: ['/api/products/p1/photos/a.jpg'] }}
+        onClose={vi.fn()}
+      />,
+    )
 
-    expect(screen.getByText('https://example.com/a.jpg')).toBeInTheDocument()
+    // The row names the file, not the path prefix every photo of the piece shares.
+    expect(screen.getByText('a.jpg')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Remover' }))
-    expect(screen.queryByText('https://example.com/a.jpg')).not.toBeInTheDocument()
+    expect(screen.queryByText('a.jpg')).not.toBeInTheDocument()
   })
 
   it('submits a changed status alongside the other fields', async () => {

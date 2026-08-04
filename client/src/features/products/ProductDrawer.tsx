@@ -411,8 +411,13 @@ export function ProductDrawer({
               {photos.map((url, index) => (
                 <li key={url.slice(0, 64) + index} className="flex items-center gap-2 text-xs">
                   <PhotoThumbnail url={url} />
+                  {/*
+                    The filename, not the whole `/api/products/<uuid>/photos/…`
+                    path: truncated to the row's width, the path is entirely
+                    the part that is identical for every photo of the piece.
+                  */}
                   <span className="flex-1 truncate text-muted-foreground">
-                    {isPendingPhoto(url) ? t('photos.pending') : url}
+                    {isPendingPhoto(url) ? t('photos.pending') : url.split('/').pop()}
                   </span>
                   {/*
                     Order matters: the first photo is the one every list, card

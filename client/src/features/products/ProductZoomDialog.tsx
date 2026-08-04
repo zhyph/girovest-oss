@@ -213,7 +213,12 @@ function ProductZoomPanel({ product, onClose }: { product: Product; onClose: () 
             <dd className="min-w-0 break-words">{product.color}</dd>
             <dt className="text-foreground-subtle">{t('fields.category')}</dt>
             <dd className="min-w-0 break-words">{product.category}</dd>
-            <dt className="text-foreground-subtle">{t('fields.rentalPrice')}</dt>
+            {/*
+              "Aluguel", not "Preço do aluguel": the long form wraps to two
+              lines in this panel's label column, and the study's own label is
+              the short one.
+            */}
+            <dt className="text-foreground-subtle">{t('columns.rentalPrice')}</dt>
             <dd className="tabular">{formatCurrency(product.rentalPrice, locale, currency)}</dd>
             <dt className="text-foreground-subtle">{t('zoom.situation')}</dt>
             <dd>

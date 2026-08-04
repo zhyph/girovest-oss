@@ -105,6 +105,11 @@ function ItemRow({
           </Button>
         )}
       </div>
+      {/*
+        Dates and price on one line rather than stacked. The dialog holds one
+        height now, so a piece row's height is what decides how many pieces you
+        can see at once — and at three stacked lines it was less than one.
+      */}
       <div className="flex gap-2">
         <label className="flex flex-1 flex-col gap-1 text-sm">
           <span>{t('fields.checkoutDate')}<RequiredMark /></span>
@@ -140,17 +145,17 @@ function ItemRow({
           />
           {dueDateError && <span className="text-xs text-destructive">{dueDateError}</span>}
         </label>
+        <label className="flex flex-1 flex-col gap-1 text-sm">
+          {t('fields.priceCharged')}
+          <Controller
+            name={`items.${index}.priceCharged`}
+            control={control}
+            render={({ field }) => (
+              <CurrencyInput value={field.value} onChange={field.onChange} aria-label={t('fields.priceCharged')} />
+            )}
+          />
+        </label>
       </div>
-      <label className="flex flex-col gap-1 text-sm">
-        {t('fields.priceCharged')}
-        <Controller
-          name={`items.${index}.priceCharged`}
-          control={control}
-          render={({ field }) => (
-            <CurrencyInput value={field.value} onChange={field.onChange} aria-label={t('fields.priceCharged')} />
-          )}
-        />
-      </label>
       {productId && checkoutDate && dueDate && availability.data?.available === false && (
         <span className="text-xs text-destructive">{t('unavailableProduct')}</span>
       )}
