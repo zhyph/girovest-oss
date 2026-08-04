@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { Prisma } from '../generated/prisma/client.js'
 import { prisma } from '../db/client.js'
 import { AppError } from '../errors/AppError.js'
 import {
@@ -177,7 +178,11 @@ describe('createContract', () => {
     expect(rejected).toHaveLength(1)
   })
 
-  it('CRITICAL: assigns unique sequential numbers to concurrent contracts for the same location on different products', async () => {
+  it('assigns unique sequential numbers to concurrent contracts for the same location on different products', async () => {
+    // NOTE: this passes even with the retry loop deleted — better-sqlite3
+    // serializes transactions, so the two attempts never actually collide
+    // under the test provider. Kept as a shape check only; the test below is
+    // the one that actually holds the retry down.
     const attemptWithProduct = (product: string) =>
       createContract(
         baseInput({
@@ -193,6 +198,75 @@ describe('createContract', () => {
     expect(fulfilled).toHaveLength(2)
     const numbers = fulfilled.map((r) => r.value.number).sort((a, b) => a - b)
     expect(numbers).toEqual([1, 2])
+  })
+
+  it('CRITICAL: re-reads and takes the next free number when a racer wins the unique constraint', async () => {
+    // The real race, forced: another staff member claims number 1 between this
+    // attempt's read and its write. Deleting the retry loop makes this throw;
+    // keeping it but reusing the number computed on the first attempt makes it
+    // come back as 1 instead of 2. Neither failure is caught by the
+    // Promise.allSettled test above, which never actually collides under
+    // better-sqlite3's serialized transactions.
+    const realTransaction = prisma.$transaction.bind(prisma)
+    let attempts = 0
+    const spy = vi.spyOn(prisma, '$transaction').mockImplementation((async (...args: unknown[]) => {
+      attempts += 1
+      if (attempts === 1) {
+        await prisma.contract.create({
+          data: {
+            number: 1,
+            locationId,
+            clientId,
+            staffId,
+            eventDate: new Date('2026-10-01'),
+            paymentMethod: 'Dinheiro',
+          },
+        })
+        throw new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+          code: 'P2002',
+          clientVersion: 'test',
+        })
+      }
+      return (realTransaction as (...a: never[]) => unknown)(...(args as never[]))
+    }) as never)
+
+    try {
+      const contract = await createContract(baseInput())
+      expect(attempts).toBe(2)
+      expect(contract.number).toBe(2)
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
+  it('gives up with a 409 rather than looping forever on unending write conflicts', async () => {
+    const spy = vi.spyOn(prisma, '$transaction').mockImplementation((() =>
+      Promise.reject(
+        new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+          code: 'P2002',
+          clientVersion: 'test',
+        }),
+      )) as never)
+
+    try {
+      await expect(createContract(baseInput())).rejects.toMatchObject({ status: 409 })
+      expect(spy).toHaveBeenCalledTimes(5)
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
+  it('does not swallow an unrelated database error as a write conflict', async () => {
+    const spy = vi.spyOn(prisma, '$transaction').mockImplementation((() =>
+      Promise.reject(new Error('disk is on fire'))) as never)
+
+    try {
+      await expect(createContract(baseInput())).rejects.toThrow('disk is on fire')
+      // One attempt, not five: only P2002/P2034 are retryable.
+      expect(spy).toHaveBeenCalledTimes(1)
+    } finally {
+      spy.mockRestore()
+    }
   })
 
   it('CRITICAL: a product taken out early cannot be booked for the days between the real pickup and its planned checkout date', async () => {

@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { isOccupiedForRange, derivedAvailability, type AllocationWindow } from './occupancy.js'
+import {
+  isOccupiedForRange,
+  derivedAvailability,
+  maintenanceEndsOn,
+  type AllocationWindow,
+} from './occupancy.js'
 
 describe('isOccupiedForRange', () => {
   it('blocks a new allocation whose range overlaps a reserved allocation', () => {
@@ -328,5 +333,72 @@ describe('early check-out occupancy', () => {
     ]
     expect(isOccupiedForRange(allocations, new Date('2026-08-10'), new Date('2026-08-11'))).toBe(true)
     expect(derivedAvailability(allocations, new Date('2026-08-11'))).toBe('rented')
+  })
+})
+
+describe('whole-day comparison against a real clock time', () => {
+  // Every production caller passes `new Date()`, which carries a wall-clock
+  // time, while every window bound is a UTC-midnight calendar day. These pin
+  // the boundary: the answer must not change part-way through a day.
+  const returnedAug1: AllocationWindow[] = [
+    {
+      status: 'returned',
+      checkoutDate: new Date('2026-07-20'),
+      actualCheckoutDate: null,
+      dueDate: new Date('2026-08-01'),
+      actualReturnDate: new Date('2026-08-01T09:00:00Z'),
+    },
+  ]
+
+  it('keeps a piece in cleaning for the whole of its window\'s LAST day', () => {
+    // Back Aug 1 with a 3-day buffer: cleaning runs Aug 2-4, so Aug 4 is still
+    // a cleaning day from its first second to its last, and Aug 5 is free.
+    for (const instant of ['2026-08-04T00:00:00Z', '2026-08-04T14:32:00Z', '2026-08-04T23:59:59Z']) {
+      expect(derivedAvailability(returnedAug1, new Date(instant), { maintenanceBufferDays: 3 })).toBe(
+        'maintenance',
+      )
+    }
+    expect(
+      derivedAvailability(returnedAug1, new Date('2026-08-05T00:00:00Z'), { maintenanceBufferDays: 3 }),
+    ).toBe('available')
+  })
+
+  it('reports the same cleaning end-date at any clock time on that last day', () => {
+    for (const instant of ['2026-08-04T00:00:00Z', '2026-08-04T14:32:00Z', '2026-08-04T23:59:59Z']) {
+      expect(maintenanceEndsOn(returnedAug1, new Date(instant), { maintenanceBufferDays: 3 })?.toISOString()).toBe(
+        new Date('2026-08-04').toISOString(),
+      )
+    }
+    expect(maintenanceEndsOn(returnedAug1, new Date('2026-08-05T00:00:00Z'), { maintenanceBufferDays: 3 })).toBe(
+      null,
+    )
+  })
+
+  it('keeps a piece rented for the whole of the day it is due back', () => {
+    const dueToday: AllocationWindow[] = [
+      {
+        status: 'checked_out',
+        checkoutDate: new Date('2026-08-01'),
+        actualCheckoutDate: new Date('2026-08-01'),
+        dueDate: new Date('2026-08-05'),
+        actualReturnDate: null,
+      },
+    ]
+    // The dress is physically with a customer until they walk back in; it must
+    // not read as available from midnight on the due date itself.
+    expect(derivedAvailability(dueToday, new Date('2026-08-05T16:45:00Z'))).toBe('rented')
+  })
+
+  it('keeps a reserved piece reserved for the whole of its last booked day', () => {
+    const reserved: AllocationWindow[] = [
+      {
+        status: 'reserved',
+        checkoutDate: new Date('2026-08-01'),
+        actualCheckoutDate: null,
+        dueDate: new Date('2026-08-05'),
+        actualReturnDate: null,
+      },
+    ]
+    expect(derivedAvailability(reserved, new Date('2026-08-05T16:45:00Z'))).toBe('reserved')
   })
 })
