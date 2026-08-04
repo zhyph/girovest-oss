@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import type * as React from 'react'
 import { Search } from 'lucide-react'
 import { cn } from '../../lib/cn.ts'
 
@@ -110,8 +111,16 @@ export function FilterChip({
  * The screen title. Serif, once per screen — the only place besides the
  * printed contract where the app is allowed to look like a boutique.
  */
-export function ScreenTitle({ children, className }: { children: ReactNode; className?: string }) {
-  return <h1 className={cn('mb-3.5 flex-shrink-0 font-serif text-display', className)}>{children}</h1>
+export function ScreenTitle({
+  children,
+  className,
+  ...props
+}: { children: ReactNode; className?: string } & React.HTMLAttributes<HTMLHeadingElement>) {
+  return (
+    <h1 className={cn('mb-3.5 flex-shrink-0 font-serif text-display', className)} {...props}>
+      {children}
+    </h1>
+  )
 }
 
 /** The label step that names a group of fields or rows. */

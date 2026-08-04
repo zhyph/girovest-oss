@@ -23,5 +23,7 @@
     "remindLater": "Lembrar depois",
     "error": "Não foi possível concluir o backup.",
     "destinationConflict": "A pasta de backup já foi usada por outra instalação. Vá até Configurações para escolher usá-la mesmo assim."
-  }
+  },
+  "todayMovement": "Movimentação de hoje",
+  "todayMovementEmpty": "Nada sai nem volta hoje."
 }

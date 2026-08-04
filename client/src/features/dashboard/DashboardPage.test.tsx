@@ -123,7 +123,11 @@ describe('DashboardPage', () => {
     renderDashboard()
 
     expect(screen.getByText('Próximas alocações')).toBeInTheDocument()
-    expect(screen.getByText('Vestido Azul — Maria Silva')).toBeInTheDocument()
+    // The piece and the client are now separate lines rather than one
+    // run-on string: the product name is what identifies the row, and the
+    // client is the quieter second line under it.
+    expect(screen.getByText('Vestido Azul')).toBeInTheDocument()
+    expect(screen.getByText('Maria Silva')).toBeInTheDocument()
   })
 
   it('shows the empty-upcoming message when there is nothing scheduled', () => {
