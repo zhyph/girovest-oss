@@ -127,7 +127,11 @@
  * Contrast: every foreground/background pairing below (background,
  * card, popover, primary, secondary, muted, accent, destructive,
  * destructive-subtle, success, warning) is verified at >= 4.5:1 (WCAG AA
- * for text) in both themes. `input`, `input-hover` and `ring` are non-text
+ * for text) in both themes — and now measured, not merely asserted here:
+ * src/paletteContrast.test.ts reads these literals back out of this file and
+ * fails the build if any of them slips. It was added because
+ * `--foreground-subtle` had been sitting at 3.36–4.12:1 under this very
+ * paragraph. `input`, `input-hover` and `ring` are non-text
  * UI-component boundaries and are verified at >= 3:1 against `background`
  * in both themes. `border` is a decorative divider (card/dialog edges) with
  * no contrast requirement under WCAG 1.4.11 and is intentionally subtle;
@@ -161,6 +165,13 @@
    */
   --palette-dark-surface: #2a2220;
   --palette-dark-surface-sunken: #1e1817;
+  /*
+   * ink-3, dark. Unlike its light twin this one always cleared AA on the
+   * surfaces it lands on (4.91 on `secondary`, 5.39 on `card`, 5.56 on
+   * `surface`, 5.97 on `background`, 6.26 on `surface-sunken`), so it is
+   * left where the design file put it. Guarded alongside the light value in
+   * src/paletteContrast.test.ts.
+   */
   --palette-dark-foreground-subtle: #a89791;
   --palette-dark-hairline: #3a2e2b;
   --palette-dark-border-strong: #5c4844;
@@ -227,16 +238,26 @@ html.light {
   /*
    * ink-3. Section labels, placeholders, contract numbers.
    *
-   * The design file uses two near-identical greys for this role, #97867d
-   * and #8a7a71. They are unified here at the darker one, because #97867d
-   * measures only 2.95:1 on `background` and 2.85:1 on `surface-sunken` —
-   * under the 3:1 floor this step needs even as large text, and this token
-   * lands on all three light surfaces (nav rail, panel, table header).
-   * #8a7a71 clears it everywhere (3.48 / 3.98 / 3.36) and is already in
-   * the design file's own palette. Still large-text-only: never below
-   * 12px, and never for the primary value in a row.
+   * The design file offers two near-identical greys for this role, #97867d
+   * and #8a7a71, and this token started at the darker of the two on a 3:1
+   * "large text only" argument. That argument does not survive contact with
+   * where the token actually landed: its 33 usages are 11–13px labels and
+   * uppercase section headings, none of which is large text under WCAG, so
+   * the applicable floor is 4.5:1 and #8a7a71 cleared it nowhere (3.36 on
+   * `surface-sunken`, which is DataList's own sticky group header, up to
+   * 4.12 on `card`).
+   *
+   * #73655e is the same hue scaled down until the WORST real pairing —
+   * ink-3 on `surface-sunken`/`muted` — clears AA with room to spare:
+   * 4.57 sunken / 4.74 background / 5.42 surface / 5.60 card / 4.96
+   * secondary. Below roughly #74665f nothing clears 4.5 on sunken at all,
+   * which is why this sits close to `--muted-foreground` (#6d5c54): at AA
+   * there is barely a luminance window left between ink-2 and ink-3 on this
+   * warm a canvas. The step between them is carried by size, weight and
+   * case, not by a colour gap that WCAG has no room for.
+   * Guarded by src/paletteContrast.test.ts.
    */
-  --foreground-subtle: #8a7a71;
+  --foreground-subtle: #73655e;
   --accent: #fbeef1; /* brand-50 */
   --accent-foreground: #7a2f40; /* brand-700 */
   --destructive: #b3261e;
