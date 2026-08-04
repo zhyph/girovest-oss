@@ -25,15 +25,15 @@
     "add": "Adicionar peça",
     "remove": "Remover peça",
     "total": "Total das peças",
-    "count_one": "{{count}} peça",
-    "count_other": "{{count}} peças"
+    "countOne": "{{count}} peça",
+    "countOther": "{{count}} peças"
   },
   "installments": {
     "title": "Parcelas",
     "add": "Adicionar parcela",
     "remove": "Remover parcela",
-    "count_one": "{{count}} parcela",
-    "count_other": "{{count}} parcelas",
+    "countOne": "{{count}} parcela",
+    "countOther": "{{count}} parcelas",
     "summary": "em {{count}}× de {{amount}}",
     "summaryMixed": "em {{count}}× · {{amount}} no total",
     "noneDefined": "sem parcelas definidas"

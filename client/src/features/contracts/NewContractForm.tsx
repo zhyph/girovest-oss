@@ -340,11 +340,18 @@ export function NewContractForm({
         page width and keeps the same fields in the same places. One
         format, two sizes — never two different forms, which is how the
         contract flow reached its previous state.
+
+        The height is FIXED, not grown: the dialog used to get taller with
+        every piece and every parcela until the Salvar button walked off the
+        bottom of a laptop screen — on the one form this shop fills in most.
+        Peças and Parcelas each scroll inside their own bordered box instead,
+        so the header, the totals and the two buttons never move.
+        `max-h` still caps it below the fixed height on a short screen.
       */}
       <DialogContent
         showCloseButton={false}
         className={cn(
-          'flex max-h-[calc(100vh-5rem)] flex-col gap-0 overflow-hidden p-0',
+          'flex h-[34.5rem] max-h-[calc(100vh-5rem)] flex-col gap-0 overflow-hidden p-0',
           items.fields.length > 4 ? 'sm:max-w-[68rem]' : 'sm:max-w-[46rem]',
         )}
       >
@@ -363,8 +370,14 @@ export function NewContractForm({
           </DialogClose>
         </div>
         <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
-        <DialogBody className="grid grid-cols-2 gap-5 px-5 pb-4">
-          <div className="flex flex-col gap-3.5">
+        {/*
+          The body itself no longer scrolls — the two lists inside it do. A
+          single scroller here is what let the whole form grow instead: adding
+          a fifth parcela pushed the Peças section out of view rather than
+          paging within it.
+        */}
+        <DialogBody className="grid grid-cols-2 gap-5 overflow-hidden px-5 pb-4">
+          <div className="flex min-h-0 flex-col gap-3.5 overflow-y-auto">
           <SectionLabel>{t('sections.clientAndEvent')}</SectionLabel>
           <label className="flex flex-col gap-1 text-sm">
             <span>{t('fields.client')}<RequiredMark /></span>
@@ -447,10 +460,24 @@ export function NewContractForm({
           </label>
           </div>
 
-          <div className="flex flex-col gap-3.5">
-          <div className="flex flex-col gap-2">
-            <SectionLabel>{t('items.title')}</SectionLabel>
-            <div className="overflow-hidden rounded-panel border border-border">
+          {/*
+            Peças gets three parts of the height to Parcelas' two: a piece row
+            carries four fields and Parcelas carries two, so an even split
+            showed one and a half pieces against three and a half parcelas.
+            Both keep a floor so neither can be squeezed to nothing.
+          */}
+          <div className="flex min-h-0 flex-col gap-3.5">
+          <div className="flex min-h-40 min-w-0 flex-[3] flex-col gap-2">
+            <div className="flex items-baseline justify-between gap-2">
+              <SectionLabel>{t('items.title')}</SectionLabel>
+              <span className="text-meta text-muted-foreground">
+                {t(items.fields.length === 1 ? 'items.countOne' : 'items.countOther', {
+                  count: items.fields.length,
+                })}
+              </span>
+            </div>
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-panel border border-border">
+            <div className="min-h-0 flex-1 overflow-y-auto">
             {items.fields.map((field, index) => (
               <ItemRow
                 key={field.id}
@@ -476,18 +503,37 @@ export function NewContractForm({
                 }
               />
             ))}
+            </div>
+            {/*
+              Pinned to the bottom of this box, not of the dialog: the button
+              that adds a piece belongs to the list of pieces, and stays
+              reachable however far down that list you have scrolled.
+            */}
             <button
               type="button"
               onClick={() => items.append({ productId: '', checkoutDate: '', dueDate: '', priceCharged: 0 })}
-              className="flex w-full items-center gap-2 bg-surface-sunken px-2.5 py-2 text-left text-[13px] font-medium text-primary hover:bg-secondary"
+              className="flex w-full flex-shrink-0 items-center gap-2 border-t border-hairline bg-surface-sunken px-2.5 py-2 text-left text-[13px] font-medium text-primary hover:bg-secondary"
             >
               {t('items.add')}
             </button>
             </div>
           </div>
-          <div className="flex flex-col gap-2">
-            <SectionLabel>{t('installments.title')}</SectionLabel>
-            <div className="overflow-hidden rounded-panel border border-border">
+          <div className="flex min-h-30 min-w-0 flex-[2] flex-col gap-2">
+            <div className="flex items-baseline justify-between gap-2">
+              <SectionLabel>{t('installments.title')}</SectionLabel>
+              <span className="text-meta text-muted-foreground">
+                {/*
+                  Selected here rather than by i18next's plural rules: pt-BR's
+                  CLDR "one" category covers zero as well, so a count of 0
+                  would read "0 parcela".
+                */}
+                {t(installmentCount === 1 ? 'installments.countOne' : 'installments.countOther', {
+                  count: installmentCount,
+                })}
+              </span>
+            </div>
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-panel border border-border">
+            <div className="min-h-0 flex-1 overflow-y-auto">
             {installments.fields.map((field, index) => (
               <div key={field.id} className="flex items-end gap-2 border-b border-hairline bg-card p-2.5 last:border-b-0">
                 <label className="flex flex-1 flex-col gap-1 text-sm">
@@ -545,10 +591,11 @@ export function NewContractForm({
                 </Button>
               </div>
             ))}
+            </div>
             <button
               type="button"
               onClick={addInstallment}
-              className="flex w-full items-center gap-2 bg-surface-sunken px-2.5 py-2 text-left text-[13px] font-medium text-primary hover:bg-secondary"
+              className="flex w-full flex-shrink-0 items-center gap-2 border-t border-hairline bg-surface-sunken px-2.5 py-2 text-left text-[13px] font-medium text-primary hover:bg-secondary"
             >
               {t('installments.add')}
             </button>

@@ -505,6 +505,50 @@ describe('dialog format', () => {
     expect(screen.getByText('Cliente e evento')).toBeInTheDocument()
     expect(screen.getByText('Peças')).toBeInTheDocument()
     expect(screen.getByText('Parcelas')).toBeInTheDocument()
+  })
+
+  /*
+    The dialog used to grow a row taller with every peça and every parcela,
+    until Salvar contrato was below the bottom of a laptop screen and the only
+    way back to it was scrolling the whole page. Fixed height, and the two
+    lists page inside their own boxes instead.
+  */
+  it('CRITICAL: holds one height and scrolls the two lists inside it', async () => {
+    mockHooks()
+    renderWithToast(<NewContractForm onClose={vi.fn()} />)
+
+    const content = document.querySelector('[data-slot="dialog-content"]') as HTMLElement
+    expect(content.className).toContain('h-[34.5rem]')
+    // The body is no longer the scroller — if it were, adding rows would push
+    // the sections past each other again instead of paging within them.
+    const body = document.querySelector('[data-slot="dialog-body"]') as HTMLElement
+    expect(body.className).toContain('overflow-hidden')
+    expect(body.className).not.toContain('overflow-y-auto')
+
+    // One scroll container per section, each holding its own add button.
+    const addPiece = screen.getByRole('button', { name: /adicionar peça/i })
+    const addInstallment = screen.getByRole('button', { name: /adicionar parcela/i })
+    const pieceBox = addPiece.parentElement as HTMLElement
+    const installmentBox = addInstallment.parentElement as HTMLElement
+    expect(pieceBox).not.toBe(installmentBox)
+    for (const box of [pieceBox, installmentBox]) {
+      expect(box.className).toContain('rounded-panel')
+      expect(box.querySelector('.overflow-y-auto')).not.toBeNull()
+    }
+  })
+
+  it('counts what each section holds, next to its label', async () => {
+    mockHooks()
+    renderWithToast(<NewContractForm onClose={vi.fn()} />)
+
+    expect(screen.getByText('1 peça')).toBeInTheDocument()
+    expect(screen.getByText('0 parcelas')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: /adicionar peça/i }))
+    await userEvent.click(screen.getByRole('button', { name: /adicionar parcela/i }))
+
+    expect(screen.getByText('2 peças')).toBeInTheDocument()
+    expect(screen.getByText('1 parcela')).toBeInTheDocument()
     expect(screen.getByLabelText(/cliente/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/forma de pagamento/i)).toBeInTheDocument()
 
