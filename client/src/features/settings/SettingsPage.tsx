@@ -16,6 +16,7 @@ import { TOUR_SECTIONS } from '../onboarding/sections.ts'
 import { useSectionTour } from '../onboarding/useSectionTour.ts'
 import { SECTION_ROUTES } from '../onboarding/tours.ts'
 import { requestTourReplay } from '../onboarding/tourReplay.ts'
+import { CURRENT_VERSION } from '../changelog/changelogData.ts'
 import { locationSettingsSchema, type LocationSettingsFormValues } from './settingsSchemas.ts'
 import { useLocationSettings, useUpdateLocationSettings } from './useLocationSettings.ts'
 import { BackupSection } from './BackupSection.tsx'
@@ -381,6 +382,19 @@ export function SettingsPage() {
               <code className="select-all rounded-md bg-muted px-2 py-1 font-mono text-xs">{installId}</code>
               <Button type="button" variant="secondary" size="sm" onClick={copyInstallId}>
                 {t('install.copy')}
+              </Button>
+            </div>
+          </div>
+        )}
+        {CURRENT_VERSION && (
+          <div className="flex flex-col gap-2 border-t border-border pt-4">
+            <SectionLabel>{t('changelogLink.title')}</SectionLabel>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm text-muted-foreground">
+                {t('changelogLink.currentVersion', { version: CURRENT_VERSION })}
+              </span>
+              <Button type="button" variant="secondary" size="sm" onClick={() => navigate('/novidades')}>
+                {t('changelogLink.view')}
               </Button>
             </div>
           </div>

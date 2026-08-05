@@ -1,0 +1,10 @@
+{
+  "title": "Novidades",
+  "subtitle": "Cada versão nova traz o resumo do que foi alterado. As atualizações chegam automaticamente quando o computador está conectado à internet.",
+  "installedBadge": "versão instalada",
+  "kinds": {
+    "new": "Novo",
+    "improved": "Melhoria",
+    "fixed": "Correção"
+  }
+}

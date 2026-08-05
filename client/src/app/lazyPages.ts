@@ -14,6 +14,7 @@ export const pageLoaders = {
   contracts: () => import('../features/contracts/ContractsPage.tsx'),
   calendar: () => import('../features/calendar/CalendarPage.tsx'),
   settings: () => import('../features/settings/SettingsPage.tsx'),
+  changelog: () => import('../features/changelog/ChangelogPage.tsx'),
   contractPrint: () => import('../features/contracts/ContractPrintPage.tsx'),
 } as const
 
@@ -34,4 +35,5 @@ export const ProductsPage = lazy(() => pageLoaders.products().then((m) => ({ def
 export const ContractsPage = lazy(() => pageLoaders.contracts().then((m) => ({ default: m.ContractsPage })))
 export const CalendarPage = lazy(() => pageLoaders.calendar().then((m) => ({ default: m.CalendarPage })))
 export const SettingsPage = lazy(() => pageLoaders.settings().then((m) => ({ default: m.SettingsPage })))
+export const ChangelogPage = lazy(() => pageLoaders.changelog().then((m) => ({ default: m.ChangelogPage })))
 export const ContractPrintPage = lazy(() => pageLoaders.contractPrint().then((m) => ({ default: m.ContractPrintPage })))

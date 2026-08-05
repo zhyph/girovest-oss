@@ -27,6 +27,11 @@
     "error": "Não foi possível concluir o backup.",
     "destinationConflict": "A pasta de backup já foi usada por outra instalação. Vá até Configurações para escolher usá-la mesmo assim."
   },
+  "changelogBanner": {
+    "message": "O aplicativo foi atualizado para a versão {{version}}. Veja o que mudou.",
+    "view": "Ver novidades",
+    "dismiss": "Dispensar"
+  },
   "todayMovement": "Movimentação de hoje",
   "todayMovementEmpty": "Nada sai nem volta hoje."
 }
