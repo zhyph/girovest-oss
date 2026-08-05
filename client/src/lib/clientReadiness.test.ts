@@ -13,6 +13,9 @@ function makeClient(overrides: Partial<Client> = {}): Client {
     addressLines: [],
     hasAllocationHistory: false,
     createdAt: '2026-01-01',
+    contractCount: 0,
+    lastRentalProductId: null,
+    lastRentalDate: null,
     ...overrides,
   }
 }

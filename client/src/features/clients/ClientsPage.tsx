@@ -13,7 +13,6 @@ import { useClients, useDeleteClient } from './useClients.ts'
 import { ClientDrawer } from './ClientDrawer.tsx'
 import { ClientDetailPanel } from './ClientDetailPanel.tsx'
 import { ProductThumbnail } from './ProductThumbnail.tsx'
-import { useAllContracts, useClientRentalSummaries, emptyRentalSummary } from './useClientContracts.ts'
 import type { Client } from './clientSchemas.ts'
 
 // Matches Contratos. The alphabetical grouping means a page boundary can fall
@@ -49,12 +48,6 @@ export function ClientsPage() {
   const navigate = useNavigate()
   const { data: clients, isLoading } = useClients()
   const { data: products } = useProducts()
-  const { contracts, isPending: contractsLoading } = useAllContracts()
-  const summaries = useClientRentalSummaries(contracts)
-  // Gated on the query's own isPending, not on contracts being empty — a
-  // shop with genuinely zero contracts anywhere would otherwise read as
-  // "still loading" forever instead of resolving to "Nunca alugou" / 0.
-  const hasContractHistory = !contractsLoading
   const deleteClient = useDeleteClient()
   const [editing, setEditing] = useState<Client | null | undefined>(undefined)
   const [deleting, setDeleting] = useState<Client | null>(null)
@@ -141,23 +134,19 @@ export function ClientsPage() {
         header: t('columns.lastRental'),
         width: '1.4fr',
         cell: (client) => {
-          // Same rule ClientDetailPanel follows: while the contracts query is
-          // in flight, the list cannot yet stand behind "Nunca alugou" — that
-          // is a fact about the client, not about the network. A dash says
-          // "not known yet" without asserting anything.
-          if (!hasContractHistory) {
-            return <span className="text-[13px] text-foreground-subtle" aria-hidden>—</span>
-          }
-          const summary = summaries.get(client.id) ?? emptyRentalSummary()
-          if (!summary.lastRentalProductId) {
+          // contractCount/lastRentalProductId now arrive on the client record
+          // itself (see clientSchemas.ts) — once `clients` has loaded, so has
+          // every row's own summary, in the same request. No separate
+          // "is the summary loaded yet" state to track.
+          if (!client.lastRentalProductId) {
             return <span className="text-[13px] text-foreground-subtle">{t('columns.neverRented')}</span>
           }
-          const product = productsById.get(summary.lastRentalProductId)
+          const product = productsById.get(client.lastRentalProductId)
           return (
             <span className="flex min-w-0 items-center gap-2">
               <ProductThumbnail product={product} className="size-7" />
               <span className="truncate text-[13px] text-muted-foreground">
-                {product?.name ?? summary.lastRentalProductId}
+                {product?.name ?? client.lastRentalProductId}
               </span>
             </span>
           )
@@ -169,9 +158,7 @@ export function ClientsPage() {
         width: '96px',
         align: 'right',
         cell: (client) => (
-          <span className="tabular text-[13px] text-muted-foreground">
-            {hasContractHistory ? (summaries.get(client.id) ?? emptyRentalSummary()).contractCount : '—'}
-          </span>
+          <span className="tabular text-[13px] text-muted-foreground">{client.contractCount}</span>
         ),
       },
       {
@@ -192,7 +179,7 @@ export function ClientsPage() {
         ),
       },
     ],
-    [t, summaries, productsById, hasContractHistory, pageClients],
+    [t, productsById, pageClients],
   )
 
   if (isLoading) return <div>{t('title')}</div>
@@ -268,8 +255,6 @@ export function ClientsPage() {
         >
           <ClientDetailPanel
             client={selected}
-            contracts={contracts}
-            contractsLoading={contractsLoading}
             onEdit={(client) => setEditing(client)}
             onDelete={(client) => setDeleting(client)}
             // Carries the client through, so the contract form opens with

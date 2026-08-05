@@ -51,4 +51,10 @@ export interface Client extends Omit<ClientFormValues, 'identityDocuments' | 'ad
   addressLines: AddressLine[]
   hasAllocationHistory: boolean
   createdAt: string
+  /** Total contracts this client has, cancelled or not. */
+  contractCount: number
+  /** The piece from her most recent NON-cancelled allocation, or null if she
+   *  has never rented anything (or every rental was cancelled). */
+  lastRentalProductId: string | null
+  lastRentalDate: string | null
 }

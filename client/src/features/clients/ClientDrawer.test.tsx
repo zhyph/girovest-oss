@@ -10,6 +10,7 @@ import { Toaster } from '../../components/ui/sonner.tsx'
 const client = {
   id: 'c1', name: 'Maria Silva', phone: '119', email: 'm@x.com', notes: '', createdAt: '2026-01-01',
   hasAllocationHistory: false, identityDocuments: [], addressLines: [],
+  contractCount: 0, lastRentalProductId: null, lastRentalDate: null,
 }
 
 function renderWithToast(ui: React.ReactElement) {
@@ -318,6 +319,9 @@ describe('ClientDrawer identity documents', () => {
       addressLines: [],
       hasAllocationHistory: false,
       createdAt: '2026-01-01',
+      contractCount: 0,
+      lastRentalProductId: null,
+      lastRentalDate: null,
     }
     renderWithToast(<ClientDrawer client={existingClient} onClose={vi.fn()} />)
     expect(screen.getByDisplayValue('Passaporte')).toBeInTheDocument()
@@ -397,6 +401,9 @@ describe('ClientDrawer address lines', () => {
       addressLines: [{ id: 'l1', label: 'Zip Code', value: '90210', sortOrder: 0, maskKey: null }],
       hasAllocationHistory: false,
       createdAt: '2026-01-01',
+      contractCount: 0,
+      lastRentalProductId: null,
+      lastRentalDate: null,
     }
     renderWithToast(<ClientDrawer client={existingClient} onClose={vi.fn()} />)
     expect(screen.getByDisplayValue('Zip Code')).toBeInTheDocument()
@@ -424,6 +431,7 @@ describe('ClientDrawer address lines', () => {
       identityDocuments: [],
       addressLines: [{ id: 'l1', label: 'Cidade', value: 'Piedade', sortOrder: 0, maskKey: null }],
       hasAllocationHistory: false, createdAt: '2026-01-01',
+      contractCount: 0, lastRentalProductId: null, lastRentalDate: null,
     }
     mockClientHooks(vi.fn(), createImpl, vi.fn(), [otherClient])
     renderWithToast(<ClientDrawer client={null} onClose={vi.fn()} />)

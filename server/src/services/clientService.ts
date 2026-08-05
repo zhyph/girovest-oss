@@ -60,6 +60,13 @@ export interface ClientDTO {
   createdAt: Date
   identityDocuments: IdentityDocumentDTO[]
   addressLines: AddressLineDTO[]
+  /** Total contracts this client has, cancelled or not — matches how the
+   *  detail panel's "N contratos" has always counted. */
+  contractCount: number
+  /** The piece from the client's most recent NON-cancelled allocation, or
+   *  null if she has never rented anything (or every rental was cancelled). */
+  lastRentalProductId: string | null
+  lastRentalDate: string | null
 }
 
 interface ClientRow {
@@ -79,8 +86,20 @@ const CLIENT_INCLUDE = {
   addressLines: { orderBy: { sortOrder: 'asc' as const } },
 }
 
-function toDTO(row: ClientRow, hasAllocationHistory: boolean): ClientDTO {
-  return { ...row, hasAllocationHistory }
+interface RentalSummary {
+  contractCount: number
+  lastRentalProductId: string | null
+  lastRentalDate: string | null
+}
+
+const EMPTY_RENTAL_SUMMARY: RentalSummary = {
+  contractCount: 0,
+  lastRentalProductId: null,
+  lastRentalDate: null,
+}
+
+function toDTO(row: ClientRow, hasAllocationHistory: boolean, rental: RentalSummary): ClientDTO {
+  return { ...row, hasAllocationHistory, ...rental }
 }
 
 async function hasHistory(clientId: string): Promise<boolean> {
@@ -105,6 +124,58 @@ async function historyByClientId(clientIds: string[]): Promise<Set<string>> {
   return result
 }
 
+/**
+ * Contract count + most recent rental per client, computed here instead of
+ * being derived in the browser from every contract at this location — the
+ * Clientes list used to fetch the location's entire contract history just
+ * to answer two small per-row facts, which stopped being "fine" the moment
+ * a shop's contract count grew past what fits comfortably in one response.
+ *
+ * `locationId` is redundant with `clientIds` already being scoped (every
+ * caller derives them from a `scopedDb(locationId).client.findMany()` a few
+ * lines above), but Contract carries the column and contractService.ts
+ * already filters by it explicitly everywhere else — same belt-and-suspenders
+ * reasoning, no reason to be the one place that doesn't.
+ */
+async function rentalSummaryByClientId(
+  locationId: string,
+  clientIds: string[],
+): Promise<Map<string, RentalSummary>> {
+  const result = new Map<string, RentalSummary>()
+  if (clientIds.length === 0) return result
+
+  const [contractCounts, lastRentals] = await Promise.all([
+    prisma.contract.groupBy({
+      by: ['clientId'],
+      where: { locationId, clientId: { in: clientIds } },
+      _count: { _all: true },
+    }),
+    // distinct + orderBy keeps exactly one row per clientId — the one with
+    // the latest checkoutDate, since sorting puts it first within each
+    // client's group before the distinct dedup runs. A cancelled allocation
+    // never left the shop, so it cannot be the last thing she wore.
+    prisma.allocation.findMany({
+      where: { clientId: { in: clientIds }, status: { not: 'cancelled' } },
+      select: { clientId: true, productId: true, checkoutDate: true },
+      distinct: ['clientId'],
+      orderBy: [{ clientId: 'asc' }, { checkoutDate: 'desc' }],
+    }),
+  ])
+
+  for (const row of contractCounts) {
+    result.set(row.clientId, { ...EMPTY_RENTAL_SUMMARY, contractCount: row._count._all })
+  }
+  for (const row of lastRentals) {
+    const existing = result.get(row.clientId) ?? { ...EMPTY_RENTAL_SUMMARY }
+    result.set(row.clientId, {
+      ...existing,
+      lastRentalProductId: row.productId,
+      lastRentalDate: row.checkoutDate.toISOString(),
+    })
+  }
+  return result
+}
+
 export async function createClient(locationId: string, data: CreateClientInput): Promise<ClientDTO> {
   const row = await scopedDb(locationId).client.create({
     data: {
@@ -117,7 +188,9 @@ export async function createClient(locationId: string, data: CreateClientInput):
     } as any,
     include: CLIENT_INCLUDE,
   })
-  return toDTO(row, false)
+  // A brand-new client has no contracts yet — skip the query entirely rather
+  // than asking rentalSummaryByClientId to prove what's already known.
+  return toDTO(row, false, { ...EMPTY_RENTAL_SUMMARY })
 }
 
 export async function listClients(locationId: string): Promise<ClientDTO[]> {
@@ -125,8 +198,14 @@ export async function listClients(locationId: string): Promise<ClientDTO[]> {
     orderBy: { createdAt: 'desc' },
     include: CLIENT_INCLUDE,
   })
-  const withHistory = await historyByClientId(rows.map((row) => row.id))
-  return rows.map((row) => toDTO(row, withHistory.has(row.id)))
+  const clientIds = rows.map((row) => row.id)
+  const [withHistory, rentalSummaries] = await Promise.all([
+    historyByClientId(clientIds),
+    rentalSummaryByClientId(locationId, clientIds),
+  ])
+  return rows.map((row) =>
+    toDTO(row, withHistory.has(row.id), rentalSummaries.get(row.id) ?? { ...EMPTY_RENTAL_SUMMARY }),
+  )
 }
 
 export async function getClient(locationId: string, id: string): Promise<ClientDTO> {
@@ -134,7 +213,11 @@ export async function getClient(locationId: string, id: string): Promise<ClientD
   if (!row) {
     throw new AppError(ErrorCodes.NOT_FOUND, 404, `Client ${id} not found`)
   }
-  return toDTO(row, await hasHistory(id))
+  const [historyFlag, rentalSummaries] = await Promise.all([
+    hasHistory(id),
+    rentalSummaryByClientId(locationId, [id]),
+  ])
+  return toDTO(row, historyFlag, rentalSummaries.get(id) ?? { ...EMPTY_RENTAL_SUMMARY })
 }
 
 export async function updateClient(locationId: string, id: string, data: UpdateClientInput): Promise<ClientDTO> {

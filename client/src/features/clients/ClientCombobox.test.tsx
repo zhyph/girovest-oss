@@ -5,9 +5,11 @@ import '../../i18n.ts'
 import { ClientCombobox } from './ClientCombobox.tsx'
 import type { Client } from './clientSchemas.ts'
 
+const RENTAL_DEFAULTS = { contractCount: 0, lastRentalProductId: null, lastRentalDate: null }
+
 const clients: Client[] = [
-  { id: 'c1', name: 'Maria Silva', phone: '11999990000', email: '', notes: '', identityDocuments: [], addressLines: [], hasAllocationHistory: false, createdAt: '2026-01-01' },
-  { id: 'c2', name: 'Cerimônia Souza', phone: '11988880000', email: '', notes: '', identityDocuments: [], addressLines: [], hasAllocationHistory: false, createdAt: '2026-01-01' },
+  { id: 'c1', name: 'Maria Silva', phone: '11999990000', email: '', notes: '', identityDocuments: [], addressLines: [], hasAllocationHistory: false, createdAt: '2026-01-01', ...RENTAL_DEFAULTS },
+  { id: 'c2', name: 'Cerimônia Souza', phone: '11988880000', email: '', notes: '', identityDocuments: [], addressLines: [], hasAllocationHistory: false, createdAt: '2026-01-01', ...RENTAL_DEFAULTS },
 ]
 
 describe('ClientCombobox', () => {

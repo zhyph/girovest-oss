@@ -4,6 +4,7 @@ import { requireAuth } from '../auth/authMiddleware.js'
 import { AppError } from '../errors/AppError.js'
 import { ErrorCodes } from '../errors/errorCodes.js'
 import { createClient, listClients, getClient, updateClient, deleteClient } from '../services/clientService.js'
+import { getClientContracts } from '../services/contractService.js'
 
 export const clientsRouter = Router()
 clientsRouter.use(requireAuth)
@@ -47,6 +48,14 @@ clientsRouter.get('/', async (req, res) => {
 
 clientsRouter.get('/:id', async (req, res) => {
   res.json(await getClient(req.staff!.locationId, req.params.id))
+})
+
+clientsRouter.get('/:id/contracts', async (req, res) => {
+  // Confirms the id belongs to this location (404s otherwise) before the
+  // contracts query runs — same "prove ownership first" shape as every
+  // other by-id lookup in this router.
+  await getClient(req.staff!.locationId, req.params.id)
+  res.json(await getClientContracts(req.staff!.locationId, req.params.id))
 })
 
 clientsRouter.patch('/:id', async (req, res) => {

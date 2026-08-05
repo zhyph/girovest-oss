@@ -301,6 +301,22 @@ export async function listContracts(
   return { contracts, total, page, pageSize, counts }
 }
 
+/**
+ * One client's full contract+allocation history, for the Clientes detail
+ * panel's "O que já alugou" section. Unlike listContracts this is never
+ * paginated — one client's own history stays small even for a long-standing
+ * regular — and it is not filtered by status: a cancelled piece still
+ * belongs in "what she rented", badged as cancelled, exactly as this panel
+ * has always shown it.
+ */
+export async function getClientContracts(locationId: string, clientId: string) {
+  return prisma.contract.findMany({
+    where: { locationId, clientId },
+    orderBy: { createdAt: 'desc' },
+    include: { allocations: true, installments: true },
+  })
+}
+
 export async function getContract(id: string, locationId: string) {
   const contract = await prisma.contract.findUnique({
     where: { id },

@@ -21,6 +21,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await prisma.allocation.deleteMany()
+  await prisma.contract.deleteMany()
   await prisma.client.deleteMany()
   await prisma.product.deleteMany()
   await prisma.staff.deleteMany()
@@ -147,6 +148,141 @@ describe('clientService', () => {
 
     const updated = await updateClient(locationId, client.id, { notes: 'updated' })
     expect(updated.hasAllocationHistory).toBe(true)
+  })
+
+  it('reports zero contracts and no last rental for a client with no contracts', async () => {
+    const created = await createClient(locationId, { name: 'Maria', phone: '119', email: 'm@x.com' })
+    expect(created.contractCount).toBe(0)
+    expect(created.lastRentalProductId).toBeNull()
+    expect(created.lastRentalDate).toBeNull()
+
+    const fetched = await getClient(locationId, created.id)
+    expect(fetched.contractCount).toBe(0)
+
+    const [listed] = await listClients(locationId)
+    expect(listed.contractCount).toBe(0)
+  })
+
+  it('counts every contract and reports the most recent NON-cancelled rental', async () => {
+    const staff = await prisma.staff.create({
+      data: { name: 'S', login: 'staff-rental', passwordHash: 'x', role: 'staff', locationId },
+    })
+    const older = await prisma.product.create({
+      data: { locationId, name: 'Vestido Antigo', category: 'festa', size: 'M', color: 'azul', rentalPrice: 100, depositAmount: 50 },
+    })
+    const newer = await prisma.product.create({
+      data: { locationId, name: 'Vestido Novo', category: 'festa', size: 'G', color: 'preto', rentalPrice: 200, depositAmount: 80 },
+    })
+    const client = await createClient(locationId, { name: 'Beatriz', phone: '129', email: 'b@x.com' })
+
+    const olderContract = await prisma.contract.create({
+      data: { number: 1, locationId, clientId: client.id, staffId: staff.id, eventDate: new Date('2026-01-10'), paymentMethod: 'PIX' },
+    })
+    await prisma.allocation.create({
+      data: {
+        productId: older.id, clientId: client.id, staffId: staff.id, contractId: olderContract.id,
+        checkoutDate: new Date('2026-01-05'), dueDate: new Date('2026-01-08'), status: 'returned', priceCharged: 100,
+      },
+    })
+
+    const newerContract = await prisma.contract.create({
+      data: { number: 2, locationId, clientId: client.id, staffId: staff.id, eventDate: new Date('2026-03-10'), paymentMethod: 'PIX' },
+    })
+    await prisma.allocation.create({
+      data: {
+        productId: newer.id, clientId: client.id, staffId: staff.id, contractId: newerContract.id,
+        checkoutDate: new Date('2026-03-05'), dueDate: new Date('2026-03-08'), status: 'reserved', priceCharged: 200,
+      },
+    })
+
+    const fetched = await getClient(locationId, client.id)
+    expect(fetched.contractCount).toBe(2)
+    expect(fetched.lastRentalProductId).toBe(newer.id)
+    expect(fetched.lastRentalDate).toBe(new Date('2026-03-05').toISOString())
+
+    const [listed] = await listClients(locationId)
+    expect(listed.contractCount).toBe(2)
+    expect(listed.lastRentalProductId).toBe(newer.id)
+  })
+
+  it('skips a cancelled allocation for "last rental" even when it is chronologically the most recent', async () => {
+    const staff = await prisma.staff.create({
+      data: { name: 'S', login: 'staff-cancelled', passwordHash: 'x', role: 'staff', locationId },
+    })
+    const kept = await prisma.product.create({
+      data: { locationId, name: 'Vestido Mantido', category: 'festa', size: 'M', color: 'azul', rentalPrice: 100, depositAmount: 50 },
+    })
+    const cancelledProduct = await prisma.product.create({
+      data: { locationId, name: 'Vestido Cancelado', category: 'festa', size: 'G', color: 'preto', rentalPrice: 200, depositAmount: 80 },
+    })
+    const client = await createClient(locationId, { name: 'Carla', phone: '139', email: 'c@x.com' })
+
+    const contract = await prisma.contract.create({
+      data: { number: 1, locationId, clientId: client.id, staffId: staff.id, eventDate: new Date('2026-01-10'), paymentMethod: 'PIX' },
+    })
+    await prisma.allocation.create({
+      data: {
+        productId: kept.id, clientId: client.id, staffId: staff.id, contractId: contract.id,
+        checkoutDate: new Date('2026-01-05'), dueDate: new Date('2026-01-08'), status: 'returned', priceCharged: 100,
+      },
+    })
+    // Cancelled, but with a LATER checkoutDate than the kept allocation above
+    // — if this were not excluded, it would win the "most recent" race.
+    await prisma.allocation.create({
+      data: {
+        productId: cancelledProduct.id, clientId: client.id, staffId: staff.id, contractId: contract.id,
+        checkoutDate: new Date('2026-01-20'), dueDate: new Date('2026-01-25'), status: 'cancelled', priceCharged: 200,
+      },
+    })
+
+    const fetched = await getClient(locationId, client.id)
+    expect(fetched.lastRentalProductId).toBe(kept.id)
+  })
+
+  it('never mixes rental summaries across locations', async () => {
+    const staffA = await prisma.staff.create({
+      data: { name: 'SA', login: 'staff-a', passwordHash: 'x', role: 'staff', locationId },
+    })
+    const staffB = await prisma.staff.create({
+      data: { name: 'SB', login: 'staff-b', passwordHash: 'x', role: 'staff', locationId: otherLocationId },
+    })
+    const productA = await prisma.product.create({
+      data: { locationId, name: 'A', category: 'festa', size: 'M', color: 'azul', rentalPrice: 100, depositAmount: 50 },
+    })
+    const productB = await prisma.product.create({
+      data: { locationId: otherLocationId, name: 'B', category: 'festa', size: 'M', color: 'azul', rentalPrice: 100, depositAmount: 50 },
+    })
+    const clientA = await createClient(locationId, { name: 'Cliente A', phone: '1', email: 'a@x.com' })
+    const clientB = await createClient(otherLocationId, { name: 'Cliente B', phone: '2', email: 'b@x.com' })
+
+    const contractA = await prisma.contract.create({
+      data: { number: 1, locationId, clientId: clientA.id, staffId: staffA.id, eventDate: new Date('2026-01-10'), paymentMethod: 'PIX' },
+    })
+    await prisma.allocation.create({
+      data: {
+        productId: productA.id, clientId: clientA.id, staffId: staffA.id, contractId: contractA.id,
+        checkoutDate: new Date('2026-01-05'), dueDate: new Date('2026-01-08'), status: 'reserved', priceCharged: 100,
+      },
+    })
+
+    // Client B, in the OTHER location, has two contracts of her own.
+    for (let number = 1; number <= 2; number += 1) {
+      const contractB = await prisma.contract.create({
+        data: { number, locationId: otherLocationId, clientId: clientB.id, staffId: staffB.id, eventDate: new Date('2026-02-10'), paymentMethod: 'PIX' },
+      })
+      await prisma.allocation.create({
+        data: {
+          productId: productB.id, clientId: clientB.id, staffId: staffB.id, contractId: contractB.id,
+          checkoutDate: new Date('2026-02-05'), dueDate: new Date('2026-02-08'), status: 'reserved', priceCharged: 100,
+        },
+      })
+    }
+
+    const fetchedA = await getClient(locationId, clientA.id)
+    expect(fetchedA.contractCount).toBe(1)
+
+    const fetchedB = await getClient(otherLocationId, clientB.id)
+    expect(fetchedB.contractCount).toBe(2)
   })
 
   it('creates a client with identity documents and address lines', async () => {
