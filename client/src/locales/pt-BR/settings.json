@@ -36,6 +36,11 @@
   },
   "maintenanceBufferHelp": "Dias em que a peça fica indisponível depois de voltar, para limpeza e reparos, antes de sair para o próximo cliente. Use 0 para liberar já no dia seguinte à devolução.",
   "shopIdentityHelp": "Nome e endereço aparecem no cabeçalho do contrato impresso e o nome também identifica a loja no menu lateral e no título da janela.",
+  "changelogLink": {
+    "title": "Novidades",
+    "currentVersion": "Versão instalada: {{version}}",
+    "view": "Ver novidades"
+  },
   "tours": {
     "title": "Tours guiados",
     "help": "Reveja as explicações passo a passo de cada tela sempre que precisar se lembrar de como algo funciona.",

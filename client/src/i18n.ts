@@ -11,6 +11,7 @@ import calendarScreen from './locales/pt-BR/calendarScreen.json'
 import settings from './locales/pt-BR/settings.json'
 import contracts from './locales/pt-BR/contracts.json'
 import tour from './locales/pt-BR/tour.json'
+import changelog from './locales/pt-BR/changelog.json'
 
 i18n.use(initReactI18next).init({
   lng: 'pt-BR',
@@ -18,7 +19,7 @@ i18n.use(initReactI18next).init({
   defaultNS: 'common',
   interpolation: { escapeValue: false },
   resources: {
-    'pt-BR': { common, auth, setup, dashboard, clients, products, allocations, calendarScreen, settings, contracts, tour },
+    'pt-BR': { common, auth, setup, dashboard, clients, products, allocations, calendarScreen, settings, contracts, tour, changelog },
   },
 })
 

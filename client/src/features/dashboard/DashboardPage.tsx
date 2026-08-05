@@ -15,6 +15,7 @@ import { useProducts } from '../products/useProducts.ts'
 import { useSectionTour } from '../onboarding/useSectionTour.ts'
 import { useDashboard, type AllocationSummary } from './useDashboard.ts'
 import { BackupReminderBanner } from './BackupReminderBanner.tsx'
+import { ChangelogBanner } from './ChangelogBanner.tsx'
 import type { Product } from '../products/productSchemas.ts'
 
 function StatTile({
@@ -181,6 +182,7 @@ export function DashboardPage() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <BackupReminderBanner />
+      <ChangelogBanner />
       <div className="flex flex-shrink-0 items-baseline justify-between gap-5">
         <ScreenTitle data-tour="dashboard.title">{t('title')}</ScreenTitle>
         <span className="text-[13px] text-muted-foreground">
