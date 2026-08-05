@@ -518,7 +518,7 @@ describe('dialog format', () => {
     renderWithToast(<NewContractForm onClose={vi.fn()} />)
 
     const content = document.querySelector('[data-slot="dialog-content"]') as HTMLElement
-    expect(content.className).toContain('h-[34.5rem]')
+    expect(content.className).toContain('h-[min(85vh,46rem)]')
     // The body is no longer the scroller — if it were, adding rows would push
     // the sections past each other again instead of paging within them.
     const body = document.querySelector('[data-slot="dialog-body"]') as HTMLElement
@@ -561,14 +561,14 @@ describe('dialog format', () => {
     renderWithToast(<NewContractForm onClose={vi.fn()} />)
 
     const panel = () => screen.getByRole('dialog')
-    expect(panel().className).toContain('sm:max-w-[46rem]')
+    expect(panel().className).toContain('sm:max-w-[min(90vw,50rem)]')
 
     // One format, two sizes — the study's single exception.
     for (let i = 0; i < 4; i += 1) {
       await userEvent.click(screen.getByRole('button', { name: /adicionar peça/i }))
     }
 
-    expect(panel().className).toContain('sm:max-w-[68rem]')
+    expect(panel().className).toContain('sm:max-w-[min(90vw,76rem)]')
     // The fields did not change, only the width.
     expect(screen.getByText('Cliente e evento')).toBeInTheDocument()
     expect(screen.getByText('Parcelas')).toBeInTheDocument()
