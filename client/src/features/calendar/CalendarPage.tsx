@@ -226,7 +226,13 @@ export function CalendarPage() {
           )}
         </div>
 
-        <aside className="min-h-0 w-105 flex-shrink-0 overflow-y-auto border-l border-border-strong">
+        {/*
+          Width scales with the viewport instead of a flat 420px on every
+          screen — same treatment as Clientes/Contratos' detail panels: this
+          panel grows on a wider window rather than staying fixed while the
+          calendar grid beside it absorbs all the extra room.
+        */}
+        <aside className="min-h-0 w-[min(24vw,34rem)] flex-shrink-0 overflow-y-auto border-l border-border-strong">
           <CalendarDayPanel
             day={selectedDay}
             sections={daySections}

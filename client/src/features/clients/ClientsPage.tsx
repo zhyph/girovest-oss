@@ -255,9 +255,16 @@ export function ClientsPage() {
           }
         />
 
+        {/*
+          Width scales with the viewport instead of a flat 520px on every
+          screen — the list beside it already takes whatever's left via
+          flex-1, so a wider window gives more room to both, but this panel
+          specifically grows rather than staying fixed while the list
+          absorbs everything.
+        */}
         <aside
           data-tour="clients.detail"
-          className="min-h-0 w-130 flex-shrink-0 overflow-y-auto border-l border-border-strong"
+          className="min-h-0 w-[min(28vw,40rem)] flex-shrink-0 overflow-y-auto border-l border-border-strong"
         >
           <ClientDetailPanel
             client={selected}

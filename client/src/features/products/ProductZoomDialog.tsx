@@ -147,13 +147,21 @@ function ProductZoomPanel({ product, onClose }: { product: Product; onClose: () 
 
   return (
     <Dialog open onOpenChange={(nextOpen) => !nextOpen && onClose()}>
+      {/*
+        Both panes below scale with the viewport instead of sitting at one
+        fixed pixel size on every screen — the outer max-w grows to match, so
+        a large monitor gets an actually-larger zoom, not the same small box
+        centered in more empty space.
+      */}
       <DialogContent
         showCloseButton={false}
         aria-describedby={undefined}
         data-tour-target="product-zoom"
-        className="flex w-auto gap-0 overflow-hidden p-0 sm:max-w-[42rem]"
+        className="flex w-auto gap-0 overflow-hidden p-0 sm:max-w-[min(92vw,56rem)]"
       >
-        <div className="relative flex h-115 w-90 flex-shrink-0 items-center justify-center bg-surface-sunken">
+        {/* aspect-ratio keeps the photo's crop consistent across sizes; only its
+            overall size (driven by height) responds to the viewport. */}
+        <div className="relative flex h-[min(65vh,32rem)] aspect-[90/115] flex-shrink-0 items-center justify-center bg-surface-sunken">
           {currentPhoto ? (
             <AuthenticatedPhoto url={currentPhoto} alt={product.name} className="size-full object-cover" />
           ) : (
@@ -187,7 +195,7 @@ function ProductZoomPanel({ product, onClose }: { product: Product; onClose: () 
           )}
         </div>
 
-        <div className="flex w-75 flex-shrink-0 flex-col">
+        <div className="flex w-[min(35vw,22rem)] flex-shrink-0 flex-col">
           <div className="flex items-start justify-between gap-3 border-b border-border px-4 pt-4 pb-3">
             <div className="flex min-w-0 flex-col gap-0.5">
               <DialogTitle className="truncate">{product.name}</DialogTitle>
