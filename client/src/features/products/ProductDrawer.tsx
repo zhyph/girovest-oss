@@ -306,7 +306,14 @@ export function ProductDrawer({
 
   return (
     <Sheet open onOpenChange={(next) => !next && discardGuard.requestClose()}>
-      <SheetContent className="w-80" aria-describedby={undefined}>
+      {/*
+        w-full below sm so a narrow window gets the whole width rather than
+        overflowing it (SheetContent has no built-in width cap of its own,
+        unlike Dialog). From sm up, width scales with the viewport instead of
+        sitting at one fixed pixel value on every screen — this drawer holds
+        a full form plus the photo list, which felt cramped at a flat 320px.
+      */}
+      <SheetContent className="w-full sm:w-[min(85vw,28rem)]" aria-describedby={undefined}>
         <SheetHeader>
           <SheetTitle>{drawerTitle}</SheetTitle>
           <SheetClose aria-label={t('common:actions.close', { ns: 'common' })}>
