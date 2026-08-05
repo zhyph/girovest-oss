@@ -2,8 +2,8 @@ import * as React from "react"
 import { XIcon } from "lucide-react"
 import { Dialog as DialogPrimitive } from "radix-ui"
 
-import { cn } from "@/lib/cn"
-import { Button } from "@/components/ui/button"
+import { cn } from "../../lib/cn.ts"
+import { Button } from "./button.tsx"
 
 function Dialog({
   ...props
