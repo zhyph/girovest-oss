@@ -64,6 +64,17 @@ export default defineConfig({
   renderer: {
     root: '.',
     plugins: [react(), tailwindcss()],
+    // Matches client/vite.config.ts's own alias. Nothing in src/ currently
+    // uses it (every file was converted to relative imports — see
+    // dialog.tsx's own history), but shadcn's CLI writes `@/...` imports by
+    // default for anything newly added, and this config silently lacking
+    // the alias is exactly how that broke the Electron renderer build last
+    // time without breaking the plain web build, which does have it.
+    resolve: {
+      alias: {
+        '@': resolve(__dirname, 'src'),
+      },
+    },
     build: {
       rollupOptions: {
         input: { index: resolve(__dirname, 'index.html') },
