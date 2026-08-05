@@ -23,6 +23,13 @@ export interface ChangelogRelease {
  */
 export const RELEASES: ChangelogRelease[] = [
   {
+    version: '0.12.1',
+    date: '2026-08-05',
+    items: [
+      { kind: 'fixed', text: 'Corrigido: o aplicativo de computador não abria corretamente em algumas instalações, e o seletor de fotos não respondia ao clique.' },
+    ],
+  },
+  {
     version: '0.12.0',
     date: '2026-08-05',
     headline: 'O aplicativo inteiro foi redesenhado: telas mais claras, fotos em todo lugar, e alguns cálculos que agora fazem sozinhos o que a loja já fazia na mão.',
