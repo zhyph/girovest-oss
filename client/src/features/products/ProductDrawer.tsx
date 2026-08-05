@@ -455,11 +455,20 @@ export function ProductDrawer({
             else, which is not a thing this app ever offered. The native input
             stays out of the layout and is driven by a button styled like
             every other control here.
+
+            No `accept="image/*"`: on this app's packaged Linux build,
+            Chromium's native file-chooser silently refuses to open at all
+            when an `accept` filter is present (confirmed by isolating a bare
+            `<input type="file" accept="image/*">` — reproducible with no
+            React/Electron involved beyond the input itself; dropping just
+            `accept` fixes it, `multiple` alone is fine). Filtering to images
+            doesn't rely on this attribute anyway — addPickedPhotos already
+            rejects non-image files by their real MIME type, and the server
+            independently verifies JPEG content by magic number.
           */}
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*"
             multiple
             className="sr-only"
             aria-label={t('photos.add')}
