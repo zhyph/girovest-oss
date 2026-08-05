@@ -6,9 +6,10 @@ import { MemoryRouter, useLocation } from 'react-router'
 import '../../i18n.ts'
 import { ClientsPage } from './ClientsPage.tsx'
 import * as useClientsModule from './useClients.ts'
-import * as useContractsModule from '../contracts/useContracts.ts'
+import * as useClientContractsModule from './useClientContracts.ts'
 import * as useProductsModule from '../products/useProducts.ts'
 import type { Contract } from '../contracts/contractSchemas.ts'
+import type { Client } from './clientSchemas.ts'
 import { Toaster } from '../../components/ui/sonner.tsx'
 
 // The "Novo contrato" shortcut navigates, and the page mounts inside a router
@@ -31,10 +32,33 @@ function renderWithQueryClient(ui: React.ReactElement) {
   )
 }
 
-function mockContracts(contracts: Contract[]) {
-  vi.spyOn(useContractsModule, 'useContractsList').mockReturnValue({
-    data: { contracts, total: contracts.length, page: 1, pageSize: 200 },
-    isPending: false,
+// contractCount/lastRentalProductId/lastRentalDate default to "never
+// rented" — the same shape a brand-new client's row actually carries — so
+// every test only has to state the fields it cares about.
+function makeClient(overrides: Partial<Client> & Pick<Client, 'id' | 'name'>): Client {
+  return {
+    phone: '119',
+    email: 'x@x.com',
+    notes: '',
+    createdAt: '2026-01-01',
+    identityDocuments: [],
+    addressLines: [],
+    hasAllocationHistory: false,
+    contractCount: 0,
+    lastRentalProductId: null,
+    lastRentalDate: null,
+    ...overrides,
+  } as Client
+}
+
+// ClientDetailPanel fetches its own history for whichever client is
+// selected — this stands in for that request. Defaults to an empty,
+// already-resolved history so tests that don't care about it don't have to
+// mock it explicitly.
+function mockClientHistory(contracts: Contract[] = [], isPending = false) {
+  vi.spyOn(useClientContractsModule, 'useClientContractHistory').mockReturnValue({
+    data: contracts,
+    isPending,
   } as never)
 }
 
@@ -58,15 +82,13 @@ function contract(id: string, clientId: string, allocations: { productId: string
 
 describe('ClientsPage', () => {
   beforeEach(() => {
-    // Default: nothing rented and no catalogue, so the tests that predate the
-    // rental columns keep describing exactly what they always described.
-    mockContracts([])
+    mockClientHistory()
     vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [] } as never)
   })
 
   it('lists clients and opens the drawer in create mode when "Novo" is clicked', async () => {
     vi.spyOn(useClientsModule, 'useClients').mockReturnValue({
-      data: [{ id: '1', name: 'Maria Silva', phone: '119', email: 'm@x.com', notes: '', createdAt: '2026-01-01' }],
+      data: [makeClient({ id: '1', name: 'Maria Silva' })],
       isLoading: false,
     } as never)
 
@@ -79,7 +101,7 @@ describe('ClientsPage', () => {
 
   it('fills the detail panel when a row is clicked, without opening the drawer', async () => {
     vi.spyOn(useClientsModule, 'useClients').mockReturnValue({
-      data: [{ id: '1', name: 'Maria Silva', phone: '119', email: 'm@x.com', notes: '', createdAt: '2026-01-01' }],
+      data: [makeClient({ id: '1', name: 'Maria Silva', email: 'm@x.com' })],
       isLoading: false,
     } as never)
 
@@ -103,7 +125,7 @@ describe('ClientsPage', () => {
 
   it('opens the drawer pre-filled from the panel Editar button', async () => {
     vi.spyOn(useClientsModule, 'useClients').mockReturnValue({
-      data: [{ id: '1', name: 'Maria Silva', phone: '119', email: 'm@x.com', notes: '', createdAt: '2026-01-01' }],
+      data: [makeClient({ id: '1', name: 'Maria Silva' })],
       isLoading: false,
     } as never)
 
@@ -119,8 +141,8 @@ describe('ClientsPage', () => {
   it('marks the selected row so it stays identifiable while the panel is read', async () => {
     vi.spyOn(useClientsModule, 'useClients').mockReturnValue({
       data: [
-        { id: '1', name: 'Maria Silva', phone: '119', email: 'm@x.com', notes: '', createdAt: '2026-01-01' },
-        { id: '2', name: 'Beatriz Costa', phone: '118', email: 'b@x.com', notes: '', createdAt: '2026-01-01' },
+        makeClient({ id: '1', name: 'Maria Silva' }),
+        makeClient({ id: '2', name: 'Beatriz Costa' }),
       ],
       isLoading: false,
     } as never)
@@ -137,8 +159,8 @@ describe('ClientsPage', () => {
   it('groups the list alphabetically with a sticky letter heading', () => {
     vi.spyOn(useClientsModule, 'useClients').mockReturnValue({
       data: [
-        { id: '1', name: 'Maria Silva', phone: '119', email: 'm@x.com', notes: '', createdAt: '2026-01-01' },
-        { id: '2', name: 'Beatriz Costa', phone: '118', email: 'b@x.com', notes: '', createdAt: '2026-01-01' },
+        makeClient({ id: '1', name: 'Maria Silva' }),
+        makeClient({ id: '2', name: 'Beatriz Costa' }),
       ],
       isLoading: false,
     } as never)
@@ -153,8 +175,8 @@ describe('ClientsPage', () => {
   it('filters the list by name, phone, or email as the search box is typed into', async () => {
     vi.spyOn(useClientsModule, 'useClients').mockReturnValue({
       data: [
-        { id: '1', name: 'Maria Silva', phone: '11999990000', email: 'maria@x.com', notes: '', createdAt: '2026-01-01' },
-        { id: '2', name: 'Beatriz Costa', phone: '11888880000', email: 'beatriz@x.com', notes: '', createdAt: '2026-01-01' },
+        makeClient({ id: '1', name: 'Maria Silva', phone: '11999990000', email: 'maria@x.com' }),
+        makeClient({ id: '2', name: 'Beatriz Costa', phone: '11888880000', email: 'beatriz@x.com' }),
       ],
       isLoading: false,
     } as never)
@@ -171,7 +193,7 @@ describe('ClientsPage', () => {
 
   it('shows a no-results message when the search matches nothing', async () => {
     vi.spyOn(useClientsModule, 'useClients').mockReturnValue({
-      data: [{ id: '1', name: 'Maria Silva', phone: '119', email: 'm@x.com', notes: '', createdAt: '2026-01-01' }],
+      data: [makeClient({ id: '1', name: 'Maria Silva' })],
       isLoading: false,
     } as never)
 
@@ -183,7 +205,7 @@ describe('ClientsPage', () => {
 
   it('keeps the header and search pinned outside the scrollable list region', () => {
     vi.spyOn(useClientsModule, 'useClients').mockReturnValue({
-      data: [{ id: '1', name: 'Maria Silva', phone: '119', email: 'm@x.com', notes: '', createdAt: '2026-01-01' }],
+      data: [makeClient({ id: '1', name: 'Maria Silva' })],
       isLoading: false,
     } as never)
 
@@ -200,8 +222,8 @@ describe('ClientsPage', () => {
   it('shows the last rented piece and the contract count instead of the e-mail', () => {
     vi.spyOn(useClientsModule, 'useClients').mockReturnValue({
       data: [
-        { id: '1', name: 'Maria Silva', phone: '119', email: 'm@x.com', notes: '', createdAt: '2026-01-01' },
-        { id: '2', name: 'Beatriz Costa', phone: '118', email: 'b@x.com', notes: '', createdAt: '2026-01-01' },
+        makeClient({ id: '1', name: 'Maria Silva', contractCount: 2, lastRentalProductId: 'p2', lastRentalDate: '2026-02-14' }),
+        makeClient({ id: '2', name: 'Beatriz Costa' }),
       ],
       isLoading: false,
     } as never)
@@ -211,10 +233,6 @@ describe('ClientsPage', () => {
         { id: 'p2', name: 'Vestido Curto Rosa', photos: [] },
       ],
     } as never)
-    mockContracts([
-      contract('c1', '1', [{ productId: 'p1', checkoutDate: '2025-06-10' }]),
-      contract('c2', '1', [{ productId: 'p2', checkoutDate: '2026-02-14' }]),
-    ])
 
     renderWithQueryClient(<ClientsPage />)
 
@@ -223,10 +241,11 @@ describe('ClientsPage', () => {
     expect(header).toHaveTextContent('Contratos')
     expect(header).not.toHaveTextContent('E-mail')
 
-    // The later checkout wins, not the later contract row.
+    // These come straight off the client record now — lastRentalProductId
+    // is already "whichever allocation was most recent", computed server
+    // side, not recomputed here from a list of contracts.
     const maria = screen.getByText('Maria Silva').closest('.border-hairline') as HTMLElement
     expect(within(maria).getByText('Vestido Curto Rosa')).toBeInTheDocument()
-    expect(within(maria).queryByText('Vestido Longo Verde')).not.toBeInTheDocument()
     expect(within(maria).getByText('2')).toBeInTheDocument()
 
     const beatriz = screen.getByText('Beatriz Costa').closest('.border-hairline') as HTMLElement
@@ -234,38 +253,14 @@ describe('ClientsPage', () => {
     expect(within(beatriz).getByText('0')).toBeInTheDocument()
   })
 
-  it('CRITICAL: does not claim "Nunca alugou" or 0 while the contracts are still loading', () => {
-    vi.spyOn(useClientsModule, 'useClients').mockReturnValue({
-      data: [{ id: '1', name: 'Maria Silva', phone: '119', email: 'm@x.com', notes: '', createdAt: '2026-01-01' }],
-      isLoading: false,
-    } as never)
-    vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [] } as never)
-    // Clients have landed, contracts have not — the ordinary first paint,
-    // since the two are separate queries. Both facts in this row come from
-    // the contracts one, so neither can be stated yet. Same guard
-    // ClientDetailPanel already applies to its own contract count.
-    vi.spyOn(useContractsModule, 'useContractsList').mockReturnValue({ data: undefined, isPending: true } as never)
-
-    renderWithQueryClient(<ClientsPage />)
-
-    const maria = screen.getByText('Maria Silva').closest('.border-hairline') as HTMLElement
-    expect(within(maria).queryByText('Nunca alugou')).not.toBeInTheDocument()
-    expect(within(maria).queryByText('0')).not.toBeInTheDocument()
-  })
-
   it('adds the contract count to the detail panel subtitle, pluralised', async () => {
     vi.spyOn(useClientsModule, 'useClients').mockReturnValue({
       data: [
-        { id: '1', name: 'Maria Silva', phone: '119', email: 'm@x.com', notes: '', createdAt: '2026-01-01' },
-        { id: '2', name: 'Beatriz Costa', phone: '118', email: 'b@x.com', notes: '', createdAt: '2026-01-01' },
+        makeClient({ id: '1', name: 'Maria Silva', contractCount: 2 }),
+        makeClient({ id: '2', name: 'Beatriz Costa', contractCount: 1 }),
       ],
       isLoading: false,
     } as never)
-    mockContracts([
-      contract('c1', '1', [{ productId: 'p1', checkoutDate: '2025-06-10' }]),
-      contract('c2', '1', [{ productId: 'p2', checkoutDate: '2026-02-14' }]),
-      contract('c3', '2', [{ productId: 'p1', checkoutDate: '2026-01-05' }]),
-    ])
 
     renderWithQueryClient(<ClientsPage />)
     const panel = document.querySelector('aside') as HTMLElement
@@ -278,10 +273,46 @@ describe('ClientsPage', () => {
     expect(within(panel).getByText('Cliente desde janeiro de 2026 · 1 contrato')).toBeInTheDocument()
   })
 
+  it('CRITICAL: does not claim "sem histórico" in the panel while this client\'s own history query is still loading', async () => {
+    vi.spyOn(useClientsModule, 'useClients').mockReturnValue({
+      data: [makeClient({ id: '1', name: 'Maria Silva', contractCount: 2 })],
+      isLoading: false,
+    } as never)
+    // The client record already says she has 2 contracts (a fact from the
+    // clients query, already loaded) — but her actual history rows come
+    // from a SEPARATE, still in-flight, per-client request. The panel must
+    // not render "sem histórico" against that gap.
+    mockClientHistory([], true)
+
+    renderWithQueryClient(<ClientsPage />)
+    await userEvent.click(screen.getByText('Maria Silva'))
+
+    const panel = document.querySelector('aside') as HTMLElement
+    expect(within(panel).getByText('Cliente desde janeiro de 2026 · 2 contratos')).toBeInTheDocument()
+    expect(within(panel).queryByText(/sem histórico|nunca alugou/i)).not.toBeInTheDocument()
+  })
+
+  it('renders the fetched history rows once the per-client request resolves', async () => {
+    vi.spyOn(useClientsModule, 'useClients').mockReturnValue({
+      data: [makeClient({ id: '1', name: 'Maria Silva', contractCount: 1 })],
+      isLoading: false,
+    } as never)
+    vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({
+      data: [{ id: 'p1', name: 'Vestido Longo Verde', photos: [] }],
+    } as never)
+    mockClientHistory([contract('c1', '1', [{ productId: 'p1', checkoutDate: '2026-02-14' }])])
+
+    renderWithQueryClient(<ClientsPage />)
+    await userEvent.click(screen.getByText('Maria Silva'))
+
+    const panel = document.querySelector('aside') as HTMLElement
+    expect(within(panel).getByText('Vestido Longo Verde')).toBeInTheDocument()
+  })
+
   it('offers deleting the client from the panel more-actions menu', async () => {
     const deleteClient = vi.fn().mockResolvedValue(undefined)
     vi.spyOn(useClientsModule, 'useClients').mockReturnValue({
-      data: [{ id: '1', name: 'Maria Silva', phone: '119', email: 'm@x.com', notes: '', createdAt: '2026-01-01' }],
+      data: [makeClient({ id: '1', name: 'Maria Silva' })],
       isLoading: false,
     } as never)
     vi.spyOn(useClientsModule, 'useDeleteClient').mockReturnValue({
@@ -306,7 +337,7 @@ describe('ClientsPage', () => {
 
   it('sends the rental-history shortcut to the new-contract flow', async () => {
     vi.spyOn(useClientsModule, 'useClients').mockReturnValue({
-      data: [{ id: '1', name: 'Maria Silva', phone: '119', email: 'm@x.com', notes: '', createdAt: '2026-01-01' }],
+      data: [makeClient({ id: '1', name: 'Maria Silva' })],
       isLoading: false,
     } as never)
 
@@ -324,16 +355,14 @@ describe('ClientsPage', () => {
 
   it('paginates the list rather than letting it run on forever', async () => {
     vi.spyOn(useClientsModule, 'useClients').mockReturnValue({
-      data: Array.from({ length: 25 }, (_, index) => ({
-        id: String(index),
-        // Zero-padded so alphabetical order matches the numeric order the
-        // assertions below read it in.
-        name: `Cliente ${String(index).padStart(2, '0')}`,
-        phone: '119',
-        email: `c${index}@x.com`,
-        notes: '',
-        createdAt: '2026-01-01',
-      })),
+      data: Array.from({ length: 25 }, (_, index) =>
+        makeClient({
+          id: String(index),
+          // Zero-padded so alphabetical order matches the numeric order the
+          // assertions below read it in.
+          name: `Cliente ${String(index).padStart(2, '0')}`,
+        }),
+      ),
       isLoading: false,
     } as never)
 
@@ -355,14 +384,9 @@ describe('ClientsPage', () => {
 
   it('returns to the first page when the search changes', async () => {
     vi.spyOn(useClientsModule, 'useClients').mockReturnValue({
-      data: Array.from({ length: 25 }, (_, index) => ({
-        id: String(index),
-        name: `Cliente ${String(index).padStart(2, '0')}`,
-        phone: '119',
-        email: `c${index}@x.com`,
-        notes: '',
-        createdAt: '2026-01-01',
-      })),
+      data: Array.from({ length: 25 }, (_, index) =>
+        makeClient({ id: String(index), name: `Cliente ${String(index).padStart(2, '0')}` }),
+      ),
       isLoading: false,
     } as never)
 

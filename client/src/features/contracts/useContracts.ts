@@ -1,6 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { apiFetch, BACKGROUND_REQUEST_INIT } from '../../lib/api.ts'
 import { overdueAsOf } from '../../lib/date.ts'
+import { CLIENTS_KEY } from '../clients/useClients.ts'
 import type { Contract, ContractDetail, NewContractFormValues, SigningTokenResponse } from './contractSchemas.ts'
 
 export const CONTRACTS_KEY = ['contracts']
@@ -62,6 +63,11 @@ function invalidateAfterMutation(queryClient: QueryClient) {
   queryClient.invalidateQueries({ queryKey: CONTRACTS_KEY })
   queryClient.invalidateQueries({ queryKey: ['calendar'] })
   queryClient.invalidateQueries({ queryKey: ['products'] })
+  // A create/cancel changes the contractCount and lastRental embedded on the
+  // client record now that Clientes gets those from the server instead of
+  // deriving them from a client-side fetch of every contract — this prefix
+  // also covers useClientContractHistory's ['clients', id, 'contracts'] keys.
+  queryClient.invalidateQueries({ queryKey: CLIENTS_KEY })
 }
 
 export function useCreateContract() {

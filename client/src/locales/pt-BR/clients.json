@@ -42,7 +42,6 @@
   "noResults": "Nenhum cliente encontrado para essa busca.",
   "detail": {
     "pickClient": "Selecione um cliente na lista para ver o cadastro e o histórico.",
-    "since": "Cliente desde {{date}}",
     "sinceWithContracts_one": "Cliente desde {{date}} · {{count}} contrato",
     "sinceWithContracts_other": "Cliente desde {{date}} · {{count}} contratos",
     "contactAndDocuments": "Contato e documentos",

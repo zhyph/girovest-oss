@@ -9,6 +9,7 @@ import type { Client } from './clientSchemas.ts'
 const created: Client = {
   id: 'c-new', name: 'Nova Cliente', phone: '11999990000', email: '', notes: '',
   identityDocuments: [], addressLines: [], hasAllocationHistory: false, createdAt: '2026-07-31',
+  contractCount: 0, lastRentalProductId: null, lastRentalDate: null,
 }
 
 function renderWithClient<T>(hook: () => T, queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })) {

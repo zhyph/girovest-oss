@@ -26,11 +26,13 @@ const readyClient: Client = {
     { id: 'a4', label: 'Estado', value: 'SP', sortOrder: 3, maskKey: null },
   ],
   hasAllocationHistory: false, createdAt: '2026-01-01',
+  contractCount: 0, lastRentalProductId: null, lastRentalDate: null,
 }
 
 const incompleteClient: Client = {
   id: 'c2', name: 'Joana Incompleta', phone: '11988888888', email: 'j@example.com', notes: '',
   identityDocuments: [], addressLines: [], hasAllocationHistory: false, createdAt: '2026-01-01',
+  contractCount: 0, lastRentalProductId: null, lastRentalDate: null,
 }
 
 const product = {
@@ -301,6 +303,7 @@ describe('inline client creation', () => {
     const created: Client = {
       id: 'c-new', name: 'Cliente Novo', phone: '11999990000', email: '', notes: '',
       identityDocuments: [], addressLines: [], hasAllocationHistory: false, createdAt: '2026-07-31',
+      contractCount: 0, lastRentalProductId: null, lastRentalDate: null,
     }
     let serverClients: Client[] = [readyClient, incompleteClient]
     const apiFetchSpy = vi.spyOn(apiModule, 'apiFetch').mockImplementation((async (path: string, init: RequestInit = {}) => {
@@ -402,6 +405,7 @@ describe('inline client and product creation together', () => {
     const newClient: Client = {
       id: 'c-combo', name: 'Cliente Combo', phone: '11999990000', email: '', notes: '',
       identityDocuments: [], addressLines: [], hasAllocationHistory: false, createdAt: '2026-07-31',
+      contractCount: 0, lastRentalProductId: null, lastRentalDate: null,
     }
     const newProduct = {
       id: 'p-combo', locationId: 'l1', name: 'Produto Combo', description: '', category: 'festa', size: 'G', color: 'rosa',

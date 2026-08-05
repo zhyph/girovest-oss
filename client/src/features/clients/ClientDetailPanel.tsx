@@ -10,7 +10,7 @@ import { useLocale } from '../../lib/LocaleContext.tsx'
 import { formatCurrency, getLocaleConfig } from '../../lib/locale.ts'
 import { useProducts } from '../products/useProducts.ts'
 import { useProductZoom, PhotoZoomButton } from '../products/ProductZoomDialog.tsx'
-import type { Contract } from '../contracts/contractSchemas.ts'
+import { useClientContractHistory } from './useClientContracts.ts'
 import type { Client } from './clientSchemas.ts'
 
 function DetailRow({ label, value }: { label: string; value: string }) {
@@ -24,22 +24,11 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 
 export function ClientDetailPanel({
   client,
-  contracts,
-  contractsLoading,
   onEdit,
   onDelete,
   onNewContract,
 }: {
   client: Client | null
-  /** Every contract of the location; this panel keeps only the client's own. */
-  contracts: Contract[]
-  /**
-   * Whether `contracts` reflects an in-flight query rather than the location's
-   * actual (possibly genuinely empty) contract history. `contracts.length ===
-   * 0` cannot answer that on its own — a freshly-installed shop with truly no
-   * contracts anywhere would read as "still loading" forever.
-   */
-  contractsLoading: boolean
   onEdit: (client: Client) => void
   onDelete?: (client: Client) => void
   onNewContract?: (client: Client) => void
@@ -49,23 +38,19 @@ export function ClientDetailPanel({
   const currency = getLocaleConfig(locale).currency
   const { data: products } = useProducts()
   const { openZoom, zoomDialog } = useProductZoom()
+  // Fetched per-client, on demand — this panel used to filter the whole
+  // location's contract list down to one client's own; now it only ever
+  // asks the server for the one client actually on screen.
+  const { data: clientContracts, isPending: historyPending } = useClientContractHistory(client?.id ?? null)
 
   const productsById = useMemo(
     () => new Map((products ?? []).map((product) => [product.id, product])),
     [products],
   )
 
-  // Matched on clientId, never on name: the list this comes from is shared
-  // with the Contratos screen, and two clients with similar names must not
-  // bleed into each other's history.
-  const clientContracts = useMemo(
-    () => (client ? contracts.filter((contract) => contract.clientId === client.id) : []),
-    [client, contracts],
-  )
-
   const history = useMemo(
     () =>
-      clientContracts
+      (clientContracts ?? [])
         .flatMap((contract) =>
           contract.allocations.map((allocation) => ({
             key: allocation.id,
@@ -96,21 +81,16 @@ export function ClientDetailPanel({
           <span className="text-heading">{client.name}</span>
           <span className="text-meta text-muted-foreground">
             {/*
-              Falls back to the bare "Cliente desde" while the contracts query
-              is in flight — gated on contractsLoading, not on contracts being
-              empty, so a shop with genuinely zero contracts anywhere still
-              resolves to "0 contratos" instead of looking permanently stuck
-              loading. Printing "0 contratos" against an in-flight query would
-              be a claim the panel cannot yet stand behind.
+              client.contractCount comes from the same request that loaded
+              the client itself (see clientSchemas.ts), so there is no
+              separate "is the count loaded yet" state to gate on here — by
+              the time this panel can render a client at all, its count is
+              already known, including a genuine zero.
             */}
-            {contractsLoading
-              ? t('detail.since', {
-                  date: formatDate(parseDateOnly(client.createdAt), locale, { month: 'long', year: 'numeric' }),
-                })
-              : t('detail.sinceWithContracts', {
-                  date: formatDate(parseDateOnly(client.createdAt), locale, { month: 'long', year: 'numeric' }),
-                  count: clientContracts.length,
-                })}
+            {t('detail.sinceWithContracts', {
+              date: formatDate(parseDateOnly(client.createdAt), locale, { month: 'long', year: 'numeric' }),
+              count: client.contractCount,
+            })}
           </span>
         </div>
         <div className="flex flex-shrink-0 gap-1.5">
@@ -168,11 +148,13 @@ export function ClientDetailPanel({
           )}
         </div>
         {history.length === 0 ? (
-          // Same distinction as the "since" line above: while the query is
-          // still in flight, an empty `history` says nothing about whether
-          // this client has rentals — render nothing rather than a "never
-          // rented" claim the panel cannot yet back up.
-          contractsLoading ? null : <p className="text-meta text-muted-foreground">{t('detail.noHistory')}</p>
+          // While this client's own history query is still in flight, an
+          // empty `history` says nothing about whether she has rentals —
+          // render nothing rather than a "never rented" claim the panel
+          // cannot yet back up. Once it resolves, an empty result is a real
+          // fact (client.contractCount already told the subtitle above this
+          // exact thing, from a different, already-loaded request).
+          historyPending ? null : <p className="text-meta text-muted-foreground">{t('detail.noHistory')}</p>
         ) : (
           <div className="overflow-hidden rounded-panel border border-border">
             {history.map((entry) => {
