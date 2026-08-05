@@ -366,18 +366,24 @@ export function NewContractForm({
         format, two sizes — never two different forms, which is how the
         contract flow reached its previous state.
 
-        The height is FIXED, not grown: the dialog used to get taller with
-        every piece and every parcela until the Salvar button walked off the
-        bottom of a laptop screen — on the one form this shop fills in most.
-        Peças and Parcelas each scroll inside their own bordered box instead,
-        so the header, the totals and the two buttons never move.
-        `max-h` still caps it below the fixed height on a short screen.
+        The height does not grow with CONTENT: the dialog used to get taller
+        with every piece and every parcela until the Salvar button walked off
+        the bottom of a laptop screen — on the one form this shop fills in
+        most. Peças and Parcelas each scroll inside their own bordered box
+        instead, so the header, the totals and the two buttons never move,
+        no matter how many rows either list holds.
+
+        It DOES scale with the SCREEN, though — both dimensions are viewport
+        percentages capped at a sensible maximum, not fixed rem values, so a
+        1440p monitor gets a dialog sized for it instead of the same box a
+        1280×800 laptop gets, and a short/narrow window still shrinks to fit
+        without the old separate `max-h` override.
       */}
       <DialogContent
         showCloseButton={false}
         className={cn(
-          'flex h-[34.5rem] max-h-[calc(100vh-5rem)] flex-col gap-0 overflow-hidden p-0',
-          items.fields.length > 4 ? 'sm:max-w-[68rem]' : 'sm:max-w-[46rem]',
+          'flex h-[min(85vh,46rem)] flex-col gap-0 overflow-hidden p-0',
+          items.fields.length > 4 ? 'sm:max-w-[min(90vw,76rem)]' : 'sm:max-w-[min(90vw,50rem)]',
         )}
       >
         <div className="flex flex-shrink-0 items-start justify-between gap-4 px-5 pt-4 pb-3.5">
