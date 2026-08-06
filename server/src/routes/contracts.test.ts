@@ -33,7 +33,7 @@ beforeEach(async () => {
 const RELAY_ENV_KEYS = ['GIROVEST_UPDATE_URL', 'GIROVEST_UPDATE_KEY', 'GIROVEST_INSTALL_ID'] as const
 
 afterEach(async () => {
-  await prisma.installment.deleteMany()
+  await prisma.payment.deleteMany()
   await prisma.allocation.deleteMany()
   await prisma.contract.deleteMany()
   await prisma.product.deleteMany()
@@ -130,7 +130,6 @@ describe('POST /api/contracts', () => {
         eventDate: '2026-02-31',
         paymentMethod: 'PIX',
         items: [{ productId: product.id, checkoutDate: '2026-02-28', dueDate: '2026-03-02', priceCharged: 100 }],
-        installments: [],
       })
 
     expect(response.status).toBe(400)
@@ -154,15 +153,14 @@ describe('POST /api/contracts', () => {
         eventDate: '2026-10-03',
         paymentMethod: 'PIX',
         items: [{ productId: product.id, checkoutDate: '2026-04-31', dueDate: '2026-10-05', priceCharged: 100 }],
-        installments: [],
       })
 
     expect(response.status).toBe(400)
   })
 })
 
-describe('PATCH /api/contracts/:contractId/installments/:installmentId', () => {
-  async function createContractWithInstallment() {
+describe('POST /api/contracts/:contractId/payments', () => {
+  async function createBareContractViaApi() {
     const product = await prisma.product.create({
       data: {
         locationId, name: 'Vestido', category: 'Festa', size: 'M', color: 'Azul',
@@ -177,52 +175,120 @@ describe('PATCH /api/contracts/:contractId/installments/:installmentId', () => {
         eventDate: '2026-10-03',
         paymentMethod: 'PIX',
         items: [{ productId: product.id, checkoutDate: '2026-10-02', dueDate: '2026-10-05', priceCharged: 100 }],
-        installments: [{ dueDate: '2026-09-20', amount: 100 }],
       })
-    return response.body as { id: string; installments: { id: string }[] }
+    return response.body as { id: string; payments: { id: string }[] }
   }
 
-  it('marks an installment as paid', async () => {
-    const contract = await createContractWithInstallment()
+  it('logs a payment', async () => {
+    const contract = await createBareContractViaApi()
 
     const response = await request(app)
-      .patch(`/api/contracts/${contract.id}/installments/${contract.installments[0].id}`)
+      .post(`/api/contracts/${contract.id}/payments`)
       .set('Authorization', `Bearer ${staffToken}`)
-      .send({ paid: true })
+      .send({ amount: 100, method: 'PIX', paidAt: '2026-09-20' })
 
-    expect(response.status).toBe(200)
-    expect(response.body.installments[0].paid).toBe(true)
-    expect(response.body.installments[0].paidAt).not.toBeNull()
+    expect(response.status).toBe(201)
+    expect(response.body.payments).toHaveLength(1)
+    expect(response.body.payments[0]).toMatchObject({ amount: 100, method: 'PIX' })
   })
 
   it('requires authentication', async () => {
-    const contract = await createContractWithInstallment()
+    const contract = await createBareContractViaApi()
 
     const response = await request(app)
-      .patch(`/api/contracts/${contract.id}/installments/${contract.installments[0].id}`)
-      .send({ paid: true })
+      .post(`/api/contracts/${contract.id}/payments`)
+      .send({ amount: 100, method: 'PIX', paidAt: '2026-09-20' })
 
     expect(response.status).toBe(401)
   })
 
-  it('rejects a payload without a paid flag', async () => {
-    const contract = await createContractWithInstallment()
+  it('rejects a non-positive amount', async () => {
+    const contract = await createBareContractViaApi()
 
     const response = await request(app)
-      .patch(`/api/contracts/${contract.id}/installments/${contract.installments[0].id}`)
+      .post(`/api/contracts/${contract.id}/payments`)
       .set('Authorization', `Bearer ${staffToken}`)
-      .send({})
+      .send({ amount: 0, method: 'PIX', paidAt: '2026-09-20' })
 
     expect(response.status).toBe(400)
   })
 
-  it('404s for an installment that does not exist', async () => {
-    const contract = await createContractWithInstallment()
+  it('404s for a contract that does not exist', async () => {
+    const response = await request(app)
+      .post('/api/contracts/does-not-exist/payments')
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({ amount: 100, method: 'PIX', paidAt: '2026-09-20' })
+
+    expect(response.status).toBe(404)
+  })
+})
+
+describe('PATCH and DELETE /api/contracts/:contractId/payments/:paymentId', () => {
+  async function createContractWithPayment() {
+    const product = await prisma.product.create({
+      data: {
+        locationId, name: 'Vestido', category: 'Festa', size: 'M', color: 'Azul',
+        rentalPrice: 100, depositAmount: 50,
+      },
+    })
+    const created = await request(app)
+      .post('/api/contracts')
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({
+        clientId,
+        eventDate: '2026-10-03',
+        paymentMethod: 'PIX',
+        items: [{ productId: product.id, checkoutDate: '2026-10-02', dueDate: '2026-10-05', priceCharged: 100 }],
+      })
+    const withPayment = await request(app)
+      .post(`/api/contracts/${created.body.id}/payments`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({ amount: 100, method: 'PIX', paidAt: '2026-09-20' })
+    return withPayment.body as { id: string; payments: { id: string }[] }
+  }
+
+  it('corrects a logged payment', async () => {
+    const contract = await createContractWithPayment()
 
     const response = await request(app)
-      .patch(`/api/contracts/${contract.id}/installments/does-not-exist`)
+      .patch(`/api/contracts/${contract.id}/payments/${contract.payments[0].id}`)
       .set('Authorization', `Bearer ${staffToken}`)
-      .send({ paid: true })
+      .send({ amount: 120 })
+
+    expect(response.status).toBe(200)
+    expect(response.body.payments[0].amount).toBe(120)
+  })
+
+  it('removes a logged payment', async () => {
+    const contract = await createContractWithPayment()
+
+    const response = await request(app)
+      .delete(`/api/contracts/${contract.id}/payments/${contract.payments[0].id}`)
+      .set('Authorization', `Bearer ${staffToken}`)
+
+    expect(response.status).toBe(200)
+    expect(response.body.payments).toEqual([])
+  })
+
+  it('requires authentication', async () => {
+    const contract = await createContractWithPayment()
+
+    const patchResponse = await request(app)
+      .patch(`/api/contracts/${contract.id}/payments/${contract.payments[0].id}`)
+      .send({ amount: 120 })
+    expect(patchResponse.status).toBe(401)
+
+    const deleteResponse = await request(app).delete(`/api/contracts/${contract.id}/payments/${contract.payments[0].id}`)
+    expect(deleteResponse.status).toBe(401)
+  })
+
+  it('404s for a payment that does not exist', async () => {
+    const contract = await createContractWithPayment()
+
+    const response = await request(app)
+      .patch(`/api/contracts/${contract.id}/payments/does-not-exist`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({ amount: 120 })
 
     expect(response.status).toBe(404)
   })
@@ -307,28 +373,16 @@ describe('POST /api/contracts/:id/sign-token', () => {
   })
 })
 
-describe('GET /api/contracts/installments/receivable', () => {
-  it('answers with the window total and count', async () => {
-    const response = await request(app)
-      .get('/api/contracts/installments/receivable?from=2026-01-01&to=2026-12-31')
-      .set('Authorization', `Bearer ${staffToken}`)
+describe('GET /api/contracts/outstanding', () => {
+  it('answers with the running total', async () => {
+    const response = await request(app).get('/api/contracts/outstanding').set('Authorization', `Bearer ${staffToken}`)
 
     expect(response.status).toBe(200)
     expect(response.body).toEqual({ total: expect.any(Number), count: expect.any(Number) })
   })
 
-  it('rejects a malformed date instead of silently widening the window', async () => {
-    const response = await request(app)
-      .get('/api/contracts/installments/receivable?from=2026-02-31&to=2026-12-31')
-      .set('Authorization', `Bearer ${staffToken}`)
-
-    expect(response.status).toBe(400)
-  })
-
   it('requires authentication', async () => {
-    const response = await request(app).get(
-      '/api/contracts/installments/receivable?from=2026-01-01&to=2026-12-31',
-    )
+    const response = await request(app).get('/api/contracts/outstanding')
     expect(response.status).toBe(401)
   })
 })

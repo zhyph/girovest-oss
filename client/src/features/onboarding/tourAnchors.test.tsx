@@ -60,7 +60,7 @@ describe('tour anchors match rendered DOM', () => {
       dueBackToday: [] as never,
       overdue: [] as never,
       upcoming: [] as never,
-      receivablesThisWeek: { total: 0, count: 0 },
+      outstanding: { total: 0, count: 0 },
       leavingMaintenance: { count: 0, items: [] },
       isLoading: false,
       isError: false,

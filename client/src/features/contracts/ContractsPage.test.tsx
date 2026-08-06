@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router'
 import '../../i18n.ts'
-import { ContractsPage, canMarkInstallmentPaid } from './ContractsPage.tsx'
+import { ContractsPage } from './ContractsPage.tsx'
 import * as useContractsModule from './useContracts.ts'
 import * as useProductsModule from '../products/useProducts.ts'
 import * as useClientsModule from '../clients/useClients.ts'
@@ -45,11 +45,7 @@ const contract: Contract = {
       conditionNotesOut: null, conditionNotesIn: null, createdAt: '2026-09-01',
     },
   ],
-  // Deliberately a date already past: an instalment can only be settled from
-  // its due date onwards, so a future-dated fixture would describe a row whose
-  // "Marcar como pago" is correctly unavailable — not the ordinary case these
-  // tests are about.
-  installments: [{ id: 'i1', contractId: 'ct1', dueDate: '2026-01-20', amount: 380, paid: false, paidAt: null }],
+  payments: [],
 }
 
 const client = {
@@ -84,8 +80,10 @@ function mockHooks(
     contracts?: Contract[]
     cancelImpl?: (...args: never[]) => Promise<unknown>
     checkOutImpl?: Mock
-    setPaidImpl?: Mock
-    counts?: { all: number; active: number; overdue: number; unsigned: number }
+    createPaymentImpl?: Mock
+    updatePaymentImpl?: Mock
+    deletePaymentImpl?: Mock
+    counts?: { all: number; active: number; overdue: number; unsigned: number; outstanding: number }
   } = {},
 ) {
   const contracts = overrides.contracts ?? [contract]
@@ -95,7 +93,13 @@ function mockHooks(
       total: contracts.length,
       page: 1,
       pageSize: 20,
-      counts: overrides.counts ?? { all: contracts.length, active: contracts.length, overdue: 0, unsigned: contracts.length },
+      counts: overrides.counts ?? {
+        all: contracts.length,
+        active: contracts.length,
+        overdue: 0,
+        unsigned: contracts.length,
+        outstanding: contracts.length,
+      },
     },
     isLoading: false,
   } as never)
@@ -117,12 +121,22 @@ function mockHooks(
   } as never)
   vi.spyOn(useAllocationsModule, 'useReturnAllocation').mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
   vi.spyOn(useAllocationsModule, 'useCancelAllocation').mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
-  const setPaidImpl = overrides.setPaidImpl ?? vi.fn().mockResolvedValue(undefined)
-  vi.spyOn(useContractsModule, 'useSetInstallmentPaid').mockReturnValue({
-    mutateAsync: setPaidImpl,
+  const createPaymentImpl = overrides.createPaymentImpl ?? vi.fn().mockResolvedValue(undefined)
+  const updatePaymentImpl = overrides.updatePaymentImpl ?? vi.fn().mockResolvedValue(undefined)
+  const deletePaymentImpl = overrides.deletePaymentImpl ?? vi.fn().mockResolvedValue(undefined)
+  vi.spyOn(useContractsModule, 'useCreatePayment').mockReturnValue({
+    mutateAsync: createPaymentImpl,
     isPending: false,
   } as never)
-  return { checkOutImpl, setPaidImpl }
+  vi.spyOn(useContractsModule, 'useUpdatePayment').mockReturnValue({
+    mutateAsync: updatePaymentImpl,
+    isPending: false,
+  } as never)
+  vi.spyOn(useContractsModule, 'useDeletePayment').mockReturnValue({
+    mutateAsync: deletePaymentImpl,
+    isPending: false,
+  } as never)
+  return { checkOutImpl, createPaymentImpl, updatePaymentImpl, deletePaymentImpl }
 }
 
 async function openCheckOutDialog() {
@@ -280,23 +294,24 @@ describe('ContractsPage', () => {
     }
     mockHooks({ contracts: [returnedContract] })
     await renderAndSelect(<ContractsPage />)
-    await openHeaderActions()
-    expect(screen.queryByRole('menuitem', { name: 'Cancelar contrato' })).not.toBeInTheDocument()
+    // Nothing left to cancel: the "•••" menu that would hold it doesn't
+    // render at all, rather than opening to an empty list.
+    expect(screen.queryByRole('button', { name: 'Mais ações' })).not.toBeInTheDocument()
   })
 
   it('shows a sign-remotely action for an unsigned contract', async () => {
     mockHooks()
     await renderAndSelect(<ContractsPage />)
-    await openHeaderActions()
-    expect(screen.getByRole('menuitem', { name: 'Assinar remotamente' })).toBeInTheDocument()
+    // Its own visible button now, not tucked into "•••" — see
+    // ContractHeaderActions.
+    expect(screen.getByRole('button', { name: 'Assinar remotamente' })).toBeInTheDocument()
   })
 
   it('hides the sign-remotely action once the contract is signed', async () => {
     const signedContract: Contract = { ...contract, signatureStatus: 'signed' }
     mockHooks({ contracts: [signedContract] })
     await renderAndSelect(<ContractsPage />)
-    await openHeaderActions()
-    expect(screen.queryByRole('menuitem', { name: 'Assinar remotamente' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Assinar remotamente' })).not.toBeInTheDocument()
   })
 
   it('shows pagination controls and a search box, and searching resets to page 1', async () => {
@@ -471,12 +486,14 @@ describe('payments summary', () => {
     const panel = document.querySelector('aside') as HTMLElement
     // Three cells, each with its own label and figure — the assertion that
     // used to match "Total: R$ ..." as one string would still pass against a
-    // single condensed line, which is exactly what this replaced.
+    // single condensed line, which is exactly what this replaced. "Em
+    // aberto" legitimately appears twice here: once as the status badge next
+    // to "Pagamentos", once as the third tile's own label.
     expect(within(panel).getByText('Total')).toBeInTheDocument()
     expect(within(panel).getByText('Pago')).toBeInTheDocument()
-    expect(within(panel).getByText('Em aberto')).toBeInTheDocument()
+    expect(within(panel).getAllByText('Em aberto').length).toBe(2)
     expect(within(panel).getAllByText(/R\$/).length).toBeGreaterThanOrEqual(3)
-    expect(screen.getByText('0 de 1 pagas')).toBeInTheDocument()
+    expect(screen.getByText('Nenhum pagamento recebido até agora.')).toBeInTheDocument()
   })
 
   it('CRITICAL: leaves cancelled pieces out of the total the shop is owed', async () => {
@@ -497,8 +514,8 @@ describe('payments summary', () => {
             },
           ],
           // The client already paid for the piece that actually went out.
-          installments: [
-            { id: 'i1', contractId: 'ct1', dueDate: '2026-09-20', amount: 380, paid: true, paidAt: '2026-09-20' },
+          payments: [
+            { id: 'pm1', contractId: 'ct1', amount: 380, method: 'PIX', paidAt: '2026-09-20', createdAt: '2026-09-20' },
           ],
         },
       ],
@@ -506,6 +523,10 @@ describe('payments summary', () => {
     await renderAndSelect(<ContractsPage />)
 
     const panel = document.querySelector('aside') as HTMLElement
+    // The Intl-formatted figure separates "R$" and the amount with a
+    // non-breaking space, so both sides are normalised to a plain one before
+    // comparing against a hand-typed literal — same reasoning as this file's
+    // own currencyValue() helper.
     const figureUnder = (label: string) =>
       within(within(panel).getByText(label).parentElement as HTMLElement)
         .getByText(/R\$/)
@@ -517,131 +538,119 @@ describe('payments summary', () => {
     expect(figureUnder('Em aberto')).toBe('R$ 0,00')
   })
 
-  it('keeps the instalment rows collapsed so a 12x contract cannot swamp the list', async () => {
+  it('lists logged payments with their date, method and amount', async () => {
     mockHooks({
       contracts: [
         {
           ...contract,
-          installments: Array.from({ length: 12 }, (_, index) => ({
-            id: `i${index}`,
-            contractId: 'ct1',
-            dueDate: '2026-09-20',
-            amount: 100,
-            paid: false,
-            paidAt: null,
-          })),
+          payments: [
+            { id: 'pm1', contractId: 'ct1', amount: 200, method: 'PIX', paidAt: '2026-07-18', createdAt: '2026-07-18' },
+          ],
         },
       ],
     })
     await renderAndSelect(<ContractsPage />)
 
-    expect(screen.queryByRole('button', { name: 'Marcar como pago' })).not.toBeInTheDocument()
-    expect(screen.getByText('0 de 12 pagas')).toBeInTheDocument()
+    // Scoped to the row itself: with only this one payment, its amount
+    // happens to equal the "Pago" tile's own total too, and a page-wide
+    // query would find both.
+    const row = screen.getByText('18/07/2026').closest('li') as HTMLElement
+    expect(within(row).getByText('PIX')).toBeInTheDocument()
+    expect(within(row).getByText('R$ 200,00')).toBeInTheDocument()
   })
 
-  it('reveals the instalment rows when the summary is opened', async () => {
+  it('logs a new payment through the dialog, defaulting the amount to what is outstanding', async () => {
+    const { createPaymentImpl } = mockHooks()
+    await renderAndSelect(<ContractsPage />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar pagamento' }))
+    expect(currencyValue('Valor recebido')).toBe('R$ 380,00')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar pagamento' }))
+
+    expect(createPaymentImpl).toHaveBeenCalledWith({
+      contractId: 'ct1',
+      values: expect.objectContaining({ amount: 380, method: 'PIX' }),
+    })
+  })
+
+  it('edits a logged payment, prefilling its own amount rather than the outstanding balance', async () => {
+    const { updatePaymentImpl } = mockHooks({
+      contracts: [
+        {
+          ...contract,
+          payments: [
+            { id: 'pm1', contractId: 'ct1', amount: 200, method: 'PIX', paidAt: '2026-07-18', createdAt: '2026-07-18' },
+          ],
+        },
+      ],
+    })
+    await renderAndSelect(<ContractsPage />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Editar pagamento' }))
+    expect(currencyValue('Valor recebido')).toBe('R$ 200,00')
+
+    const amountField = screen.getByLabelText('Valor recebido')
+    await userEvent.clear(amountField)
+    await userEvent.type(amountField, '25000')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar pagamento' }))
+
+    expect(updatePaymentImpl).toHaveBeenCalledWith({
+      contractId: 'ct1',
+      paymentId: 'pm1',
+      values: expect.objectContaining({ amount: 250 }),
+    })
+  })
+
+  it('deletes a logged payment after confirming', async () => {
+    const { deletePaymentImpl } = mockHooks({
+      contracts: [
+        {
+          ...contract,
+          payments: [
+            { id: 'pm1', contractId: 'ct1', amount: 200, method: 'PIX', paidAt: '2026-07-18', createdAt: '2026-07-18' },
+          ],
+        },
+      ],
+    })
+    await renderAndSelect(<ContractsPage />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Excluir pagamento' }))
+    const dialog = screen.getByRole('dialog')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Excluir' }))
+
+    expect(deletePaymentImpl).toHaveBeenCalledWith({ contractId: 'ct1', paymentId: 'pm1' })
+  })
+
+  it('shows Devolver, not a negative Em aberto, once the client has paid more than the total', async () => {
+    mockHooks({
+      contracts: [
+        {
+          ...contract,
+          payments: [
+            { id: 'pm1', contractId: 'ct1', amount: 500, method: 'PIX', paidAt: '2026-07-18', createdAt: '2026-07-18' },
+          ],
+        },
+      ],
+    })
+    await renderAndSelect(<ContractsPage />)
+
+    const panel = document.querySelector('aside') as HTMLElement
+    expect(within(panel).getByText('Devolver')).toBeInTheDocument()
+    expect(within(panel).queryByText('Em aberto')).not.toBeInTheDocument()
+  })
+
+  it('previews an overpayment as "para devolver", not as a raw negative amount', async () => {
     mockHooks()
     await renderAndSelect(<ContractsPage />)
 
-    await userEvent.click(screen.getByRole('button', { name: /Pagamentos/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar pagamento' }))
+    const amountField = screen.getByLabelText('Valor recebido')
+    await userEvent.clear(amountField)
+    await userEvent.type(amountField, '100000')
 
-    expect(screen.getByRole('button', { name: 'Marcar como pago' })).toBeInTheDocument()
-  })
-
-  it('sends the paid flag for the instalment that was toggled', async () => {
-    const { setPaidImpl } = mockHooks({
-      contracts: [
-        {
-          ...contract,
-          installments: [{ id: 'i1', contractId: 'ct1', dueDate: '2026-01-20', amount: 380, paid: false, paidAt: null }],
-        },
-      ],
-    })
-    await renderAndSelect(<ContractsPage />)
-    await userEvent.click(screen.getByRole('button', { name: /Pagamentos/ }))
-
-    await userEvent.click(screen.getByRole('button', { name: 'Marcar como pago' }))
-
-    expect(setPaidImpl).toHaveBeenCalledWith({ contractId: 'ct1', installmentId: 'i1', paid: true })
-  })
-
-  /*
-    Money that has not been agreed to arrive yet cannot be marked as arrived.
-    The rows sit one under the other in a collapsed list, and the mis-click
-    this prevents — settling March's instalment while looking at February's —
-    leaves the contract reporting a balance the shop never collected. The
-    control stays visible and says why, because a button that vanishes reads
-    as a bug rather than as a rule.
-  */
-  it('CRITICAL: refuses to settle an instalment before its due date has arrived', async () => {
-    const { setPaidImpl } = mockHooks({
-      contracts: [
-        {
-          ...contract,
-          installments: [
-            { id: 'i1', contractId: 'ct1', dueDate: '2099-12-01', amount: 380, paid: false, paidAt: null },
-          ],
-        },
-      ],
-    })
-    await renderAndSelect(<ContractsPage />)
-    await userEvent.click(screen.getByRole('button', { name: /Pagamentos/ }))
-
-    const action = screen.getByRole('button', { name: /Só é possível marcar como pago a partir de 01\/12\/2099/ })
-    expect(action).toBeDisabled()
-    await userEvent.click(action)
-    expect(setPaidImpl).not.toHaveBeenCalled()
-  })
-
-  it('settles an instalment due today, not only one already overdue', async () => {
-    const today = new Date()
-    const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
-    const { setPaidImpl } = mockHooks({
-      contracts: [
-        {
-          ...contract,
-          installments: [{ id: 'i1', contractId: 'ct1', dueDate: iso, amount: 380, paid: false, paidAt: null }],
-        },
-      ],
-    })
-    await renderAndSelect(<ContractsPage />)
-    await userEvent.click(screen.getByRole('button', { name: /Pagamentos/ }))
-
-    await userEvent.click(screen.getByRole('button', { name: 'Marcar como pago' }))
-
-    expect(setPaidImpl).toHaveBeenCalledWith({ contractId: 'ct1', installmentId: 'i1', paid: true })
-  })
-
-  it('leaves undoing unrestricted, so a wrongly-settled future instalment can be taken back', async () => {
-    const { setPaidImpl } = mockHooks({
-      contracts: [
-        {
-          ...contract,
-          installments: [
-            { id: 'i1', contractId: 'ct1', dueDate: '2099-12-01', amount: 380, paid: true, paidAt: '2026-01-01' },
-          ],
-        },
-      ],
-    })
-    await renderAndSelect(<ContractsPage />)
-    await userEvent.click(screen.getByRole('button', { name: /Pagamentos/ }))
-
-    await userEvent.click(screen.getByRole('button', { name: 'Desmarcar' }))
-
-    expect(setPaidImpl).toHaveBeenCalledWith({ contractId: 'ct1', installmentId: 'i1', paid: false })
-  })
-})
-
-describe('canMarkInstallmentPaid', () => {
-  const today = new Date(2026, 7, 4)
-
-  it('allows the due day itself and every day after it', () => {
-    expect(canMarkInstallmentPaid('2026-08-04', today)).toBe(true)
-    expect(canMarkInstallmentPaid('2026-08-03', today)).toBe(true)
-  })
-
-  it('refuses tomorrow', () => {
-    expect(canMarkInstallmentPaid('2026-08-05', today)).toBe(false)
+    expect(screen.getByText('Fica R$ 620,00 para devolver')).toBeInTheDocument()
+    expect(screen.queryByText(/-R\$/)).not.toBeInTheDocument()
   })
 })
 
@@ -679,7 +688,7 @@ describe('status filter chips', () => {
     // Deliberately larger than the page: the counts describe every contract
     // the search matches, not the 20 rows that came back, which is the whole
     // reason they are computed server-side.
-    mockHooks({ counts: { all: 240, active: 96, overdue: 7, unsigned: 31 } })
+    mockHooks({ counts: { all: 240, active: 96, overdue: 7, unsigned: 31, outstanding: 50 } })
     renderWithProviders(<ContractsPage />)
 
     expect(await screen.findByRole('button', { name: /^Ativos\s*96$/ })).toBeInTheDocument()
@@ -690,7 +699,7 @@ describe('status filter chips', () => {
 
   it('asks the server for the picked view instead of narrowing the page in the browser', async () => {
     const listSpy = vi.fn().mockReturnValue({
-      data: { contracts: [contract], total: 1, page: 1, pageSize: 20, counts: { all: 1, active: 1, overdue: 0, unsigned: 1 } },
+      data: { contracts: [contract], total: 1, page: 1, pageSize: 20, counts: { all: 1, active: 1, overdue: 0, unsigned: 1, outstanding: 1 } },
       isLoading: false,
     })
     mockHooks()
@@ -705,7 +714,7 @@ describe('status filter chips', () => {
 
   it('returns to the first page when the view changes', async () => {
     const listSpy = vi.fn().mockReturnValue({
-      data: { contracts: [contract], total: 60, page: 3, pageSize: 20, counts: { all: 60, active: 60, overdue: 2, unsigned: 60 } },
+      data: { contracts: [contract], total: 60, page: 3, pageSize: 20, counts: { all: 60, active: 60, overdue: 2, unsigned: 60, outstanding: 30 } },
       isLoading: false,
     })
     mockHooks()
@@ -721,7 +730,7 @@ describe('status filter chips', () => {
   })
 
   it('shows every contract by default', async () => {
-    mockHooks({ counts: { all: 3, active: 2, overdue: 1, unsigned: 2 } })
+    mockHooks({ counts: { all: 3, active: 2, overdue: 1, unsigned: 2, outstanding: 3 } })
     renderWithProviders(<ContractsPage />)
 
     expect(await screen.findByRole('button', { name: /^Todos\s*3$/ })).toHaveAttribute('aria-pressed', 'true')

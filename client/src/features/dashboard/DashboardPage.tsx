@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { AlertTriangle, ArrowDownLeft, ArrowUpRight, Shirt } from 'lucide-react'
 import { Button } from '../../components/ui/button.tsx'
 import { SectionLabel, ScreenTitle } from '../../components/ui/toolbar.tsx'
@@ -23,6 +23,7 @@ function StatTile({
   value,
   danger,
   display,
+  footer,
 }: {
   label: string
   value: number
@@ -33,6 +34,8 @@ function StatTile({
    * machine, and CountUp has no currency formatter to hand it anyway.
    */
   display?: string
+  /** A third, small line under the number — currently only the receivable tile's "em N contratos em aberto" link. */
+  footer?: React.ReactNode
 }) {
   const isUrgent = danger && value > 0
   return (
@@ -60,6 +63,7 @@ function StatTile({
       >
         {display ?? <CountUp to={value} duration={0.6} />}
       </span>
+      {footer}
     </div>
   )
 }
@@ -139,7 +143,7 @@ export function DashboardPage() {
     dueBackToday,
     overdue,
     upcoming,
-    receivablesThisWeek,
+    outstanding,
     leavingMaintenance,
     isLoading,
     isError,
@@ -233,9 +237,21 @@ export function DashboardPage() {
             <StatTile label={t('dueBackToday')} value={dueBackToday.length} />
             <StatTile label={t('overdue')} value={overdue.length} danger />
             <StatTile
-              label={t('receivableThisWeek')}
-              value={receivablesThisWeek.count}
-              display={formatCurrency(receivablesThisWeek.total, locale, currency)}
+              label={t('receivableTotal')}
+              value={outstanding.total}
+              display={formatCurrency(outstanding.total, locale, currency)}
+              footer={
+                outstanding.count > 0 ? (
+                  <Link
+                    to="/contratos?status=outstanding"
+                    className="text-meta text-muted-foreground hover:text-foreground hover:underline"
+                  >
+                    {t(outstanding.count === 1 ? 'receivableCountOne' : 'receivableCountOther', {
+                      count: outstanding.count,
+                    })}
+                  </Link>
+                ) : undefined
+              }
             />
           </div>
 

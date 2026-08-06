@@ -10,17 +10,11 @@ export const contractItemSchema = z.object({
   priceCharged: z.number().nonnegative(),
 })
 
-export const contractInstallmentSchema = z.object({
-  dueDate: isoDateString,
-  amount: z.number().nonnegative(),
-})
-
 export const newContractSchema = z.object({
   clientId: z.string().min(1),
   eventDate: isoDateString,
   paymentMethod: z.string().min(1),
   items: z.array(contractItemSchema).min(1),
-  installments: z.array(contractInstallmentSchema),
 })
 
 export type NewContractFormValues = z.infer<typeof newContractSchema>
@@ -47,13 +41,13 @@ export interface ContractAllocation {
   createdAt: string
 }
 
-export interface ContractInstallment {
+export interface ContractPayment {
   id: string
   contractId: string
-  dueDate: string
   amount: number
-  paid: boolean
-  paidAt: string | null
+  method: string
+  paidAt: string
+  createdAt: string
 }
 
 export interface Contract {
@@ -69,7 +63,7 @@ export interface Contract {
   signedAt: string | null
   createdAt: string
   allocations: ContractAllocation[]
-  installments: ContractInstallment[]
+  payments: ContractPayment[]
 }
 
 export interface ContractDetailIdentityDocument {

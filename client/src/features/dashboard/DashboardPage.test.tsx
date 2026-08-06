@@ -24,7 +24,7 @@ describe('DashboardPage', () => {
       dueBackToday: [] as never,
       overdue: [] as never,
       upcoming: [] as never,
-      receivablesThisWeek: { total: 0, count: 0 },
+      outstanding: { total: 0, count: 0 },
       leavingMaintenance: { count: 0, items: [] },
       isLoading: false,
       isError: false,
@@ -54,7 +54,7 @@ describe('DashboardPage', () => {
       dueBackToday: [] as never,
       overdue: [{ id: '2' }, { id: '3' }] as never,
       upcoming: [] as never,
-      receivablesThisWeek: { total: 0, count: 0 },
+      outstanding: { total: 0, count: 0 },
       leavingMaintenance: { count: 0, items: [] },
       isLoading: false,
       isError: false,
@@ -80,7 +80,7 @@ describe('DashboardPage', () => {
       dueBackToday: [] as never,
       overdue: [] as never,
       upcoming: [] as never,
-      receivablesThisWeek: { total: 0, count: 0 },
+      outstanding: { total: 0, count: 0 },
       leavingMaintenance: { count: 0, items: [] },
       isLoading: true,
       isError: false,
@@ -101,7 +101,7 @@ describe('DashboardPage', () => {
       dueBackToday: [] as never,
       overdue: [] as never,
       upcoming: [] as never,
-      receivablesThisWeek: { total: 0, count: 0 },
+      outstanding: { total: 0, count: 0 },
       leavingMaintenance: { count: 0, items: [] },
       isLoading: false,
       isError: true,
@@ -127,7 +127,7 @@ describe('DashboardPage', () => {
       dueBackToday: [] as never,
       overdue: [] as never,
       upcoming: [{ id: 'a1', productId: 'p1', clientId: 'c1', checkoutDate: '2026-07-25', dueDate: '2026-07-30', status: 'reserved' }] as never,
-      receivablesThisWeek: { total: 0, count: 0 },
+      outstanding: { total: 0, count: 0 },
       leavingMaintenance: { count: 0, items: [] },
       isLoading: false,
       isError: false,
@@ -150,7 +150,7 @@ describe('DashboardPage', () => {
       dueBackToday: [] as never,
       overdue: [] as never,
       upcoming: [] as never,
-      receivablesThisWeek: { total: 0, count: 0 },
+      outstanding: { total: 0, count: 0 },
       leavingMaintenance: { count: 0, items: [] },
       isLoading: false,
       isError: false,
@@ -161,14 +161,14 @@ describe('DashboardPage', () => {
     expect(screen.getByText('Nada programado para os próximos dias.')).toBeInTheDocument()
   })
 
-  it('shows the week\'s receivables as money, not as a count', () => {
+  it('shows the outstanding total as money, not as a count, with a link to the contracts behind it', () => {
     mockProductsAndClients()
     vi.spyOn(useDashboardModule, 'useDashboard').mockReturnValue({
       goingOutToday: [] as never,
       dueBackToday: [] as never,
       overdue: [] as never,
       upcoming: [] as never,
-      receivablesThisWeek: { total: 4280.5, count: 3 },
+      outstanding: { total: 4280.5, count: 3 },
       leavingMaintenance: { count: 0, items: [] },
       isLoading: false,
       isError: false,
@@ -176,11 +176,32 @@ describe('DashboardPage', () => {
 
     renderDashboard()
 
-    expect(screen.getByText('A receber esta semana')).toBeInTheDocument()
-    // The formatted total, not the installment count — a tile reading "3"
+    expect(screen.getByText('Total a receber')).toBeInTheDocument()
+    // The formatted total, not the contract count — a tile reading "3"
     // here would be the regression this guards against.
     expect(screen.getByText(/4\.280,50/)).toBeInTheDocument()
     expect(screen.queryByText('3')).not.toBeInTheDocument()
+
+    const link = screen.getByRole('link', { name: 'em 3 contratos em aberto' })
+    expect(link).toHaveAttribute('href', '/contratos?status=outstanding')
+  })
+
+  it('leaves off the contracts link when nothing is outstanding', () => {
+    mockProductsAndClients()
+    vi.spyOn(useDashboardModule, 'useDashboard').mockReturnValue({
+      goingOutToday: [] as never,
+      dueBackToday: [] as never,
+      overdue: [] as never,
+      upcoming: [] as never,
+      outstanding: { total: 0, count: 0 },
+      leavingMaintenance: { count: 0, items: [] },
+      isLoading: false,
+      isError: false,
+    })
+
+    renderDashboard()
+
+    expect(screen.queryByRole('link', { name: /contratos em aberto/ })).not.toBeInTheDocument()
   })
 
   it('lists the pieces leaving the cleaning window and when they free up', () => {
@@ -190,7 +211,7 @@ describe('DashboardPage', () => {
       dueBackToday: [] as never,
       overdue: [] as never,
       upcoming: [] as never,
-      receivablesThisWeek: { total: 0, count: 0 },
+      outstanding: { total: 0, count: 0 },
       leavingMaintenance: { count: 1, items: [{ id: 'p9', name: 'Vestido Longo', availableOn: '2026-08-06' }] },
       isLoading: false,
       isError: false,
@@ -210,7 +231,7 @@ describe('DashboardPage', () => {
       dueBackToday: [{ id: 'a2', productId: 'p2', clientId: 'c2', dueDate: '2026-08-04' }] as never,
       overdue: [] as never,
       upcoming: [] as never,
-      receivablesThisWeek: { total: 0, count: 0 },
+      outstanding: { total: 0, count: 0 },
       leavingMaintenance: { count: 0, items: [] },
       isLoading: false,
       isError: false,
@@ -237,7 +258,7 @@ describe('DashboardPage', () => {
       dueBackToday: [] as never,
       overdue: [] as never,
       upcoming: [] as never,
-      receivablesThisWeek: { total: 0, count: 0 },
+      outstanding: { total: 0, count: 0 },
       leavingMaintenance: { count: 0, items: [] },
       isLoading: false,
       isError: false,

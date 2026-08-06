@@ -7,8 +7,10 @@ import {
   cancelContract,
   listContracts,
   getContract,
-  setInstallmentPaid,
-  sumReceivables,
+  createPayment,
+  updatePayment,
+  deletePayment,
+  sumOutstanding,
 } from './contractService.js'
 import { checkOutAllocation } from './allocationService.js'
 
@@ -38,7 +40,7 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
-  await prisma.installment.deleteMany()
+  await prisma.payment.deleteMany()
   await prisma.allocation.deleteMany()
   await prisma.contract.deleteMany()
   await prisma.product.deleteMany()
@@ -57,13 +59,12 @@ function baseInput(overrides: Partial<Parameters<typeof createContract>[0]> = {}
     items: [
       { productId, checkoutDate: new Date('2026-10-02'), dueDate: new Date('2026-10-05'), priceCharged: 100 },
     ],
-    installments: [{ dueDate: new Date('2026-09-20'), amount: 100 }],
     ...overrides,
   }
 }
 
 describe('createContract', () => {
-  it('creates a Contract with its Allocations and Installments in one call', async () => {
+  it('creates a Contract with its Allocations in one call, with no payments logged yet', async () => {
     const contract = await createContract(baseInput())
 
     expect(contract.locationId).toBe(locationId)
@@ -73,9 +74,10 @@ describe('createContract', () => {
     expect(contract.allocations).toHaveLength(1)
     expect(contract.allocations[0].status).toBe('reserved')
     expect(contract.allocations[0].contractId).toBe(contract.id)
-    expect(contract.installments).toHaveLength(1)
-    expect(contract.installments[0].amount).toBe(100)
-    expect(contract.installments[0].paid).toBe(false)
+    // Creation is payment-free — the first payment (e.g. a deposit) is
+    // logged afterward from the contract's own screen, same as every later
+    // one.
+    expect(contract.payments).toEqual([])
   })
 
   it('creates one Allocation per item for a multi-item contract', async () => {
@@ -140,11 +142,6 @@ describe('createContract', () => {
         baseInput({ items: [{ productId, checkoutDate: new Date('2026-10-03'), dueDate: new Date('2026-10-04'), priceCharged: 100 }] }),
       ),
     ).rejects.toThrow(AppError)
-  })
-
-  it('creates a contract with zero installments', async () => {
-    const contract = await createContract(baseInput({ installments: [] }))
-    expect(contract.installments).toEqual([])
   })
 
   it('rejects a contract that lists the same product twice with overlapping dates', async () => {
@@ -340,14 +337,15 @@ describe('cancelContract', () => {
 })
 
 describe('listContracts', () => {
-  it('lists contracts with their allocations and installments', async () => {
-    await createContract(baseInput())
+  it('lists contracts with their allocations and payments', async () => {
+    const contract = await createContract(baseInput())
+    await createPayment(contract.id, locationId, { amount: 50, method: 'PIX', paidAt: new Date('2026-09-25') })
 
     const { contracts } = await listContracts(locationId)
 
     expect(contracts).toHaveLength(1)
     expect(contracts[0].allocations).toHaveLength(1)
-    expect(contracts[0].installments).toHaveLength(1)
+    expect(contracts[0].payments).toHaveLength(1)
   })
 
   it('does not list contracts belonging to another location', async () => {
@@ -552,37 +550,91 @@ describe('booking a piece that is already out on an active contract', () => {
   })
 })
 
-describe('setInstallmentPaid', () => {
-  it('marks an installment as paid and stamps when it was registered', async () => {
+describe('createPayment / updatePayment / deletePayment', () => {
+  it('logs a payment against a contract', async () => {
     const contract = await createContract(baseInput())
 
-    const updated = await setInstallmentPaid(contract.id, contract.installments[0].id, locationId, true)
+    const updated = await createPayment(contract.id, locationId, {
+      amount: 100,
+      method: 'PIX',
+      paidAt: new Date('2026-09-25'),
+    })
 
-    expect(updated.installments[0].paid).toBe(true)
-    expect(updated.installments[0].paidAt).toBeInstanceOf(Date)
+    expect(updated.payments).toHaveLength(1)
+    expect(updated.payments[0]).toMatchObject({ amount: 100, method: 'PIX' })
   })
 
-  it('clears the timestamp when an installment is un-marked', async () => {
+  it('allows logging more than what is outstanding, rather than capping it', async () => {
     const contract = await createContract(baseInput())
-    await setInstallmentPaid(contract.id, contract.installments[0].id, locationId, true)
 
-    const updated = await setInstallmentPaid(contract.id, contract.installments[0].id, locationId, false)
+    const updated = await createPayment(contract.id, locationId, {
+      amount: 9999,
+      method: 'Dinheiro',
+      paidAt: new Date('2026-09-25'),
+    })
 
-    expect(updated.installments[0].paid).toBe(false)
-    expect(updated.installments[0].paidAt).toBeNull()
+    expect(updated.payments[0].amount).toBe(9999)
   })
 
-  it('refuses an installment belonging to another location', async () => {
+  it('refuses to log a payment against a contract from another location', async () => {
     const contract = await createContract(baseInput())
     const otherLocation = await prisma.location.create({ data: { name: 'Outra', address: 'B' } })
 
     await expect(
-      setInstallmentPaid(contract.id, contract.installments[0].id, otherLocation.id, true),
+      createPayment(contract.id, otherLocation.id, { amount: 100, method: 'PIX', paidAt: new Date() }),
     ).rejects.toThrow(AppError)
   })
 
-  it('refuses an installment that belongs to a different contract', async () => {
+  it('corrects a logged payment', async () => {
+    const contract = await createContract(baseInput())
+    const withPayment = await createPayment(contract.id, locationId, {
+      amount: 100,
+      method: 'PIX',
+      paidAt: new Date('2026-09-25'),
+    })
+
+    const updated = await updatePayment(contract.id, withPayment.payments[0].id, locationId, { amount: 120 })
+
+    expect(updated.payments[0].amount).toBe(120)
+  })
+
+  it('removes a logged payment', async () => {
+    const contract = await createContract(baseInput())
+    const withPayment = await createPayment(contract.id, locationId, {
+      amount: 100,
+      method: 'PIX',
+      paidAt: new Date('2026-09-25'),
+    })
+
+    const updated = await deletePayment(contract.id, withPayment.payments[0].id, locationId)
+
+    expect(updated.payments).toEqual([])
+  })
+
+  it('refuses to touch a payment belonging to another location', async () => {
+    const contract = await createContract(baseInput())
+    const withPayment = await createPayment(contract.id, locationId, {
+      amount: 100,
+      method: 'PIX',
+      paidAt: new Date('2026-09-25'),
+    })
+    const otherLocation = await prisma.location.create({ data: { name: 'Outra', address: 'B' } })
+
+    await expect(
+      updatePayment(contract.id, withPayment.payments[0].id, otherLocation.id, { amount: 50 }),
+    ).rejects.toThrow(AppError)
+    await expect(deletePayment(contract.id, withPayment.payments[0].id, otherLocation.id)).rejects.toThrow(
+      AppError,
+    )
+  })
+
+  it('refuses a payment that belongs to a different contract', async () => {
     const first = await createContract(baseInput())
+    const firstPayment = await createPayment(first.id, locationId, {
+      amount: 100,
+      method: 'PIX',
+      paidAt: new Date('2026-09-25'),
+    })
     const second = await createContract(
       baseInput({
         items: [
@@ -592,82 +644,62 @@ describe('setInstallmentPaid', () => {
     )
 
     await expect(
-      setInstallmentPaid(second.id, first.installments[0].id, locationId, true),
+      updatePayment(second.id, firstPayment.payments[0].id, locationId, { amount: 50 }),
     ).rejects.toThrow(AppError)
   })
 })
 
-describe('sumReceivables', () => {
-  const WEEK_START = new Date('2026-10-05')
-  const WEEK_END = new Date('2026-10-11')
+describe('sumOutstanding', () => {
+  it('sums the live pieces minus what has been paid, across every active contract', async () => {
+    await createContract(baseInput())
 
-  it('sums only the unpaid installments due inside the window', async () => {
+    expect(await sumOutstanding(locationId)).toEqual({ total: 100, count: 1 })
+  })
+
+  it('subtracts logged payments from the total owed', async () => {
+    const contract = await createContract(baseInput())
+    await createPayment(contract.id, locationId, { amount: 40, method: 'PIX', paidAt: new Date('2026-09-25') })
+
+    expect(await sumOutstanding(locationId)).toEqual({ total: 60, count: 1 })
+  })
+
+  it('floors a single contract at zero rather than letting it offset another contract\'s balance, and leaves it out of the count', async () => {
+    const overpaid = await createContract(baseInput())
+    await createPayment(overpaid.id, locationId, { amount: 500, method: 'PIX', paidAt: new Date('2026-09-25') })
     await createContract(
       baseInput({
-        installments: [
-          { dueDate: new Date('2026-10-06'), amount: 150 },
-          { dueDate: new Date('2026-10-11'), amount: 50.5 },
-          // The day after the window closes — the single most likely
-          // off-by-one, so it is a fixture rather than a comment.
-          { dueDate: new Date('2026-10-12'), amount: 999 },
-          { dueDate: new Date('2026-10-04'), amount: 777 },
+        items: [
+          { productId: secondProductId, checkoutDate: new Date('2026-10-02'), dueDate: new Date('2026-10-05'), priceCharged: 150 },
         ],
       }),
     )
 
-    expect(await sumReceivables(locationId, WEEK_START, WEEK_END)).toEqual({ total: 200.5, count: 2 })
-  })
-
-  it('drops an installment as soon as it is marked paid', async () => {
-    const contract = await createContract(
-      baseInput({
-        installments: [
-          { dueDate: new Date('2026-10-06'), amount: 150 },
-          { dueDate: new Date('2026-10-07'), amount: 60 },
-        ],
-      }),
-    )
-    const paidOne = contract.installments.find((installment) => installment.amount === 150)!
-    await setInstallmentPaid(contract.id, paidOne.id, locationId, true)
-
-    expect(await sumReceivables(locationId, WEEK_START, WEEK_END)).toEqual({ total: 60, count: 1 })
-  })
-
-  it('reports zero rather than null when nothing is due in the window', async () => {
-    await createContract(baseInput({ installments: [{ dueDate: new Date('2026-12-01'), amount: 300 }] }))
-
-    expect(await sumReceivables(locationId, WEEK_START, WEEK_END)).toEqual({ total: 0, count: 0 })
+    expect(await sumOutstanding(locationId)).toEqual({ total: 150, count: 1 })
   })
 
   it('CRITICAL: stops counting a contract once it is cancelled', async () => {
-    const abandoned = await createContract(
-      baseInput({ installments: [{ dueDate: new Date('2026-10-06'), amount: 150 }] }),
-    )
+    const abandoned = await createContract(baseInput())
     const kept = await createContract(
       baseInput({
         items: [
-          { productId: secondProductId, checkoutDate: new Date('2026-10-02'), dueDate: new Date('2026-10-05'), priceCharged: 100 },
+          { productId: secondProductId, checkoutDate: new Date('2026-10-02'), dueDate: new Date('2026-10-05'), priceCharged: 150 },
         ],
-        installments: [{ dueDate: new Date('2026-10-07'), amount: 60 }],
       }),
     )
 
-    expect(await sumReceivables(locationId, WEEK_START, WEEK_END)).toEqual({ total: 210, count: 2 })
+    expect(await sumOutstanding(locationId)).toEqual({ total: 250, count: 2 })
 
-    // Cancelling does not delete the instalments, so without an explicit
-    // exclusion the Painel keeps promising the shop money for a dress it
-    // agreed never to send out.
     await cancelContract(abandoned.id, locationId)
 
-    expect(await sumReceivables(locationId, WEEK_START, WEEK_END)).toEqual({ total: 60, count: 1 })
+    expect(await sumOutstanding(locationId)).toEqual({ total: 150, count: 1 })
     expect(kept.id).toBeDefined()
   })
 
-  it('never counts another location\'s installments', async () => {
-    await createContract(baseInput({ installments: [{ dueDate: new Date('2026-10-06'), amount: 150 }] }))
+  it('never counts another location\'s contracts', async () => {
+    await createContract(baseInput())
     const otherLocation = await prisma.location.create({ data: { name: 'Other', address: 'X' } })
 
-    expect(await sumReceivables(otherLocation.id, WEEK_START, WEEK_END)).toEqual({ total: 0, count: 0 })
+    expect(await sumOutstanding(otherLocation.id)).toEqual({ total: 0, count: 0 })
   })
 })
 
@@ -708,7 +740,7 @@ describe('listContracts status filters and counts', () => {
     const result = await listContracts(locationId, { page: 1, pageSize: 1 })
 
     expect(result.contracts).toHaveLength(1)
-    expect(result.counts).toEqual({ all: 3, active: 2, overdue: 1, unsigned: 2 })
+    expect(result.counts).toEqual({ all: 3, active: 2, overdue: 1, unsigned: 2, outstanding: 3 })
     expect([reserved.id, late.id]).toContain(result.contracts[0].id === reserved.id ? reserved.id : late.id)
   })
 
@@ -791,6 +823,24 @@ describe('listContracts status filters and counts', () => {
 
     const result = await listContracts(locationId, { search: otherClient.name })
 
-    expect(result.counts).toEqual({ all: 0, active: 0, overdue: 0, unsigned: 0 })
+    expect(result.counts).toEqual({ all: 0, active: 0, overdue: 0, unsigned: 0, outstanding: 0 })
+  })
+
+  it('the outstanding filter lists only contracts with a positive balance', async () => {
+    const owed = await createContract(baseInput())
+    const settled = await createContract(
+      baseInput({
+        items: [
+          { productId: secondProductId, checkoutDate: new Date('2026-10-02'), dueDate: new Date('2026-10-05'), priceCharged: 150 },
+        ],
+      }),
+    )
+    await createPayment(settled.id, locationId, { amount: 150, method: 'PIX', paidAt: new Date('2026-09-25') })
+
+    const result = await listContracts(locationId, { status: 'outstanding' })
+
+    expect(result.contracts.map((contract) => contract.id)).toEqual([owed.id])
+    expect(result.total).toBe(1)
+    expect(result.counts.outstanding).toBe(1)
   })
 })

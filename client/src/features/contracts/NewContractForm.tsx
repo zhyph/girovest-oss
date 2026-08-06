@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useForm, Controller, useFieldArray, useWatch, type Path } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslation } from 'react-i18next'
@@ -163,32 +163,6 @@ function ItemRow({
   )
 }
 
-/**
- * The even split the form suggests across every instalment: the pieces'
- * total divided by however many instalments there currently are, in whole
- * cents, with any leftover cent handed to the first rows rather than lost.
- *
- * Rounding each row independently (`total / count` per row) can drift the
- * suggested amounts away from the total — 100 / 3 rounds to 33.33 three
- * times, which sums to 99.99, not 100 — and a contract whose instalments
- * never add up to its total either shows a nonzero "Em aberto" once every
- * instalment is paid, or can never reach zero at all. Distributing the
- * remainder in cents keeps `sum(amounts) === itemsTotal` exactly.
- *
- * Exported for its own test: this is arithmetic the shop's money depends on,
- * and it should not need a rendered dialog to be checked.
- */
-export function suggestedInstallmentAmounts(itemsTotal: number, installmentCount: number): number[] {
-  if (installmentCount <= 0) return []
-  const totalCents = Math.round(itemsTotal * 100)
-  const baseCents = Math.floor(totalCents / installmentCount)
-  const remainderCents = totalCents - baseCents * installmentCount
-  return Array.from(
-    { length: installmentCount },
-    (_, index) => (baseCents + (index < remainderCents ? 1 : 0)) / 100,
-  )
-}
-
 function useWatchField(
   control: ReturnType<typeof useForm<NewContractFormValues>>['control'],
   name: Path<NewContractFormValues>,
@@ -225,7 +199,6 @@ export function NewContractForm({
     control,
     watch,
     setValue,
-    getValues,
     formState: { errors, isDirty },
   } = useForm<NewContractFormValues>({
     resolver: zodResolver(newContractSchema),
@@ -234,26 +207,10 @@ export function NewContractForm({
       eventDate: '',
       paymentMethod: '',
       items: [{ productId: '', checkoutDate: '', dueDate: '', priceCharged: 0 }],
-      installments: [],
     },
   })
 
   const items = useFieldArray({ control, name: 'items' })
-  const installments = useFieldArray({ control, name: 'installments' })
-  /**
-   * Which instalment amounts the staff member has typed into, positionally.
-   *
-   * The even split is a SUGGESTION, not a rule: a client who pays R$500 now
-   * and the rest in two goes is an ordinary Saturday, and the form must not
-   * undo that the moment a third instalment is added. So a row that has been
-   * edited by hand is left alone forever after, and only untouched rows pick
-   * up the recomputed suggestion.
-   *
-   * Kept alongside the field array rather than inside the form values because
-   * it is not part of the contract — it never reaches the server, and adding
-   * it to the schema would mean teaching the payload about the UI's memory.
-   */
-  const [touchedAmounts, setTouchedAmounts] = useState<boolean[]>([])
   // `isDirty` compares against defaultValues, and the preselected client IS
   // a default value, so an untouched dialog opened from Clientes stays clean
   // and closes without a discard prompt.
@@ -296,58 +253,6 @@ export function NewContractForm({
   const itemsTotal = (watchedItems ?? []).reduce((sum, item) => sum + (Number(item?.priceCharged) || 0), 0)
   const currency = getLocaleConfig(locale).currency
   const paymentMethods = getPaymentMethods(locale)
-  const installmentCount = installments.fields.length
-  // Memoized so this array's identity only changes when its inputs do —
-  // the effect below depends on it, and a fresh array every render would
-  // fire that effect on every keystroke elsewhere in the form.
-  const suggestedAmounts = useMemo(
-    () => suggestedInstallmentAmounts(itemsTotal, installmentCount),
-    [itemsTotal, installmentCount],
-  )
-  const watchedInstallments = watch('installments')
-  const installmentAmounts = (watchedInstallments ?? []).map((installment) => Number(installment?.amount) || 0)
-  // "em 3× de R$150" is only true while the three are actually equal. Once a
-  // row has been typed over by hand — which the whole touched-tracking exists
-  // to allow — the footer reports the sum instead of a per-instalment figure
-  // that no instalment carries.
-  const installmentsAreEven =
-    installmentAmounts.length > 0 && installmentAmounts.every((amount) => amount === installmentAmounts[0])
-  const installmentsSum = installmentAmounts.reduce((sum, amount) => sum + amount, 0)
-
-  // Re-suggests whenever either side of the division moves: a piece added or
-  // removed (or repriced) changes the total, an instalment added or removed
-  // changes the divisor. Untouched rows only — see touchedAmounts.
-  useEffect(() => {
-    if (installmentCount === 0) return
-    for (let index = 0; index < installmentCount; index += 1) {
-      if (touchedAmounts[index]) continue
-      const suggested = suggestedAmounts[index]
-      // Guarded so the effect cannot re-enter itself: setValue re-renders, and
-      // an unconditional write would then re-run this on every pass.
-      if (getValues(`installments.${index}.amount`) === suggested) continue
-      setValue(`installments.${index}.amount`, suggested, { shouldDirty: true })
-    }
-  }, [installmentCount, suggestedAmounts, touchedAmounts, getValues, setValue])
-
-  function addInstallment() {
-    const nextSuggestions = suggestedInstallmentAmounts(itemsTotal, installmentCount + 1)
-    installments.append({ dueDate: '', amount: nextSuggestions[installmentCount] })
-    setTouchedAmounts((current) => [...current, false])
-  }
-
-  function removeInstallment(index: number) {
-    installments.remove(index)
-    setTouchedAmounts((current) => current.filter((_, position) => position !== index))
-  }
-
-  function markAmountTouched(index: number) {
-    setTouchedAmounts((current) => {
-      if (current[index]) return current
-      const next = [...current]
-      next[index] = true
-      return next
-    })
-  }
 
   return (
     <>
@@ -492,13 +397,12 @@ export function NewContractForm({
           </div>
 
           {/*
-            Peças gets three parts of the height to Parcelas' two: a piece row
-            carries four fields and Parcelas carries two, so an even split
-            showed one and a half pieces against three and a half parcelas.
-            Both keep a floor so neither can be squeezed to nothing.
+            Peças now has the whole right column to itself — Parcelas is
+            gone, since a payment plan no longer exists to build. This is
+            the cramped edge the design study called out: four fields per
+            row against a two-thirds-height box.
           */}
-          <div className="flex min-h-0 flex-col gap-3.5">
-          <div className="flex min-h-40 min-w-0 flex-[3] flex-col gap-2">
+          <div className="flex min-h-0 min-w-0 flex-col gap-2">
             <div className="flex items-baseline justify-between gap-2">
               <SectionLabel>{t('items.title')}</SectionLabel>
               <span className="text-meta text-muted-foreground">
@@ -549,119 +453,18 @@ export function NewContractForm({
             </button>
             </div>
           </div>
-          <div className="flex min-h-30 min-w-0 flex-[2] flex-col gap-2">
-            <div className="flex items-baseline justify-between gap-2">
-              <SectionLabel>{t('installments.title')}</SectionLabel>
-              <span className="text-meta text-muted-foreground">
-                {/*
-                  Selected here rather than by i18next's plural rules: pt-BR's
-                  CLDR "one" category covers zero as well, so a count of 0
-                  would read "0 parcela".
-                */}
-                {t(installmentCount === 1 ? 'installments.countOne' : 'installments.countOther', {
-                  count: installmentCount,
-                })}
-              </span>
-            </div>
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-panel border border-border">
-            <div className="min-h-0 flex-1 overflow-y-auto">
-            {installments.fields.map((field, index) => (
-              <div key={field.id} className="flex items-end gap-2 border-b border-hairline bg-card p-2.5 last:border-b-0">
-                <label className="flex flex-1 flex-col gap-1 text-sm">
-                  {t('fields.installmentDueDate')}
-                  <Controller
-                    name={`installments.${index}.dueDate`}
-                    control={control}
-                    render={({ field: dateField }) => (
-                      <DateInput
-                        value={dateField.value}
-                        onChange={dateField.onChange}
-                        aria-label={t('fields.installmentDueDate')}
-                        aria-invalid={errors.installments?.[index]?.dueDate ? true : undefined}
-                      />
-                    )}
-                  />
-                  {errors.installments?.[index]?.dueDate && (
-                    <span className="text-xs text-destructive">
-                      {t(
-                        errors.installments[index]?.dueDate?.type === 'custom'
-                          ? 'validation.installmentDueDateInvalid'
-                          : 'validation.installmentDueDateRequired',
-                      )}
-                    </span>
-                  )}
-                </label>
-                <label className="flex flex-1 flex-col gap-1 text-sm">
-                  {t('fields.installmentAmount')}
-                  <Controller
-                    name={`installments.${index}.amount`}
-                    control={control}
-                    render={({ field: amountField }) => (
-                      <CurrencyInput
-                        value={amountField.value}
-                        onChange={(next) => {
-                          // Only a real edit marks the row: the even-split
-                          // suggestion is written with setValue, which never
-                          // comes through here.
-                          markAmountTouched(index)
-                          amountField.onChange(next)
-                        }}
-                        aria-label={t('fields.installmentAmount')}
-                      />
-                    )}
-                  />
-                </label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => removeInstallment(index)}
-                  aria-label={t('installments.remove')}
-                >
-                  <X size={16} />
-                </Button>
-              </div>
-            ))}
-            </div>
-            <button
-              type="button"
-              onClick={addInstallment}
-              className="flex w-full flex-shrink-0 items-center gap-2 border-t border-hairline bg-surface-sunken px-2.5 py-2 text-left text-[13px] font-medium text-primary hover:bg-secondary"
-            >
-              {t('installments.add')}
-            </button>
-            </div>
-          </div>
-          </div>
         </DialogBody>
         <DialogActions className="justify-between">
           {/*
-            The footer answers "how is this being paid?" beside the total it
-            is being paid against. A contract with no instalments is not an
-            error — plenty are paid in one go on the day — but it is worth
-            saying out loud before saving, so it reads as a warning rather
-            than as a number.
+            No payment is collected here — that happens on the contract's own
+            screen, once it exists, the same way every later payment is
+            logged too. The footer says so, rather than leaving her to
+            wonder where the deposit she is about to collect goes.
           */}
           <div className="flex min-w-0 items-baseline gap-2">
             <span className="text-meta text-muted-foreground">{t('items.total')}</span>
             <span className="tabular text-[15px] font-semibold">{formatCurrency(itemsTotal, locale, currency)}</span>
-            {installmentCount === 0 ? (
-              <span className="rounded-badge border border-warning-border bg-warning px-1.5 py-0.5 text-meta text-warning-foreground">
-                {t('installments.noneDefined')}
-              </span>
-            ) : (
-              <span className="text-meta text-muted-foreground">
-                {installmentsAreEven
-                  ? t('installments.summary', {
-                      count: installmentCount,
-                      amount: formatCurrency(installmentAmounts[0], locale, currency),
-                    })
-                  : t('installments.summaryMixed', {
-                      count: installmentCount,
-                      amount: formatCurrency(installmentsSum, locale, currency),
-                    })}
-              </span>
-            )}
+            <span className="text-meta text-muted-foreground">{t('paymentsLoggedAfterSave')}</span>
           </div>
           <div className="flex gap-2">
             <Button type="button" variant="secondary" onClick={discardGuard.requestClose}>

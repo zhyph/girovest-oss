@@ -1,6 +1,6 @@
-import { useId, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronRight } from 'lucide-react'
+import { QrCode, Plus, Pencil, Trash2 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router'
 import { startOfWeek, endOfWeek } from 'date-fns'
@@ -13,10 +13,11 @@ import { Toolbar, ToolbarSearch, ScreenTitle, SectionLabel, FilterChip } from '.
 import { RowActions, DropdownMenuItem } from '../../components/ui/dropdown-menu.tsx'
 import { DataList, DataListEmpty, type DataListColumn } from '../../components/ui/data-list.tsx'
 import { StatusBadge, type EntityState } from '../../components/ui/status-badge.tsx'
+import { Badge } from '../../components/ui/badge.tsx'
 import { AuthenticatedPhoto } from '../../components/ui/authenticated-photo.tsx'
 import { formatCurrency, getLocaleConfig } from '../../lib/locale.ts'
 import { ConfirmDialog } from '../../components/ui/confirm-dialog.tsx'
-import { parseDateOnly, formatDate, overdueAsOf } from '../../lib/date.ts'
+import { parseDateOnly, formatDate } from '../../lib/date.ts'
 import { useLocale } from '../../lib/LocaleContext.tsx'
 import { showErrorToast } from '../../lib/toast.ts'
 import { useUnsavedChangesGuard } from '../../lib/useUnsavedChangesGuard.ts'
@@ -35,13 +36,15 @@ import type { Allocation } from '../allocations/allocationSchemas.ts'
 import {
   useContractsList,
   useCancelContract,
-  useSetInstallmentPaid,
+  useDeletePayment,
   CONTRACTS_KEY,
+  CONTRACT_STATUS_FILTERS,
   type ContractStatusFilter,
 } from './useContracts.ts'
-import type { Contract } from './contractSchemas.ts'
+import type { Contract, ContractPayment } from './contractSchemas.ts'
 import { NewContractForm } from './NewContractForm.tsx'
 import { SignRemotelyModal } from './SignRemotelyModal.tsx'
+import { PaymentDialog } from './PaymentDialog.tsx'
 
 /**
  * A contract's single visible state, derived from its pieces. The list
@@ -321,73 +324,67 @@ export function AllocationActions({ allocation }: { allocation: Allocation }) {
 const SHORT_DATE: Intl.DateTimeFormatOptions = { day: '2-digit', month: '2-digit', year: 'numeric' }
 
 /**
- * An instalment can be settled from its due date onwards, never before it.
- *
- * The shop's own rule, and a real safeguard: "Marcar como pago" sits one row
- * away from the instalment above it, and marking February's instead of
- * January's makes the contract look settled money that has not arrived. The
- * reverse direction is deliberately NOT gated — undoing a mistake must never
- * be harder than making it, and a wrongly-marked future instalment is exactly
- * the thing you need to be able to unmark.
- *
- * Uses the same start-of-today instant every overdue question in the app is
- * asked as of, so an instalment due today is payable today.
+ * The three money tiles' state: whether the client still owes, is settled,
+ * or has paid past the total. The label and tone on the third tile change
+ * with it — "Devolver" in a neutral tone rather than "Em aberto" turned
+ * negative, since a client who paid extra is not a problem to flag red.
  */
-export function canMarkInstallmentPaid(dueDate: string, today = overdueAsOf()): boolean {
-  return parseDateOnly(dueDate) <= today
+function outstandingState(outstanding: number): 'open' | 'settled' | 'overpaid' {
+  if (outstanding > 0) return 'open'
+  if (outstanding === 0) return 'settled'
+  return 'overpaid'
 }
 
-function ContractPayments({ contract }: { contract: Contract }) {
+function ContractPayments({ contract, clientName }: { contract: Contract; clientName: string }) {
   const { t } = useTranslation('contracts')
   const { locale } = useLocale()
   const currency = getLocaleConfig(locale).currency
-  const setPaid = useSetInstallmentPaid()
-  // Collapsed by default: a contract paid in 12 instalments would otherwise
-  // push every other contract off the screen. The money summary — the part
-  // worth scanning down the list — stays visible either way.
-  const [isExpanded, setIsExpanded] = useState(false)
-  const listId = useId()
+  const deletePayment = useDeletePayment()
+  const [dialogTarget, setDialogTarget] = useState<'new' | ContractPayment | null>(null)
+  const [deleting, setDeleting] = useState<ContractPayment | null>(null)
 
-  // The contract is worth what its live pieces were charged at; installments
-  // are just how the client agreed to pay it. They do not always add up to the
-  // same number, so the outstanding balance is measured against the pieces.
+  // The contract is worth what its live pieces were charged at; payments are
+  // just what has actually come in against that. They do not always add up
+  // to the same number, so the outstanding balance is measured against the
+  // pieces, never against a payment plan — there is no plan any more.
   const total = contractTotal(contract)
-  const paid = contract.installments.reduce(
-    (sum, installment) => (installment.paid ? sum + installment.amount : sum),
-    0,
-  )
+  const paid = contract.payments.reduce((sum, payment) => sum + payment.amount, 0)
   const outstanding = total - paid
-  const paidCount = contract.installments.filter((installment) => installment.paid).length
+  const state = outstandingState(outstanding)
 
-  async function toggle(installmentId: string, paidNow: boolean) {
+  const thirdTile =
+    state === 'overpaid'
+      ? { key: 'refund', label: t('payments.refund'), value: -outstanding, tone: 'neutral' as const }
+      : {
+          key: 'outstanding',
+          label: t('payments.outstanding'),
+          value: outstanding,
+          tone: state === 'open' ? ('urgent' as const) : ('plain' as const),
+        }
+  const tiles = [
+    { key: 'total', label: t('payments.total'), value: total, tone: 'plain' as const },
+    { key: 'paid', label: t('payments.paid'), value: paid, tone: 'plain' as const },
+    thirdTile,
+  ]
+
+  async function confirmDelete() {
+    if (!deleting) return
     try {
-      await setPaid.mutateAsync({ contractId: contract.id, installmentId, paid: paidNow })
+      await deletePayment.mutateAsync({ contractId: contract.id, paymentId: deleting.id })
+      setDeleting(null)
     } catch (error) {
-      showErrorToast(
-        t(`errors.${resolveErrorCode(error)}`, { defaultValue: t('errors.INSTALLMENT_UPDATE_FAILED') }),
-      )
+      showErrorToast(t(`errors.${resolveErrorCode(error)}`, { defaultValue: t('errors.PAYMENT_UPDATE_FAILED') }))
     }
   }
 
   return (
     <div className="flex flex-col gap-2.5">
-      {contract.installments.length > 0 ? (
-        <button
-          type="button"
-          aria-expanded={isExpanded}
-          aria-controls={listId}
-          onClick={() => setIsExpanded((open) => !open)}
-          className="-ml-1 inline-flex w-fit items-center gap-1 rounded px-1 py-0.5 text-label text-foreground-subtle uppercase transition-colors hover:bg-secondary"
-        >
-          <ChevronRight size={12} className={cn('transition-transform', isExpanded && 'rotate-90')} />
-          {t('payments.title')}
-          <span className="tabular normal-case">
-            {t('payments.paidCount', { paid: paidCount, total: contract.installments.length })}
-          </span>
-        </button>
-      ) : (
+      <div className="flex items-center justify-between gap-2">
         <SectionLabel>{t('payments.title')}</SectionLabel>
-      )}
+        {state === 'open' && <StatusBadge state="open" />}
+        {state === 'settled' && <StatusBadge state="paid" />}
+        {state === 'overpaid' && <Badge tone="neutral">{t('payments.overpaidBadge')}</Badge>}
+      </div>
       {/*
         Three cells rather than one run-on line. The money is the question
         this panel is opened to answer, and "Total: X Pago: Y Em aberto: Z"
@@ -396,22 +393,20 @@ function ContractPayments({ contract }: { contract: Contract }) {
         figure reads the same way wherever it appears.
       */}
       <div className="grid grid-cols-3 gap-2">
-        {[
-          { key: 'total', label: t('payments.total'), value: total, urgent: false },
-          { key: 'paid', label: t('payments.paid'), value: paid, urgent: false },
-          { key: 'outstanding', label: t('payments.outstanding'), value: outstanding, urgent: outstanding > 0 },
-        ].map((cell) => (
+        {tiles.map((cell) => (
           <div
             key={cell.key}
             className={cn(
               'flex flex-col gap-1 rounded-panel border px-3 py-2.5',
-              cell.urgent ? 'border-warning-border bg-warning' : 'border-border bg-card',
+              cell.tone === 'urgent' && 'border-warning-border bg-warning',
+              cell.tone === 'neutral' && 'border-border bg-surface-sunken',
+              cell.tone === 'plain' && 'border-border bg-card',
             )}
           >
             <span
               className={cn(
                 'text-label uppercase',
-                cell.urgent ? 'text-warning-foreground' : 'text-foreground-subtle',
+                cell.tone === 'urgent' ? 'text-warning-foreground' : cell.tone === 'neutral' ? 'text-muted-foreground' : 'text-foreground-subtle',
               )}
             >
               {cell.label}
@@ -419,7 +414,7 @@ function ContractPayments({ contract }: { contract: Contract }) {
             <span
               className={cn(
                 'tabular text-body font-semibold',
-                cell.urgent ? 'text-warning-foreground' : 'text-foreground',
+                cell.tone === 'urgent' ? 'text-warning-foreground' : cell.tone === 'neutral' ? 'text-muted-foreground' : 'text-foreground',
               )}
             >
               {formatCurrency(cell.value, locale, currency)}
@@ -427,65 +422,91 @@ function ContractPayments({ contract }: { contract: Contract }) {
           </div>
         ))}
       </div>
-      {contract.installments.length === 0 ? (
-        <span className="text-xs text-muted-foreground">{t('payments.none')}</span>
-      ) : (
-        isExpanded && (
-        <ul id={listId} className="flex flex-col gap-1">
-          {contract.installments.map((installment) => {
-            const payable = installment.paid || canMarkInstallmentPaid(installment.dueDate)
-            const blockedReason = t('payments.payableFrom', {
-              date: formatDate(parseDateOnly(installment.dueDate), locale, SHORT_DATE),
-            })
-            return (
-            <li key={installment.id} className="flex items-center justify-between gap-3 text-xs">
-              <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
-                <span>{formatDate(parseDateOnly(installment.dueDate), locale, SHORT_DATE)}</span>
-                <span className="font-medium">{formatCurrency(installment.amount, locale, currency)}</span>
-                {installment.paid && installment.paidAt && (
-                  <span className="text-muted-foreground">
-                    {t('payments.paidOn', {
-                      date: formatDate(new Date(installment.paidAt), locale, SHORT_DATE),
-                    })}
-                  </span>
-                )}
-              </span>
-              {/*
-                Disabled and still on screen, with the reason on the wrapper
-                rather than on the button: a disabled control is exempt from
-                pointer events in several browsers, so its own `title` never
-                surfaces. Hiding the action instead would leave the staff
-                member looking for a button that is simply absent, with
-                nothing to explain why.
-              */}
-              <span title={payable ? undefined : blockedReason}>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={installment.paid ? 'ghost' : 'secondary'}
-                  disabled={setPaid.isPending || !payable}
-                  aria-label={payable ? undefined : blockedReason}
-                  onClick={() => toggle(installment.id, !installment.paid)}
-                >
-                  {installment.paid ? t('payments.markUnpaid') : t('payments.markPaid')}
-                </Button>
-              </span>
-            </li>
-            )
-          })}
-        </ul>
-        )
+      {state === 'overpaid' && (
+        <span className="text-meta text-muted-foreground">
+          {t('payments.overpaidNote', { amount: formatCurrency(-outstanding, locale, currency) })}
+        </span>
       )}
+      {contract.payments.length === 0 ? (
+        <div className="flex flex-col items-center gap-3 rounded-panel border border-dashed border-border-strong bg-card p-5">
+          <span className="text-center text-meta text-muted-foreground">{t('payments.none')}</span>
+          <Button type="button" onClick={() => setDialogTarget('new')}>
+            <Plus size={15} />
+            {t('payments.log')}
+          </Button>
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-panel border border-border">
+          <ul>
+            {contract.payments.map((payment) => (
+              <li
+                key={payment.id}
+                className="grid grid-cols-[76px_1fr_92px_26px_26px] items-center gap-2 border-b border-hairline bg-card px-3 py-2 last:border-b-0"
+              >
+                <span className="tabular text-[13px]">{formatDate(parseDateOnly(payment.paidAt), locale, SHORT_DATE)}</span>
+                <span className="truncate text-[12.5px] text-muted-foreground">{payment.method}</span>
+                <span className="tabular text-right text-[13.5px] font-semibold">
+                  {formatCurrency(payment.amount, locale, currency)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setDialogTarget(payment)}
+                  aria-label={t('payments.edit')}
+                  className="inline-flex size-6.5 items-center justify-center rounded-control text-foreground-subtle hover:bg-surface-sunken hover:text-foreground"
+                >
+                  <Pencil size={14} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDeleting(payment)}
+                  aria-label={t('payments.delete')}
+                  className="inline-flex size-6.5 items-center justify-center rounded-control text-foreground-subtle hover:bg-destructive-subtle hover:text-destructive"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </li>
+            ))}
+          </ul>
+          <button
+            type="button"
+            onClick={() => setDialogTarget('new')}
+            className="flex w-full items-center gap-2 border-t border-hairline bg-surface-sunken px-3 py-2 text-left text-[13px] font-medium text-primary hover:bg-secondary"
+          >
+            <Plus size={15} />
+            {t('payments.log')}
+          </button>
+        </div>
+      )}
+      {dialogTarget !== null && (
+        <PaymentDialog
+          contract={contract}
+          clientName={clientName}
+          payment={dialogTarget === 'new' ? undefined : dialogTarget}
+          onClose={() => setDialogTarget(null)}
+        />
+      )}
+      <ConfirmDialog
+        open={deleting !== null}
+        title={t('payments.delete')}
+        message={t('payments.deleteConfirmMessage')}
+        confirmLabel={t('common:actions.delete', { ns: 'common' })}
+        cancelLabel={t('common:actions.cancel', { ns: 'common' })}
+        confirmVariant="danger"
+        confirmDisabled={deletePayment.isPending}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleting(null)}
+      />
     </div>
   )
 }
 
 /**
- * Imprimir stays a visible button; the other two hide behind the overflow.
- * Printing is what this panel is opened for several times a day, while
- * signing happens once per contract and cancelling ideally never — three
- * equal-weight buttons made the rare destructive one as easy to hit as the
- * routine one.
+ * Signing and cancelling used to share the same "•••" overflow menu, at the
+ * same visual weight — but signing is routine (nearly every new contract
+ * needs it) while cancelling is rare and destructive. Burying both equally
+ * made the routine one hard to find. Now: unsigned, "Assinar remotamente" is
+ * the panel's own primary button; signed, it simply isn't there any more.
+ * "•••" is left holding only the rare, destructive action.
  */
 function ContractHeaderActions({ contract }: { contract: Contract }) {
   const { t } = useTranslation('contracts')
@@ -510,6 +531,17 @@ function ContractHeaderActions({ contract }: { contract: Contract }) {
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
+      {canSign && (
+        <Button
+          type="button"
+          size="sm"
+          className="h-7.5 gap-1.5 px-3 text-[13px]"
+          onClick={() => setShowSignModal(true)}
+        >
+          <QrCode size={14} />
+          {t('sign.action')}
+        </Button>
+      )}
       <Link
         to={`/contratos/${contract.id}/imprimir`}
         className="inline-flex h-7.5 items-center justify-center rounded-control border border-border-strong bg-surface px-3 text-[13px] font-medium text-foreground hover:bg-surface-sunken"
@@ -517,23 +549,19 @@ function ContractHeaderActions({ contract }: { contract: Contract }) {
         {t('print.action')}
       </Link>
       {/*
-        A signed contract with nothing left reserved has neither action, and
-        an empty menu is worse than no menu.
+        "•••" now holds only the rare, destructive action — a signed
+        contract with nothing left reserved has none, and an empty menu is
+        worse than no menu.
       */}
-      {(canSign || canCancel) && (
+      {canCancel && (
         <RowActions label={t('detail.moreActions')}>
-          {canSign && (
-            <DropdownMenuItem onSelect={() => setShowSignModal(true)}>{t('sign.action')}</DropdownMenuItem>
-          )}
-          {canCancel && (
-            <DropdownMenuItem
-              destructive
-              disabled={cancelContract.isPending}
-              onSelect={() => setShowCancelConfirm(true)}
-            >
-              {t('cancelContract.action')}
-            </DropdownMenuItem>
-          )}
+          <DropdownMenuItem
+            destructive
+            disabled={cancelContract.isPending}
+            onSelect={() => setShowCancelConfirm(true)}
+          >
+            {t('cancelContract.action')}
+          </DropdownMenuItem>
         </RowActions>
       )}
       <SignRemotelyModal
@@ -723,7 +751,7 @@ function ContractDetailPanel({
       </div>
 
       <div className="px-5 py-4">
-        <ContractPayments contract={contract} />
+        <ContractPayments contract={contract} clientName={clientName} />
       </div>
       {zoomDialog}
     </div>
@@ -735,15 +763,24 @@ export function ContractsPage() {
   const { locale } = useLocale()
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState<ContractStatusFilter>('all')
-  const { data, isLoading } = useContractsList({ page, search, status: filter })
-  const { data: products } = useProducts()
-  const { data: clients } = useClients()
   // `?novo=1` is how the rail's "Nova alocação" shortcut opens this form
   // from anywhere in the app. The param is the single source of truth
   // while the form is up, so closing it (or navigating back) clears the
   // URL too and a refresh doesn't silently reopen the form.
   const [searchParams, setSearchParams] = useSearchParams()
+  // `?status=` is the same kind of one-time deep link, this time from the
+  // Painel's "Total a receber" tile — it just needs to preselect a chip
+  // rather than open something, so it is read once into plain state instead
+  // of staying the URL's source of truth the way `novo`/`clienteId` do.
+  const [filter, setFilter] = useState<ContractStatusFilter>(() => {
+    const requested = searchParams.get('status')
+    return (CONTRACT_STATUS_FILTERS as readonly string[]).includes(requested ?? '')
+      ? (requested as ContractStatusFilter)
+      : 'all'
+  })
+  const { data, isLoading } = useContractsList({ page, search, status: filter })
+  const { data: products } = useProducts()
+  const { data: clients } = useClients()
   const showForm = searchParams.get('novo') === '1'
   // Set by the Clientes screen's own "Novo contrato" shortcut, which knows
   // who the contract is for. Cleared with `novo` so a stale id cannot outlive
@@ -788,7 +825,7 @@ export function ContractsPage() {
   // grouping stays client-side on purpose: a group header counts the rows
   // printed under it, so it can only ever describe the page it is drawn on.
   const today = new Date()
-  const counts = data?.counts ?? { all: 0, active: 0, overdue: 0, unsigned: 0 }
+  const counts = data?.counts ?? { all: 0, active: 0, overdue: 0, unsigned: 0, outstanding: 0 }
   const weekGroups = WEEK_GROUP_ORDER.map((key) => ({
     key,
     label: t(`groups.${key}`),
@@ -911,7 +948,7 @@ export function ContractsPage() {
           />
         }
         filtersDataTour="contracts.filters"
-        filters={(['active', 'overdue', 'unsigned', 'all'] as const).map((key) => (
+        filters={(['active', 'overdue', 'unsigned', 'outstanding', 'all'] as const).map((key) => (
           <FilterChip key={key} active={filter === key} onClick={() => handleFilterChange(key)} count={counts[key]}>
             {t(`filters.${key}`)}
           </FilterChip>

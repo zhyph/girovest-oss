@@ -9,8 +9,10 @@ import {
   cancelContract,
   listContracts,
   getContract,
-  setInstallmentPaid,
-  sumReceivables,
+  createPayment,
+  updatePayment,
+  deletePayment,
+  sumOutstanding,
   CONTRACT_STATUS_FILTERS,
 } from '../services/contractService.js'
 import { issueSigningToken } from '../services/signingService.js'
@@ -65,18 +67,11 @@ contractsRouter.get('/', async (req, res) => {
   )
 })
 
-const receivablesSchema = z.object({ from: isoDate, to: isoDate })
-
-// Two path segments, so it can never be swallowed by `/:id` below — but it is
-// declared first anyway, so that reordering the file can't silently turn this
-// into a contract lookup for the id "installments".
-contractsRouter.get('/installments/receivable', async (req, res) => {
+// Declared first, so it can never be swallowed by `/:id` below — reordering
+// this file can't silently turn "outstanding" into a contract-id lookup.
+contractsRouter.get('/outstanding', async (req, res) => {
   if (!req.staff) throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Unauthorized')
-  const parsed = receivablesSchema.safeParse(req.query)
-  if (!parsed.success) {
-    throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'from and to query params are required')
-  }
-  res.json(await sumReceivables(req.staff.locationId, parsed.data.from, parsed.data.to))
+  res.json(await sumOutstanding(req.staff.locationId))
 })
 
 contractsRouter.get('/:id', async (req, res) => {
@@ -92,17 +87,11 @@ const itemSchema = z.object({
   priceCharged: z.number().nonnegative(),
 })
 
-const installmentSchema = z.object({
-  dueDate: isoDate,
-  amount: z.number().nonnegative(),
-})
-
 const createSchema = z.object({
   clientId: z.string().min(1),
   eventDate: isoDate,
   paymentMethod: z.string().min(1),
   items: z.array(itemSchema).min(1),
-  installments: z.array(installmentSchema),
 })
 
 contractsRouter.post('/', async (req, res) => {
@@ -121,18 +110,42 @@ contractsRouter.post('/:id/cancel', async (req, res) => {
   res.json(await cancelContract(req.params.id, locationId))
 })
 
-const installmentPaidSchema = z.object({ paid: z.boolean() })
+const createPaymentSchema = z.object({
+  amount: z.number().positive(),
+  method: z.string().min(1),
+  paidAt: isoDate,
+})
 
-contractsRouter.patch('/:contractId/installments/:installmentId', async (req, res) => {
+contractsRouter.post('/:contractId/payments', async (req, res) => {
   if (!req.staff) throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Unauthorized')
-  const parsed = installmentPaidSchema.safeParse(req.body)
+  const parsed = createPaymentSchema.safeParse(req.body)
   if (!parsed.success) {
-    throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'Invalid installment payload')
+    throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'Invalid payment payload')
   }
   const locationId = req.staff.locationId
-  res.json(
-    await setInstallmentPaid(req.params.contractId, req.params.installmentId, locationId, parsed.data.paid),
-  )
+  res.status(201).json(await createPayment(req.params.contractId, locationId, parsed.data))
+})
+
+const updatePaymentSchema = z.object({
+  amount: z.number().positive().optional(),
+  method: z.string().min(1).optional(),
+  paidAt: isoDate.optional(),
+})
+
+contractsRouter.patch('/:contractId/payments/:paymentId', async (req, res) => {
+  if (!req.staff) throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Unauthorized')
+  const parsed = updatePaymentSchema.safeParse(req.body)
+  if (!parsed.success) {
+    throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'Invalid payment payload')
+  }
+  const locationId = req.staff.locationId
+  res.json(await updatePayment(req.params.contractId, req.params.paymentId, locationId, parsed.data))
+})
+
+contractsRouter.delete('/:contractId/payments/:paymentId', async (req, res) => {
+  if (!req.staff) throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Unauthorized')
+  const locationId = req.staff.locationId
+  res.json(await deletePayment(req.params.contractId, req.params.paymentId, locationId))
 })
 
 contractsRouter.post('/:id/sign-token', async (req, res) => {

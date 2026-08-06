@@ -25,7 +25,7 @@ const contract: ContractDetail = {
       product: { id: 'p1', name: 'Vestido Azul' },
     },
   ],
-  installments: [],
+  payments: [],
 }
 
 function renderPage() {

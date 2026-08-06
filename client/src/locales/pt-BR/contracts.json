@@ -16,9 +16,7 @@
     "checkoutDate": "Retirada",
     "dueDate": "Devolução",
     "priceCharged": "Valor",
-    "paymentMethod": "Forma de Pagamento",
-    "installmentDueDate": "Vencimento da Parcela",
-    "installmentAmount": "Valor da Parcela"
+    "paymentMethod": "Forma de Pagamento"
   },
   "items": {
     "title": "Peças",
@@ -28,16 +26,7 @@
     "countOne": "{{count}} peça",
     "countOther": "{{count}} peças"
   },
-  "installments": {
-    "title": "Parcelas",
-    "add": "Adicionar parcela",
-    "remove": "Remover parcela",
-    "countOne": "{{count}} parcela",
-    "countOther": "{{count}} parcelas",
-    "summary": "em {{count}}× de {{amount}}",
-    "summaryMixed": "em {{count}}× · {{amount}} no total",
-    "noneDefined": "sem parcelas definidas"
-  },
+  "paymentsLoggedAfterSave": "Pagamentos são lançados na tela do contrato, depois de salvar.",
   "clientReadiness": {
     "missing": "Faltam campos obrigatórios: {{fields}}",
     "complete": "Completar cadastro",
@@ -70,9 +59,9 @@
     "clientSection": "Cliente",
     "itemsSection": "Peças",
     "total": "Valor Total",
-    "installmentsSection": "Parcelas",
-    "installmentPaid": "Pago",
-    "installmentPending": "Pendente",
+    "paymentsSection": "Pagamentos",
+    "paymentDate": "Data",
+    "paymentMethodColumn": "Forma",
     "clausesSection": "Termos e Condições",
     "signatureLabel": "Assinatura do Cliente",
     "signedAt": "Assinado em {{date}}"
@@ -102,8 +91,6 @@
     "checkoutDateInvalid": "Esta data não existe",
     "dueDateRequired": "Data de devolução é obrigatória",
     "dueDateInvalid": "Esta data não existe",
-    "installmentDueDateRequired": "Vencimento é obrigatório",
-    "installmentDueDateInvalid": "Esta data não existe",
     "paymentMethodRequired": "Forma de pagamento é obrigatória"
   },
   "unavailableProduct": "Este produto não está disponível para essas datas.",
@@ -113,20 +100,29 @@
     "DUE_DATE_BEFORE_CHECKOUT": "A data de devolução deve ser após a data de retirada.",
     "PRODUCT_UNAVAILABLE": "Produto não disponível para as datas escolhidas.",
     "PRODUCT_NOT_IN_CIRCULATION": "Este produto não está disponível para aluguel.",
-    "INSTALLMENT_UPDATE_FAILED": "Não foi possível atualizar a parcela. Tente novamente."
+    "PAYMENT_UPDATE_FAILED": "Não foi possível salvar o pagamento. Tente novamente."
   },
   "payments": {
     "title": "Pagamentos",
     "total": "Total",
     "paid": "Pago",
     "outstanding": "Em aberto",
-    "markPaid": "Marcar como pago",
-    "markUnpaid": "Desmarcar",
-    "payableFrom": "Só é possível marcar como pago a partir de {{date}}",
-    "paidOn": "pago em {{date}}",
-    "settled": "Contrato quitado.",
-    "none": "Nenhuma parcela cadastrada neste contrato.",
-    "paidCount": "{{paid}} de {{total}} pagas"
+    "refund": "Devolver",
+    "overpaidBadge": "Pago a mais",
+    "overpaidNote": "A cliente pagou {{amount}} além do total. Nada a fazer no sistema — o valor fica registrado assim.",
+    "none": "Nenhum pagamento recebido até agora.",
+    "log": "Registrar pagamento",
+    "edit": "Editar pagamento",
+    "delete": "Excluir pagamento",
+    "deleteConfirmMessage": "Isso remove este pagamento do contrato. O valor volta a contar como em aberto.",
+    "amountLabel": "Valor recebido",
+    "amountHint": "Já vem com o que falta receber. Pode trocar por qualquer valor.",
+    "dateLabel": "Data",
+    "methodLabel": "Como foi pago",
+    "remainingAfter": "Fica {{amount}} em aberto",
+    "refundAfter": "Fica {{amount}} para devolver",
+    "save": "Salvar pagamento",
+    "subtitle": "Contrato {{number}} · {{client}}"
   },
   "newContractSubtitle": "Cliente, evento e peças em uma tela só.",
   "saveContract": "Salvar contrato",
@@ -154,6 +150,7 @@
     "active": "Ativos",
     "overdue": "Atrasados",
     "unsigned": "Não assinados",
+    "outstanding": "Em aberto",
     "all": "Todos"
   },
   "groups": {

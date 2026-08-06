@@ -6,7 +6,7 @@ import type { Contract, ContractDetail, NewContractFormValues, SigningTokenRespo
 
 export const CONTRACTS_KEY = ['contracts']
 
-export const CONTRACT_STATUS_FILTERS = ['all', 'active', 'overdue', 'unsigned'] as const
+export const CONTRACT_STATUS_FILTERS = ['all', 'active', 'overdue', 'unsigned', 'outstanding'] as const
 export type ContractStatusFilter = (typeof CONTRACT_STATUS_FILTERS)[number]
 
 export interface ContractStatusCounts {
@@ -14,6 +14,7 @@ export interface ContractStatusCounts {
   active: number
   overdue: number
   unsigned: number
+  outstanding: number
 }
 
 export interface ContractsPage {
@@ -87,15 +88,63 @@ export function useCancelContract() {
   })
 }
 
-export function useSetInstallmentPaid() {
+export interface PaymentInput {
+  amount: number
+  method: string
+  /** ISO date-only string, e.g. "2026-08-04". */
+  paidAt: string
+}
+
+export function useCreatePayment() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ contractId, installmentId, paid }: { contractId: string; installmentId: string; paid: boolean }) =>
-      apiFetch<ContractDetail>(`/api/contracts/${contractId}/installments/${installmentId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ paid }),
+    mutationFn: ({ contractId, values }: { contractId: string; values: PaymentInput }) =>
+      apiFetch<ContractDetail>(`/api/contracts/${contractId}/payments`, {
+        method: 'POST',
+        body: JSON.stringify(values),
       }),
     onSuccess: () => invalidateAfterMutation(queryClient),
+  })
+}
+
+export function useUpdatePayment() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      contractId,
+      paymentId,
+      values,
+    }: {
+      contractId: string
+      paymentId: string
+      values: Partial<PaymentInput>
+    }) =>
+      apiFetch<ContractDetail>(`/api/contracts/${contractId}/payments/${paymentId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(values),
+      }),
+    onSuccess: () => invalidateAfterMutation(queryClient),
+  })
+}
+
+export function useDeletePayment() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ contractId, paymentId }: { contractId: string; paymentId: string }) =>
+      apiFetch<ContractDetail>(`/api/contracts/${contractId}/payments/${paymentId}`, { method: 'DELETE' }),
+    onSuccess: () => invalidateAfterMutation(queryClient),
+  })
+}
+
+export interface OutstandingSummary {
+  total: number
+  count: number
+}
+
+export function useOutstanding() {
+  return useQuery({
+    queryKey: [...CONTRACTS_KEY, 'outstanding'],
+    queryFn: () => apiFetch<OutstandingSummary>('/api/contracts/outstanding'),
   })
 }
 

@@ -85,27 +85,23 @@ export function ContractPrintView({ contract }: ContractPrintViewProps) {
         <h2 className="font-medium">
           {t('fields.paymentMethod')}: {contract.paymentMethod}
         </h2>
-        {contract.installments.length > 0 && (
+        {contract.payments.length > 0 && (
           <>
-            <h3 className="font-medium">{t('print.installmentsSection')}</h3>
+            <h3 className="font-medium">{t('print.paymentsSection')}</h3>
             <table className="w-full border-collapse text-left">
               <thead>
                 <tr className="border-b border-border-soft">
-                  <th className="py-1">{t('fields.installmentDueDate')}</th>
-                  <th className="py-1">{t('fields.installmentAmount')}</th>
-                  <th className="py-1">{t('print.installmentPaid')}</th>
+                  <th className="py-1">{t('print.paymentDate')}</th>
+                  <th className="py-1">{t('print.paymentMethodColumn')}</th>
+                  <th className="py-1">{t('fields.priceCharged')}</th>
                 </tr>
               </thead>
               <tbody>
-                {contract.installments.map((installment) => (
-                  <tr key={installment.id} className="border-b border-border-soft print:break-inside-avoid">
-                    <td className="py-1">
-                      {formatDate(parseDateOnly(installment.dueDate), locale, DATE_FORMAT_OPTIONS)}
-                    </td>
-                    <td className="py-1">{formatCurrency(installment.amount, locale, currency)}</td>
-                    <td className="py-1">
-                      {installment.paid ? t('print.installmentPaid') : t('print.installmentPending')}
-                    </td>
+                {contract.payments.map((payment) => (
+                  <tr key={payment.id} className="border-b border-border-soft print:break-inside-avoid">
+                    <td className="py-1">{formatDate(parseDateOnly(payment.paidAt), locale, DATE_FORMAT_OPTIONS)}</td>
+                    <td className="py-1">{payment.method}</td>
+                    <td className="py-1">{formatCurrency(payment.amount, locale, currency)}</td>
                   </tr>
                 ))}
               </tbody>

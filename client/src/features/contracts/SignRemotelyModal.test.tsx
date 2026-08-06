@@ -11,7 +11,7 @@ const unsignedContract: Contract = {
   id: 'ct1', number: 1, locationId: 'loc1', clientId: 'c1', staffId: 's1',
   eventDate: '2026-10-03', paymentMethod: 'PIX', signatureStatus: 'unsigned',
   signatureImage: null, signedAt: null, createdAt: '2026-09-01',
-  allocations: [], installments: [],
+  allocations: [], payments: [],
 }
 
 const tokenResponse: SigningTokenResponse = {

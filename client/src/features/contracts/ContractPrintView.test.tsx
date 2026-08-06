@@ -44,7 +44,7 @@ const baseContract: ContractDetail = {
       product: { id: 'p1', name: 'Vestido Azul' },
     },
   ],
-  installments: [{ id: 'i1', contractId: 'ct1', dueDate: '2026-09-20', amount: 380, paid: false, paidAt: null }],
+  payments: [{ id: 'pm1', contractId: 'ct1', amount: 380, method: 'PIX', paidAt: '2026-09-20', createdAt: '2026-09-20' }],
 }
 
 describe('ContractPrintView', () => {

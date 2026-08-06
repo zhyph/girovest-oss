@@ -14,11 +14,6 @@ export interface CreateContractItemInput {
   priceCharged: number
 }
 
-export interface CreateContractInstallmentInput {
-  dueDate: Date
-  amount: number
-}
-
 export interface CreateContractInput {
   locationId: string
   clientId: string
@@ -26,7 +21,6 @@ export interface CreateContractInput {
   eventDate: Date
   paymentMethod: string
   items: CreateContractItemInput[]
-  installments: CreateContractInstallmentInput[]
 }
 
 export async function createContract(input: CreateContractInput) {
@@ -147,14 +141,8 @@ export async function createContract(input: CreateContractInput) {
                   priceCharged: item.priceCharged,
                 })),
               },
-              installments: {
-                create: input.installments.map((installment) => ({
-                  dueDate: installment.dueDate,
-                  amount: installment.amount,
-                })),
-              },
             },
-            include: { allocations: true, installments: true },
+            include: { allocations: true, payments: true },
           })
         },
         useSerializable ? { isolationLevel: Prisma.TransactionIsolationLevel.Serializable } : undefined,
@@ -192,11 +180,11 @@ export async function cancelContract(id: string, locationId: string) {
 
   return prisma.contract.findUniqueOrThrow({
     where: { id },
-    include: { allocations: true, installments: true },
+    include: { allocations: true, payments: true },
   })
 }
 
-export const CONTRACT_STATUS_FILTERS = ['all', 'active', 'overdue', 'unsigned'] as const
+export const CONTRACT_STATUS_FILTERS = ['all', 'active', 'overdue', 'unsigned', 'outstanding'] as const
 export type ContractStatusFilter = (typeof CONTRACT_STATUS_FILTERS)[number]
 
 export interface ContractStatusCounts {
@@ -204,6 +192,7 @@ export interface ContractStatusCounts {
   active: number
   overdue: number
   unsigned: number
+  outstanding: number
 }
 
 /**
@@ -228,7 +217,10 @@ export interface ContractStatusCounts {
  */
 const NOT_CANCELLED = { allocations: { some: { status: { not: 'cancelled' } } } }
 
-function statusWhere(status: ContractStatusFilter, asOf: Date) {
+/** The subset of statuses `statusWhere` can express as a Prisma filter — `outstanding` is computed, not queryable, and gets its own path below. */
+type QueryableStatus = Exclude<ContractStatusFilter, 'outstanding'>
+
+function statusWhere(status: QueryableStatus, asOf: Date) {
   switch (status) {
     case 'active':
       return { allocations: { some: { status: { in: ['reserved', 'checked_out'] } } } }
@@ -244,6 +236,34 @@ function statusWhere(status: ContractStatusFilter, asOf: Date) {
     case 'all':
       return {}
   }
+}
+
+/** A contract's live pieces total minus what has been paid against it, floored at zero. Shared by sumOutstanding and the `outstanding` list filter below, so the two can never disagree about which contracts count. */
+function contractOutstanding(contract: {
+  allocations: { status: string; priceCharged: number }[]
+  payments: { amount: number }[]
+}): number {
+  const owed = contract.allocations
+    .filter((allocation) => allocation.status !== 'cancelled')
+    .reduce((sum, allocation) => sum + allocation.priceCharged, 0)
+  const paid = contract.payments.reduce((sum, payment) => sum + payment.amount, 0)
+  return Math.max(0, owed - paid)
+}
+
+/**
+ * Every non-cancelled contract matching `where` that still has money owed on
+ * it, newest first — "outstanding" can't be expressed as a Prisma `where`
+ * fragment (it's allocations total minus payments total), so this fetches
+ * the candidates and filters in application code instead. Fine at this
+ * app's scale: one shop's contracts, not a multi-tenant dataset.
+ */
+async function outstandingContracts(searched: Prisma.ContractWhereInput) {
+  const contracts = await prisma.contract.findMany({
+    where: { ...searched, ...NOT_CANCELLED },
+    orderBy: { createdAt: 'desc' },
+    include: { allocations: true, payments: true },
+  })
+  return contracts.filter((contract) => contractOutstanding(contract) > 0)
 }
 
 export async function listContracts(
@@ -281,13 +301,36 @@ export async function listContracts(
         }
       : {}),
   }
+
+  // Computed once regardless of which chip is selected: every branch below
+  // needs it for the "Em aberto" count, and the outstanding branch reuses it
+  // as the list itself rather than querying twice.
+  const withBalance = await outstandingContracts(searched)
+
+  if (status === 'outstanding') {
+    const [active, overdue, unsigned, all] = await Promise.all([
+      prisma.contract.count({ where: { ...searched, ...statusWhere('active', asOf) } }),
+      prisma.contract.count({ where: { ...searched, ...statusWhere('overdue', asOf) } }),
+      prisma.contract.count({ where: { ...searched, ...statusWhere('unsigned', asOf) } }),
+      prisma.contract.count({ where: searched }),
+    ])
+    const counts: ContractStatusCounts = { all, active, overdue, unsigned, outstanding: withBalance.length }
+    return {
+      contracts: withBalance.slice((page - 1) * pageSize, (page - 1) * pageSize + pageSize),
+      total: withBalance.length,
+      page,
+      pageSize,
+      counts,
+    }
+  }
+
   const where = { ...searched, ...statusWhere(status, asOf) }
 
   const [contracts, total, active, overdue, unsigned, all] = await Promise.all([
     prisma.contract.findMany({
       where,
       orderBy: { createdAt: 'desc' },
-      include: { allocations: true, installments: true },
+      include: { allocations: true, payments: true },
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
@@ -297,7 +340,7 @@ export async function listContracts(
     prisma.contract.count({ where: { ...searched, ...statusWhere('unsigned', asOf) } }),
     prisma.contract.count({ where: searched }),
   ])
-  const counts: ContractStatusCounts = { all, active, overdue, unsigned }
+  const counts: ContractStatusCounts = { all, active, overdue, unsigned, outstanding: withBalance.length }
   return { contracts, total, page, pageSize, counts }
 }
 
@@ -313,7 +356,7 @@ export async function getClientContracts(locationId: string, clientId: string) {
   return prisma.contract.findMany({
     where: { locationId, clientId },
     orderBy: { createdAt: 'desc' },
-    include: { allocations: true, installments: true },
+    include: { allocations: true, payments: true },
   })
 }
 
@@ -322,7 +365,7 @@ export async function getContract(id: string, locationId: string) {
     where: { id },
     include: {
       allocations: { include: { product: true } },
-      installments: true,
+      payments: true,
       client: { include: { identityDocuments: true, addressLines: { orderBy: { sortOrder: 'asc' } } } },
       location: { include: { contractClauses: { orderBy: { sortOrder: 'asc' } } } },
     },
@@ -336,78 +379,73 @@ export async function getContract(id: string, locationId: string) {
   return contract
 }
 
-export interface ReceivablesSummary {
-  /** Sum of every still-unpaid installment falling inside the window. */
+export interface OutstandingSummary {
+  /** Total still owed, right now, across every contract that still owes something. */
   total: number
-  /** How many installments make up that sum. */
+  /** How many contracts make up that total — the Painel tile's "em N contratos em aberto" links to exactly this set (GET /api/contracts?status=outstanding). */
   count: number
 }
 
 /**
- * What the shop is still owed for installments due between `from` and `to`.
- *
- * Scoped through `Installment.contract.locationId` — Installment carries no
- * locationId column of its own, exactly like setInstallmentPaid's lookup.
- * Only unpaid rows count: the question this answers is "how much money is
- * still coming in", not "how much was billed".
- *
- * Cancelled contracts are left out. Cancelling a contract does not delete its
- * instalments, so without this a contract the shop already walked away from
- * keeps generating accounts receivable — the Painel would report money coming
- * in for dresses that were never sent out. Same rule `contractTotal` follows
- * on the client and the `active`/`unsigned` filters follow above.
- *
- * Both bounds are inclusive. Installment.dueDate is a date-only value stored
- * at UTC midnight, so callers pass plain YYYY-MM-DD days (see the route's
- * `isoDate` parsing) and a `to` of the window's last day covers that day.
+ * What the shop is still owed, right now, across every contract with a
+ * positive balance — no date window, unlike the installment schedule this
+ * replaced, since a Payment carries no due date to window against (see
+ * Payment in models.prisma). A settled or cancelled contract contributes
+ * neither to the total nor the count — same rule the `outstanding` list
+ * filter above follows, via the same `outstandingContracts` helper, so the
+ * two can never disagree about which contracts count.
  */
-export async function sumReceivables(locationId: string, from: Date, to: Date): Promise<ReceivablesSummary> {
-  const result = await prisma.installment.aggregate({
-    where: {
-      paid: false,
-      dueDate: { gte: from, lte: to },
-      contract: { locationId, ...NOT_CANCELLED },
-    },
-    _sum: { amount: true },
-    _count: { _all: true },
-  })
-  // `_sum` is null (not 0) when nothing matched, which would render as an
-  // empty tile rather than R$ 0,00.
-  return { total: result._sum.amount ?? 0, count: result._count._all }
+export async function sumOutstanding(locationId: string): Promise<OutstandingSummary> {
+  const withBalance = await outstandingContracts({ locationId })
+  const total = withBalance.reduce((sum, contract) => sum + contractOutstanding(contract), 0)
+  return { total, count: withBalance.length }
 }
 
 /**
- * Records that an installment was (or was not) paid.
- *
- * `paidAt` is derived here rather than taken from the caller: it is a record of
- * when the shop registered the payment, and letting a client set it would make
- * the audit trail unreliable. Un-marking clears it so a mistake leaves no
- * misleading timestamp behind.
+ * Logs a payment against a contract. No cap against the outstanding balance:
+ * overpayment is allowed and left to show up plainly in the totals rather
+ * than being blocked, since the alternative is refusing to record what a
+ * client actually paid.
  */
-export async function setInstallmentPaid(
+export async function createPayment(
   contractId: string,
-  installmentId: string,
   locationId: string,
-  paid: boolean,
+  data: { amount: number; method: string; paidAt: Date },
 ) {
-  // Scoped through the contract so an installment belonging to another
-  // location reads as NOT_FOUND, matching how contracts themselves behave.
-  const installment = await prisma.installment.findUnique({
-    where: { id: installmentId },
+  const contract = await prisma.contract.findUnique({ where: { id: contractId } })
+  if (!contract || contract.locationId !== locationId) {
+    throw new AppError(ErrorCodes.NOT_FOUND, 404, `Contract ${contractId} not found`)
+  }
+  await prisma.payment.create({ data: { contractId, ...data } })
+  return getContract(contractId, locationId)
+}
+
+/** Scoped through the contract so a payment belonging to another location or a different contract both read as NOT_FOUND. */
+async function findOwnedPayment(contractId: string, paymentId: string, locationId: string) {
+  const payment = await prisma.payment.findUnique({
+    where: { id: paymentId },
     include: { contract: { select: { id: true, locationId: true } } },
   })
-  if (
-    !installment ||
-    installment.contract.id !== contractId ||
-    installment.contract.locationId !== locationId
-  ) {
-    throw new AppError(ErrorCodes.NOT_FOUND, 404, `Installment ${installmentId} not found`)
+  if (!payment || payment.contract.id !== contractId || payment.contract.locationId !== locationId) {
+    throw new AppError(ErrorCodes.NOT_FOUND, 404, `Payment ${paymentId} not found`)
   }
+  return payment
+}
 
-  await prisma.installment.update({
-    where: { id: installmentId },
-    data: { paid, paidAt: paid ? new Date() : null },
-  })
+/** Corrects a logged payment — mistakes happen, and there is no other way to fix one. */
+export async function updatePayment(
+  contractId: string,
+  paymentId: string,
+  locationId: string,
+  data: { amount?: number; method?: string; paidAt?: Date },
+) {
+  await findOwnedPayment(contractId, paymentId, locationId)
+  await prisma.payment.update({ where: { id: paymentId }, data })
+  return getContract(contractId, locationId)
+}
 
+export async function deletePayment(contractId: string, paymentId: string, locationId: string) {
+  await findOwnedPayment(contractId, paymentId, locationId)
+  await prisma.payment.delete({ where: { id: paymentId } })
   return getContract(contractId, locationId)
 }

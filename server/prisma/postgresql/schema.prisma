@@ -136,10 +136,29 @@ model Contract {
   client       Client        @relation(fields: [clientId], references: [id])
   staff        Staff         @relation(fields: [staffId], references: [id])
   allocations  Allocation[]
+  // Vestigial: no longer written by the app (see Payment below). Kept
+  // declared, table intact and undropped, purely so paymentBackfill.ts can
+  // still read it through Prisma on an install that hasn't run that backfill
+  // yet — same reasoning Allocation.contractId stayed nullable rather than
+  // ever being hardened to required.
   installments Installment[]
+  payments      Payment[]
   signingTokens SigningToken[]
 
   @@unique([locationId, number])
+}
+
+model Payment {
+  id         String   @id @default(uuid())
+  contractId String
+  amount     Float
+  /** Freeform, same locale-configured list as Contract.paymentMethod — what this particular payment actually used. */
+  method     String
+  /** When it was actually paid — she can date it in the past (collected it yesterday, logging it today) or edit it after the fact. */
+  paidAt     DateTime
+  createdAt  DateTime @default(now())
+
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
 }
 
 model SigningToken {
@@ -172,6 +191,13 @@ model RelayIdempotencyKey {
   createdAt    DateTime @default(now())
 }
 
+/**
+ * Superseded by Payment: a fixed pre-set schedule didn't match how payments
+ * actually arrive (any amount, any time). Left declared rather than dropped
+ * — see paymentBackfill.ts, which converts every `paid` row here into a
+ * Payment once and empties the table; nothing in the app writes to it
+ * anymore.
+ */
 model Installment {
   id         String    @id @default(uuid())
   contractId String

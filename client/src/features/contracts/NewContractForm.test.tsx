@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import '../../i18n.ts'
-import { NewContractForm, suggestedInstallmentAmounts } from './NewContractForm.tsx'
+import { NewContractForm } from './NewContractForm.tsx'
 import * as useClientsModule from '../clients/useClients.ts'
 import * as useProductsModule from '../products/useProducts.ts'
 import * as useAllocationsModule from '../allocations/useAllocations.ts'
@@ -191,17 +191,7 @@ describe('NewContractForm', () => {
     expect(screen.getAllByLabelText(/produto/i)).toHaveLength(1)
   })
 
-  it('lets staff add and remove installment rows', async () => {
-    mockHooks()
-    renderWithToast(<NewContractForm onClose={vi.fn()} />)
-    await userEvent.click(screen.getByRole('button', { name: /adicionar parcela/i }))
-    expect(screen.getAllByLabelText(/valor da parcela/i)).toHaveLength(1)
-    const removeButtons = screen.getAllByRole('button', { name: /remover parcela/i })
-    await userEvent.click(removeButtons[0])
-    expect(screen.queryAllByLabelText(/valor da parcela/i)).toHaveLength(0)
-  })
-
-  it('submits the full payload including payment method and installments', async () => {
+  it('submits the full payload including payment method, with no payment collected at creation', async () => {
     const createImpl = vi.fn().mockResolvedValue(undefined)
     mockHooks()
     vi.spyOn(useContractsModule, 'useCreateContract').mockReturnValue({ mutateAsync: createImpl, isPending: false } as never)
@@ -220,6 +210,9 @@ describe('NewContractForm', () => {
     expect(createImpl.mock.calls[0][0].paymentMethod).toBe('PIX')
     expect(createImpl.mock.calls[0][0].clientId).toBe('c1')
     expect(createImpl.mock.calls[0][0].locationId).toBeUndefined()
+    // No payment plan submitted with the contract — the first payment, like
+    // every later one, is logged from the contract's own screen afterward.
+    expect(createImpl.mock.calls[0][0].installments).toBeUndefined()
     expect(onClose).toHaveBeenCalledOnce()
   })
 
@@ -505,19 +498,22 @@ describe('dialog format', () => {
     renderWithToast(<NewContractForm onClose={vi.fn()} />)
 
     // The study rejected step-by-step precisely because it hides fields:
-    // client, event, pieces and instalments must all be reachable at once.
+    // client, event and pieces must all be reachable at once. Payment
+    // method lives in the same left column; no payment plan to build here
+    // any more.
     expect(screen.getByText('Cliente e evento')).toBeInTheDocument()
     expect(screen.getByText('Peças')).toBeInTheDocument()
-    expect(screen.getByText('Parcelas')).toBeInTheDocument()
+    expect(screen.getByLabelText(/forma de pagamento/i)).toBeInTheDocument()
+    expect(screen.queryByText('Parcelas')).not.toBeInTheDocument()
   })
 
   /*
     The dialog used to grow a row taller with every peça and every parcela,
     until Salvar contrato was below the bottom of a laptop screen and the only
-    way back to it was scrolling the whole page. Fixed height, and the two
-    lists page inside their own boxes instead.
+    way back to it was scrolling the whole page. Fixed height, and the list
+    pages inside its own box instead.
   */
-  it('CRITICAL: holds one height and scrolls the two lists inside it', async () => {
+  it('CRITICAL: holds one height and scrolls the piece list inside it', async () => {
     mockHooks()
     renderWithToast(<NewContractForm onClose={vi.fn()} />)
 
@@ -529,35 +525,33 @@ describe('dialog format', () => {
     expect(body.className).toContain('overflow-hidden')
     expect(body.className).not.toContain('overflow-y-auto')
 
-    // One scroll container per section, each holding its own add button.
     const addPiece = screen.getByRole('button', { name: /adicionar peça/i })
-    const addInstallment = screen.getByRole('button', { name: /adicionar parcela/i })
     const pieceBox = addPiece.parentElement as HTMLElement
-    const installmentBox = addInstallment.parentElement as HTMLElement
-    expect(pieceBox).not.toBe(installmentBox)
-    for (const box of [pieceBox, installmentBox]) {
-      expect(box.className).toContain('rounded-panel')
-      expect(box.querySelector('.overflow-y-auto')).not.toBeNull()
-    }
+    expect(pieceBox.className).toContain('rounded-panel')
+    expect(pieceBox.querySelector('.overflow-y-auto')).not.toBeNull()
   })
 
-  it('counts what each section holds, next to its label', async () => {
+  it('counts what the piece list holds, next to its label', async () => {
     mockHooks()
     renderWithToast(<NewContractForm onClose={vi.fn()} />)
 
     expect(screen.getByText('1 peça')).toBeInTheDocument()
-    expect(screen.getByText('0 parcelas')).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: /adicionar peça/i }))
-    await userEvent.click(screen.getByRole('button', { name: /adicionar parcela/i }))
 
     expect(screen.getByText('2 peças')).toBeInTheDocument()
-    expect(screen.getByText('1 parcela')).toBeInTheDocument()
     expect(screen.getByLabelText(/cliente/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/forma de pagamento/i)).toBeInTheDocument()
 
     // No step affordances of any kind.
     expect(screen.queryByRole('button', { name: /próximo|avançar|voltar/i })).not.toBeInTheDocument()
+  })
+
+  it('says payments are logged after saving, not collected here', async () => {
+    mockHooks()
+    renderWithToast(<NewContractForm onClose={vi.fn()} />)
+
+    expect(screen.getByText('Pagamentos são lançados na tela do contrato, depois de salvar.')).toBeInTheDocument()
   })
 
   it('widens to page width once the contract passes four pieces, keeping the same fields', async () => {
@@ -575,7 +569,7 @@ describe('dialog format', () => {
     expect(panel().className).toContain('sm:max-w-[min(90vw,76rem)]')
     // The fields did not change, only the width.
     expect(screen.getByText('Cliente e evento')).toBeInTheDocument()
-    expect(screen.getByText('Parcelas')).toBeInTheDocument()
+    expect(screen.getByText('Peças')).toBeInTheDocument()
   })
 })
 
@@ -618,137 +612,3 @@ describe('opened for a client already on screen', () => {
   })
 })
 
-// Intl currency output separates the symbol with a NON-BREAKING space, so a
-// hand-typed "R$ 100,00" never equals it in a value assertion (toHaveTextContent
-// normalises whitespace and hides this; toHaveValue does not).
-const money = (value: number) =>
-  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
-
-describe('installment suggestion', () => {
-  it('divides the pieces total evenly by however many instalments there are', () => {
-    expect(suggestedInstallmentAmounts(300, 3)).toEqual([100, 100, 100])
-    // No instalments is not a division by zero — it is simply no suggestion.
-    expect(suggestedInstallmentAmounts(300, 0)).toEqual([])
-  })
-
-  it('always sums to exactly the total, distributing the remainder cent instead of losing or inventing it', () => {
-    // 100 / 3 rounds to 33.33 on every row independently, which sums to
-    // 99.99 — this is the bug: assert the SUM, not a per-row figure.
-    const threeWay = suggestedInstallmentAmounts(100, 3)
-    expect(threeWay.reduce((sum, amount) => sum + amount, 0)).toBeCloseTo(100, 2)
-    expect(threeWay).toEqual([33.34, 33.33, 33.33])
-
-    // 100 / 7 rounds to 14.29 on every row independently, which sums to
-    // 100.03 — the opposite drift, same bug.
-    const sevenWay = suggestedInstallmentAmounts(100, 7)
-    expect(sevenWay.reduce((sum, amount) => sum + amount, 0)).toBeCloseTo(100, 2)
-    expect(sevenWay).toEqual([14.29, 14.29, 14.29, 14.29, 14.28, 14.28, 14.28])
-
-    // 350 / 3 rounds to 116.67 on every row, which sums to 350.01.
-    const unevenLarger = suggestedInstallmentAmounts(350, 3)
-    expect(unevenLarger.reduce((sum, amount) => sum + amount, 0)).toBeCloseTo(350, 2)
-  })
-
-  it('prefills a new instalment with the even split instead of zero', async () => {
-    mockHooks()
-    renderWithToast(<NewContractForm onClose={vi.fn()} />)
-    await pickProduct(/Vestido Azul/)
-
-    await userEvent.click(screen.getByRole('button', { name: /adicionar parcela/i }))
-    expect(screen.getByLabelText(/valor da parcela/i)).toHaveValue(money(100))
-
-    // Adding a second re-suggests over the new divisor, on both rows.
-    await userEvent.click(screen.getByRole('button', { name: /adicionar parcela/i }))
-    const amounts = screen.getAllByLabelText(/valor da parcela/i)
-    expect(amounts[0]).toHaveValue(money(50))
-    expect(amounts[1]).toHaveValue(money(50))
-  })
-
-  it('re-suggests when a piece is added, because the total moved', async () => {
-    mockHooks()
-    renderWithToast(<NewContractForm onClose={vi.fn()} />)
-    await pickProduct(/Vestido Azul/)
-    await userEvent.click(screen.getByRole('button', { name: /adicionar parcela/i }))
-    expect(screen.getByLabelText(/valor da parcela/i)).toHaveValue(money(100))
-
-    await userEvent.click(screen.getByRole('button', { name: /adicionar peça/i }))
-    const productFields = screen.getAllByLabelText(/produto/i)
-    await userEvent.click(productFields[1])
-    await userEvent.click(await screen.findByRole('option', { name: /Vestido Azul/ }))
-
-    expect(screen.getByLabelText(/valor da parcela/i)).toHaveValue(money(200))
-  })
-
-  /*
-    The requirement the mockup itself does not state, and the reason the even
-    split is tracked per row at all. "R$500 agora e o resto em duas vezes" is
-    an ordinary arrangement in this shop. Recomputing over every row would
-    silently wipe the 500 the moment the third instalment was added — with no
-    error, no prompt, and nothing on screen to say it happened.
-  */
-  it('CRITICAL: never overwrites an amount the staff member typed', async () => {
-    mockHooks()
-    renderWithToast(<NewContractForm onClose={vi.fn()} />)
-    await pickProduct(/Vestido Azul/)
-
-    await userEvent.click(screen.getByRole('button', { name: /adicionar parcela/i }))
-    await userEvent.click(screen.getByRole('button', { name: /adicionar parcela/i }))
-
-    const typed = screen.getAllByLabelText(/valor da parcela/i)[0]
-    await userEvent.clear(typed)
-    await userEvent.type(typed, '8000')
-    expect(typed).toHaveValue(money(80))
-
-    await userEvent.click(screen.getByRole('button', { name: /adicionar parcela/i }))
-
-    const amounts = screen.getAllByLabelText(/valor da parcela/i)
-    expect(amounts[0]).toHaveValue(money(80))
-    // The two rows nobody touched still take the new suggestion.
-    expect(amounts[1]).toHaveValue(money(33.33))
-    expect(amounts[2]).toHaveValue(money(33.33))
-  })
-
-  it('forgets the edited row once it is removed, so its successor is suggested again', async () => {
-    mockHooks()
-    renderWithToast(<NewContractForm onClose={vi.fn()} />)
-    await pickProduct(/Vestido Azul/)
-    await userEvent.click(screen.getByRole('button', { name: /adicionar parcela/i }))
-
-    const typed = screen.getByLabelText(/valor da parcela/i)
-    await userEvent.clear(typed)
-    await userEvent.type(typed, '8000')
-    await userEvent.click(screen.getByRole('button', { name: /remover parcela/i }))
-    await userEvent.click(screen.getByRole('button', { name: /adicionar parcela/i }))
-
-    expect(screen.getByLabelText(/valor da parcela/i)).toHaveValue(money(100))
-  })
-
-  it('says so, in warning ink, when a contract has no instalments at all', async () => {
-    mockHooks()
-    renderWithToast(<NewContractForm onClose={vi.fn()} />)
-    await pickProduct(/Vestido Azul/)
-
-    expect(screen.getByText('sem parcelas definidas')).toBeInTheDocument()
-
-    await userEvent.click(screen.getByRole('button', { name: /adicionar parcela/i }))
-    await userEvent.click(screen.getByRole('button', { name: /adicionar parcela/i }))
-
-    expect(screen.queryByText('sem parcelas definidas')).not.toBeInTheDocument()
-    expect(screen.getByText('em 2× de R$ 50,00')).toBeInTheDocument()
-  })
-
-  it('reports the sum rather than a per-instalment figure once the rows differ', async () => {
-    mockHooks()
-    renderWithToast(<NewContractForm onClose={vi.fn()} />)
-    await pickProduct(/Vestido Azul/)
-    await userEvent.click(screen.getByRole('button', { name: /adicionar parcela/i }))
-    await userEvent.click(screen.getByRole('button', { name: /adicionar parcela/i }))
-
-    const typed = screen.getAllByLabelText(/valor da parcela/i)[0]
-    await userEvent.clear(typed)
-    await userEvent.type(typed, '8000')
-
-    // 80 + 50: "em 2× de R$ 50,00" would be a claim neither row supports.
-    expect(screen.getByText('em 2× · R$ 130,00 no total')).toBeInTheDocument()
-  })
-})

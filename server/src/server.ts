@@ -5,6 +5,7 @@ import { signingApp } from './signingApp.js'
 import { detectLanCandidates } from './network/lanNetwork.js'
 import { runContractBackfill } from './services/contractBackfill.js'
 import { runProductBackfill } from './services/productBackfill.js'
+import { runPaymentBackfill } from './services/paymentBackfill.js'
 import { relayCredentialsFromEnv, resumeRelayConnections } from './network/relayResume.js'
 import { closeAllRelayConnections } from './network/relayRegistry.js'
 import { pruneExpiredIdempotencyKeys } from './network/relayIdempotencyPrune.js'
@@ -14,6 +15,7 @@ const host = process.env.HOST ?? '0.0.0.0'
 
 await runContractBackfill()
 await runProductBackfill()
+await runPaymentBackfill()
 
 // Relay mode's WebSocket-per-session doesn't survive a process restart on
 // its own (unlike LAN mode, which is stateless) — reopen one for every
