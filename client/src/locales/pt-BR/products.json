@@ -34,7 +34,9 @@
     "photoCounter": "{{index}} / {{total}}",
     "arrowHint": "Use ← → para ver as outras fotos.",
     "situation": "Situação",
-    "openRecord": "Abrir ficha do produto"
+    "openRecord": "Abrir ficha do produto",
+    "nextReservation": "Próxima reserva",
+    "nextReservationDetail": "{{from}} a {{to}} · {{client}} · contrato {{contract}}"
   },
   "status": {
     "active": "Disponível",
@@ -102,6 +104,10 @@
     "code": "Nº",
     "rentalPrice": "Aluguel",
     "size": "Tam."
+  },
+  "card": {
+    "nextReservation": "Reservada a partir de {{date}}",
+    "nextReservationShort": "a partir de {{date}}"
   },
   "codePrefix": "Nº "
 }

@@ -10,6 +10,7 @@ import { cn } from '../../lib/cn.ts'
 import { useLocale } from '../../lib/LocaleContext.tsx'
 import { formatCurrency, getLocaleConfig } from '../../lib/locale.ts'
 import { productState } from './productState.ts'
+import { NextReservationDetail } from './NextReservation.tsx'
 import type { Product } from './productSchemas.ts'
 
 /**
@@ -232,6 +233,11 @@ function ProductZoomPanel({ product, onClose }: { product: Product; onClose: () 
             <dd>
               <StatusBadge state={productState(product)} />
             </dd>
+            {product.nextReservation && (
+              <div className="col-span-2">
+                <NextReservationDetail reservation={product.nextReservation} />
+              </div>
+            )}
           </dl>
 
           <div className="flex flex-shrink-0 flex-col gap-2 border-t border-hairline bg-surface px-4 py-3">

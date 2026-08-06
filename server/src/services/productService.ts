@@ -36,8 +36,25 @@ export interface ProductDTO {
   photos: string[]
   status: ProductStatus
   availability: DerivedAvailability
+  /**
+   * This piece's next confirmed booking, set only while `availability` reads
+   * `available` — a piece already reserved, rented, or in maintenance shows
+   * that state instead, which already says it's unavailable. Carries enough
+   * to answer "booked for who, and when" without opening the piece's
+   * allocation history.
+   */
+  nextReservation: UpcomingReservation | null
   hasAllocationHistory: boolean
   createdAt: Date
+}
+
+export interface UpcomingReservation {
+  /** First day of the piece's next booked rental. */
+  from: Date
+  /** Planned return day of that same booking. */
+  to: Date
+  clientName: string
+  contractNumber: number
 }
 
 export interface CreateProductInput {
@@ -80,24 +97,82 @@ interface ProductRow {
   createdAt: Date
 }
 
-function toDTO(row: ProductRow, availability: DerivedAvailability, hasAllocationHistory: boolean): ProductDTO {
+interface AvailabilityInfo {
+  availability: DerivedAvailability
+  nextReservation: UpcomingReservation | null
+}
+
+const STILL_AVAILABLE: AvailabilityInfo = { availability: 'available', nextReservation: null }
+
+function toDTO(row: ProductRow, info: AvailabilityInfo, hasAllocationHistory: boolean): ProductDTO {
   return {
     ...row,
     photos: JSON.parse(row.photos) as string[],
     status: row.status as ProductStatus,
-    availability,
+    availability: info.availability,
+    nextReservation: info.nextReservation,
     hasAllocationHistory,
   }
 }
 
-async function availabilityFor(productId: string, asOf = new Date()): Promise<DerivedAvailability> {
-  const maintenanceBufferDays = await maintenanceBufferForProduct(productId)
-  const windows = await loadBlockingWindows([productId], maintenanceBufferDays, asOf)
-  return derivedAvailability(windows, asOf, { maintenanceBufferDays })
+function availabilityInfoFrom(windows: AllocationWindow[], asOf: Date, maintenanceBufferDays: number): AvailabilityInfo {
+  // `nextReservation` is filled in by a follow-up query, scoped to only the
+  // products that land here `available` — see upcomingReservationsByProductId.
+  return { availability: derivedAvailability(windows, asOf, { maintenanceBufferDays }), nextReservation: null }
 }
 
-async function availabilityByProductId(productIds: string[]): Promise<Map<string, DerivedAvailability>> {
-  const result = new Map<string, DerivedAvailability>()
+/**
+ * The earliest still-ahead `reserved` allocation per product, enriched with
+ * who it's for and which contract — the one piece of this feature that needs
+ * more than the occupancy windows already loaded for `availability`, so it's
+ * a deliberately separate, second query rather than folded into
+ * `loadBlockingWindows` (which every other occupancy caller uses and has no
+ * reason to join Contract/Client for).
+ *
+ * `contractId: { not: null }` is defensive, not load-bearing under the
+ * current schema — every `Allocation` is expected to carry one — but the
+ * column itself is still nullable, and a reservation this function can't
+ * attribute to a contract number is one it has no business surfacing.
+ */
+async function upcomingReservationsByProductId(
+  productIds: string[],
+  asOf: Date,
+): Promise<Map<string, UpcomingReservation>> {
+  const result = new Map<string, UpcomingReservation>()
+  if (productIds.length === 0) return result
+
+  const today = new Date(Date.UTC(asOf.getUTCFullYear(), asOf.getUTCMonth(), asOf.getUTCDate()))
+  // ast-grep-ignore: no-unscoped-location-model — Scoped to the caller-verified productIds, same pattern as availabilityByProductId's own allocation lookup.
+  const allocations = await prisma.allocation.findMany({
+    where: { productId: { in: productIds }, status: 'reserved', checkoutDate: { gt: today }, contractId: { not: null } },
+    include: { client: true, contract: { select: { number: true } } },
+    orderBy: { checkoutDate: 'asc' },
+  })
+  // Ordered ascending, so the first row seen per product is its earliest
+  // upcoming booking — nothing later can displace it.
+  for (const allocation of allocations) {
+    if (result.has(allocation.productId) || !allocation.contract) continue
+    result.set(allocation.productId, {
+      from: allocation.checkoutDate,
+      to: allocation.dueDate,
+      clientName: allocation.client.name,
+      contractNumber: allocation.contract.number,
+    })
+  }
+  return result
+}
+
+async function availabilityFor(productId: string, asOf = new Date()): Promise<AvailabilityInfo> {
+  const maintenanceBufferDays = await maintenanceBufferForProduct(productId)
+  const windows = await loadBlockingWindows([productId], maintenanceBufferDays, asOf)
+  const info = availabilityInfoFrom(windows, asOf, maintenanceBufferDays)
+  if (info.availability !== 'available') return info
+  const reservations = await upcomingReservationsByProductId([productId], asOf)
+  return { ...info, nextReservation: reservations.get(productId) ?? null }
+}
+
+async function availabilityByProductId(productIds: string[]): Promise<Map<string, AvailabilityInfo>> {
+  const result = new Map<string, AvailabilityInfo>()
   if (productIds.length === 0) return result
 
   const asOf = new Date()
@@ -129,10 +204,23 @@ async function availabilityByProductId(productIds: string[]): Promise<Map<string
         byProduct.set(allocation.productId, [...(byProduct.get(allocation.productId) ?? []), toWindow(allocation)])
       }
       for (const id of ids) {
-        result.set(id, derivedAvailability(byProduct.get(id) ?? [], asOf, { maintenanceBufferDays }))
+        result.set(id, availabilityInfoFrom(byProduct.get(id) ?? [], asOf, maintenanceBufferDays))
       }
     }),
   )
+
+  // Second pass, scoped to only the products that actually need it: joining
+  // Contract/Client for every product in a catalogue just to answer "who is
+  // it reserved for" on the handful reading `available` would be wasted work
+  // on the majority that are reserved/rented/in maintenance already.
+  const availableIds = productIds.filter((id) => result.get(id)?.availability === 'available')
+  if (availableIds.length > 0) {
+    const reservations = await upcomingReservationsByProductId(availableIds, asOf)
+    for (const id of availableIds) {
+      const reservation = reservations.get(id)
+      if (reservation) result.set(id, { availability: 'available', nextReservation: reservation })
+    }
+  }
 
   return result
 }
@@ -203,7 +291,7 @@ export async function createProduct(data: CreateProductInput): Promise<ProductDT
         },
         useSerializable ? { isolationLevel: Prisma.TransactionIsolationLevel.Serializable } : undefined,
       )
-      return toDTO(row, 'available', false)
+      return toDTO(row, STILL_AVAILABLE, false)
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -227,7 +315,7 @@ export async function listProducts(locationId: string): Promise<ProductDTO[]> {
   const availability = await availabilityByProductId(rows.map((row) => row.id))
   const withHistory = await historyByProductId(rows.map((row) => row.id))
   return rows.map((row) =>
-    toDTO(row, availability.get(row.id) ?? 'available', withHistory.has(row.id)),
+    toDTO(row, availability.get(row.id) ?? STILL_AVAILABLE, withHistory.has(row.id)),
   )
 }
 
@@ -261,7 +349,7 @@ export async function listProductsForLocation(
   const availability = await availabilityByProductId(rows.map((row) => row.id))
   const withHistory = await historyByProductId(rows.map((row) => row.id))
   return rows.map((row) =>
-    toDTO(row, availability.get(row.id) ?? 'available', withHistory.has(row.id)),
+    toDTO(row, availability.get(row.id) ?? STILL_AVAILABLE, withHistory.has(row.id)),
   )
 }
 

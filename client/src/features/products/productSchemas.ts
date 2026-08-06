@@ -32,8 +32,22 @@ export interface Product extends ProductFormValues {
   code: number | null
   status: ProductStatus
   availability: ProductAvailability
+  /**
+   * Set only while `availability` is `'available'` — see server/productService.ts.
+   * Optional (not just nullable) so the many product fixtures across the test
+   * suite that predate this field keep compiling without every one of them
+   * being touched; consumers treat missing and `null` the same.
+   */
+  nextReservation?: UpcomingReservation | null
   hasAllocationHistory: boolean
   createdAt: string
+}
+
+export interface UpcomingReservation {
+  from: string
+  to: string
+  clientName: string
+  contractNumber: number
 }
 
 export interface PhotoTokenResponse {

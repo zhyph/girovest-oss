@@ -14,6 +14,7 @@ import { formatCurrency, getLocaleConfig } from '../../lib/locale.ts'
 import { useLocale } from '../../lib/LocaleContext.tsx'
 import { useSectionTour } from '../onboarding/useSectionTour.ts'
 import { useProducts, PRODUCTS_KEY } from './useProducts.ts'
+import { NextReservationHint, NextReservationTag } from './NextReservation.tsx'
 import { ProductDrawer } from './ProductDrawer.tsx'
 import { AddPhotosSessionModal } from './AddPhotosSessionModal.tsx'
 import { ProductFacetMenu, ProductSortMenu } from './ProductBrowsingMenus.tsx'
@@ -191,7 +192,12 @@ export function ProductsPage() {
         key: 'state',
         header: t('fields.status'),
         width: '1fr',
-        cell: (product) => <StatusBadge state={productState(product)} />,
+        cell: (product) => (
+          <span className="flex flex-wrap items-center gap-1.5">
+            <StatusBadge state={productState(product)} />
+            <NextReservationTag reservation={product.nextReservation} />
+          </span>
+        ),
       },
       {
         key: 'price',
@@ -348,6 +354,13 @@ export function ProductsPage() {
                     </span>
                   </span>
                 </button>
+                {/*
+                  Own element rather than a third line inside the caption
+                  button: it only exists for a piece that is Disponível AND
+                  already booked ahead, so a card with nothing to say here
+                  keeps exactly its current height.
+                */}
+                <NextReservationHint reservation={product.nextReservation} className="mx-2.5 mb-2.5 -mt-1" />
               </div>
             ))}
           </div>
