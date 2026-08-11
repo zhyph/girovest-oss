@@ -1,11 +1,12 @@
 import { useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Navigate } from 'react-router'
+import { Navigate, Link } from 'react-router'
 import { Button } from '../../components/ui/button.tsx'
 import { Input } from '../../components/ui/input.tsx'
 import { Card, CardBody, CardHeader } from '../../components/ui/card.tsx'
 import { useAuth } from '../../lib/useAuth.ts'
 import { useSetupStatus } from '../../lib/useSetup.ts'
+import { RecoveryCodeReveal } from '../../components/RecoveryCodeReveal.tsx'
 
 export function LoginPage() {
   const { t } = useTranslation(['auth', 'common'])
@@ -14,15 +15,39 @@ export function LoginPage() {
   const [loginValue, setLoginValue] = useState('')
   const [password, setPassword] = useState('')
   const [errorCode, setErrorCode] = useState<string | null>(null)
+  // Set only for an account that predates recovery codes: the server backfills
+  // one on this exact successful login (see authRoutes.ts) and this is the
+  // only time it will ever be handed back, so it has to be shown before
+  // moving on — even though isLoggedIn is already true at this point.
+  const [backfilledCode, setBackfilledCode] = useState<string | null>(null)
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
     setErrorCode(null)
     try {
-      await login(loginValue, password)
+      const recoveryCode = await login(loginValue, password)
+      if (recoveryCode) setBackfilledCode(recoveryCode)
     } catch (error) {
       setErrorCode((error as { code?: string }).code ?? 'UNKNOWN')
     }
+  }
+
+  // Checked before isLoggedIn below on purpose: login() already flipped
+  // isLoggedIn true by the time backfilledCode is set, and the reveal has to
+  // win that race or it would never render at all.
+  if (backfilledCode) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Card className="w-80">
+          <CardHeader>
+            <h1 className="text-lg font-semibold">{t('auth:recoveryCode.title')}</h1>
+          </CardHeader>
+          <CardBody>
+            <RecoveryCodeReveal code={backfilledCode} onContinue={() => setBackfilledCode(null)} />
+          </CardBody>
+        </Card>
+      </div>
+    )
   }
 
   // Once login() resolves, isLoggedIn flips true (react-query's cache update
@@ -64,6 +89,9 @@ export function LoginPage() {
               </p>
             )}
             <Button type="submit">{t('auth:submit')}</Button>
+            <Link to="/recuperar-senha" className="text-center text-sm text-muted-foreground hover:text-foreground">
+              {t('auth:forgotPassword')}
+            </Link>
           </form>
         </CardBody>
       </Card>

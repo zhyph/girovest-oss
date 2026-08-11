@@ -4,7 +4,7 @@ import { ChunkErrorBoundary } from '../components/ChunkErrorBoundary.tsx'
 import { RouteFallback } from '../components/RouteFallback.tsx'
 import { ProtectedRoute } from './ProtectedRoute.tsx'
 import { AppLayout } from './AppLayout.tsx'
-import { LoginPage, SetupPage, DashboardPage, ClientsPage, ProductsPage, ContractsPage, CalendarPage, SettingsPage, ChangelogPage, ContractPrintPage } from './lazyPages.ts'
+import { LoginPage, RecoverPasswordPage, SupportResetPage, SetupPage, DashboardPage, ClientsPage, ProductsPage, ContractsPage, CalendarPage, SettingsPage, ChangelogPage, ContractPrintPage } from './lazyPages.ts'
 
 export function AppRouter() {
   return (
@@ -23,6 +23,22 @@ export function AppRouter() {
           element={
             <Suspense fallback={<RouteFallback />}>
               <LoginPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/recuperar-senha"
+          element={
+            <Suspense fallback={<RouteFallback />}>
+              <RecoverPasswordPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/recuperar-senha/suporte"
+          element={
+            <Suspense fallback={<RouteFallback />}>
+              <SupportResetPage />
             </Suspense>
           }
         />

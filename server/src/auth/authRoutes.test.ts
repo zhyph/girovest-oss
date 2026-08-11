@@ -1,8 +1,10 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
 import request from 'supertest'
+import { generateKeyPairSync, sign } from 'node:crypto'
 import { app } from '../app.js'
 import { prisma } from '../db/client.js'
-import { hashPassword } from './passwords.js'
+import { hashPassword, verifyPassword } from './passwords.js'
+import { generateRecoveryCode, hashRecoveryCode } from './recoveryCodes.js'
 import { BACKGROUND_REQUEST_HEADER } from './authMiddleware.js'
 
 describe('POST /api/auth/login', () => {
@@ -111,6 +113,357 @@ describe('GET /api/auth/me', () => {
   it('rejects a request with no token', async () => {
     const response = await request(app).get('/api/auth/me')
     expect(response.status).toBe(401)
+  })
+})
+
+describe('POST /api/auth/login recovery-code backfill', () => {
+  let locationId: string
+
+  beforeAll(async () => {
+    const location = await prisma.location.create({
+      data: { name: 'Loja Teste Backfill', address: 'Rua Teste, 5' },
+    })
+    locationId = location.id
+
+    // No recoveryCodeHash on purpose: this is exactly the shape of every
+    // account that existed before the feature shipped.
+    await prisma.staff.create({
+      data: {
+        name: 'Elis Owner',
+        login: 'elis',
+        passwordHash: await hashPassword('correct-horse'),
+        role: 'owner',
+        locationId,
+      },
+    })
+  })
+
+  afterAll(async () => {
+    await prisma.staff.deleteMany({ where: { locationId } })
+    await prisma.location.delete({ where: { id: locationId } })
+  })
+
+  it('mints and returns a recovery code on the first successful login of an account that has none', async () => {
+    const response = await request(app).post('/api/auth/login').send({ login: 'elis', password: 'correct-horse' })
+
+    expect(response.status).toBe(200)
+    expect(typeof response.body.recoveryCode).toBe('string')
+
+    const staff = await prisma.staff.findUniqueOrThrow({ where: { login: 'elis' } })
+    expect(staff.recoveryCodeHash).not.toBeNull()
+  })
+
+  it('does not mint a second code, or return one, on a later login', async () => {
+    const response = await request(app).post('/api/auth/login').send({ login: 'elis', password: 'correct-horse' })
+
+    expect(response.status).toBe(200)
+    expect(response.body.recoveryCode).toBeUndefined()
+  })
+
+  it('never mints one on a failed login attempt', async () => {
+    const location = await prisma.location.create({
+      data: { name: 'Loja Teste Backfill Falha', address: 'Rua Teste, 6' },
+    })
+    await prisma.staff.create({
+      data: {
+        name: 'Fia Owner',
+        login: 'fia',
+        passwordHash: await hashPassword('correct-horse'),
+        role: 'owner',
+        locationId: location.id,
+      },
+    })
+
+    const response = await request(app).post('/api/auth/login').send({ login: 'fia', password: 'wrong-password' })
+
+    expect(response.status).toBe(401)
+    const staff = await prisma.staff.findUniqueOrThrow({ where: { login: 'fia' } })
+    expect(staff.recoveryCodeHash).toBeNull()
+
+    await prisma.staff.deleteMany({ where: { locationId: location.id } })
+    await prisma.location.delete({ where: { id: location.id } })
+  })
+})
+
+describe('POST /api/auth/recover', () => {
+  let locationId: string
+  let recoveryCode: string
+
+  beforeAll(async () => {
+    const location = await prisma.location.create({
+      data: { name: 'Loja Teste Recover', address: 'Rua Teste, 3' },
+    })
+    locationId = location.id
+    recoveryCode = generateRecoveryCode()
+
+    await prisma.staff.create({
+      data: {
+        name: 'Carla Owner',
+        login: 'carla',
+        passwordHash: await hashPassword('old-password'),
+        role: 'owner',
+        locationId,
+        recoveryCodeHash: await hashRecoveryCode(recoveryCode),
+      },
+    })
+  })
+
+  afterAll(async () => {
+    await prisma.staff.deleteMany({ where: { locationId } })
+    await prisma.location.delete({ where: { id: locationId } })
+  })
+
+  it('rejects an unknown login with INVALID_CREDENTIALS (not a different error)', async () => {
+    const response = await request(app)
+      .post('/api/auth/recover')
+      .send({ login: 'nobody', recoveryCode: 'WHATEVER-CODE-HERE-NOW', newPassword: 'brand-new-password' })
+
+    expect(response.status).toBe(401)
+    expect(response.body.code).toBe('INVALID_CREDENTIALS')
+  })
+
+  it('rejects a wrong recovery code', async () => {
+    const response = await request(app)
+      .post('/api/auth/recover')
+      .send({ login: 'carla', recoveryCode: 'WRONG-CODE-0000-0000', newPassword: 'brand-new-password' })
+
+    expect(response.status).toBe(401)
+    expect(response.body.code).toBe('INVALID_CREDENTIALS')
+  })
+
+  it('accepts the right code case/dash-insensitively, sets the new password, and hands back a fresh code', async () => {
+    const response = await request(app).post('/api/auth/recover').send({
+      login: 'carla',
+      recoveryCode: recoveryCode.toLowerCase().replace(/-/g, ' '),
+      newPassword: 'brand-new-password',
+    })
+
+    expect(response.status).toBe(200)
+    expect(typeof response.body.recoveryCode).toBe('string')
+    expect(response.body.recoveryCode).not.toBe(recoveryCode)
+
+    const staff = await prisma.staff.findUniqueOrThrow({ where: { login: 'carla' } })
+    await expect(verifyPassword('brand-new-password', staff.passwordHash)).resolves.toBe(true)
+
+    // The old password no longer works.
+    const oldLogin = await request(app).post('/api/auth/login').send({ login: 'carla', password: 'old-password' })
+    expect(oldLogin.status).toBe(401)
+
+    // Nor does the just-used recovery code -- it was single-use, rotated away.
+    const reuse = await request(app)
+      .post('/api/auth/recover')
+      .send({ login: 'carla', recoveryCode, newPassword: 'another-password' })
+    expect(reuse.status).toBe(401)
+  })
+
+  it('rejects an account with no recovery code yet (accounts created before this feature)', async () => {
+    const location = await prisma.location.create({
+      data: { name: 'Loja Teste Sem Recovery', address: 'Rua Teste, 4' },
+    })
+    await prisma.staff.create({
+      data: {
+        name: 'Duda Owner',
+        login: 'duda',
+        passwordHash: await hashPassword('some-password'),
+        role: 'owner',
+        locationId: location.id,
+      },
+    })
+
+    const response = await request(app)
+      .post('/api/auth/recover')
+      .send({ login: 'duda', recoveryCode: 'ANY-CODE-AT-ALL-0000', newPassword: 'brand-new-password' })
+
+    expect(response.status).toBe(401)
+    expect(response.body.code).toBe('INVALID_CREDENTIALS')
+
+    await prisma.staff.deleteMany({ where: { locationId: location.id } })
+    await prisma.location.delete({ where: { id: location.id } })
+  })
+})
+
+describe('POST /api/auth/reset-with-support-token', () => {
+  let locationId: string
+  const INSTALL_ID = 'b2a4f6c8-1111-4222-8333-444455556666'
+  const { privateKey, publicKey } = generateKeyPairSync('ed25519')
+  const PUBLIC_SPKI = publicKey.export({ type: 'spki', format: 'der' }).toString('base64')
+  const originalEnv = { installId: process.env.GIROVEST_INSTALL_ID, pubkey: process.env.GIROVEST_ACTIVATION_PUBKEY }
+
+  function b64url(buf: Buffer): string {
+    return buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+  }
+  function mint(login: string, purpose = 'password_reset', issuedAt = new Date().toISOString()): string {
+    const canonical = JSON.stringify({ installId: INSTALL_ID, login, purpose, issuedAt })
+    const data = Buffer.from(canonical, 'utf-8')
+    return `${b64url(data)}.${b64url(sign(null, data, privateKey))}`
+  }
+
+  beforeAll(async () => {
+    const location = await prisma.location.create({
+      data: { name: 'Loja Teste Support Reset', address: 'Rua Teste, 7' },
+    })
+    locationId = location.id
+    await prisma.staff.create({
+      data: {
+        name: 'Gil Owner',
+        login: 'gil',
+        passwordHash: await hashPassword('old-password'),
+        role: 'owner',
+        locationId,
+      },
+    })
+  })
+
+  afterAll(async () => {
+    await prisma.staff.deleteMany({ where: { locationId } })
+    await prisma.location.delete({ where: { id: locationId } })
+  })
+
+  beforeEach(() => {
+    process.env.GIROVEST_INSTALL_ID = INSTALL_ID
+    process.env.GIROVEST_ACTIVATION_PUBKEY = PUBLIC_SPKI
+  })
+
+  afterEach(() => {
+    if (originalEnv.installId === undefined) delete process.env.GIROVEST_INSTALL_ID
+    else process.env.GIROVEST_INSTALL_ID = originalEnv.installId
+    if (originalEnv.pubkey === undefined) delete process.env.GIROVEST_ACTIVATION_PUBKEY
+    else process.env.GIROVEST_ACTIVATION_PUBKEY = originalEnv.pubkey
+  })
+
+  it('resets the password and hands back a fresh recovery code for a valid ticket', async () => {
+    const response = await request(app)
+      .post('/api/auth/reset-with-support-token')
+      .send({ login: 'gil', token: mint('gil'), newPassword: 'support-reset-password' })
+
+    expect(response.status).toBe(200)
+    expect(typeof response.body.recoveryCode).toBe('string')
+
+    const staff = await prisma.staff.findUniqueOrThrow({ where: { login: 'gil' } })
+    await expect(verifyPassword('support-reset-password', staff.passwordHash)).resolves.toBe(true)
+    expect(staff.recoveryCodeHash).not.toBeNull()
+  })
+
+  // Without this, an approved ticket has no expiry shorter than 48h and
+  // nothing else ever marks it spent -- it could reset the password an
+  // unlimited number of times inside that window.
+  it('rejects reusing the same ticket a second time', async () => {
+    const token = mint('gil')
+    const first = await request(app)
+      .post('/api/auth/reset-with-support-token')
+      .send({ login: 'gil', token, newPassword: 'first-reset-password' })
+    expect(first.status).toBe(200)
+
+    const second = await request(app)
+      .post('/api/auth/reset-with-support-token')
+      .send({ login: 'gil', token, newPassword: 'second-reset-password' })
+    expect(second.status).toBe(401)
+
+    const staff = await prisma.staff.findUniqueOrThrow({ where: { login: 'gil' } })
+    await expect(verifyPassword('first-reset-password', staff.passwordHash)).resolves.toBe(true)
+    await expect(verifyPassword('second-reset-password', staff.passwordHash)).resolves.toBe(false)
+  })
+
+  it('rejects a case-mismatched login even though the ticket carries an exact login', async () => {
+    const response = await request(app)
+      .post('/api/auth/reset-with-support-token')
+      .send({ login: 'GIL', token: mint('gil'), newPassword: 'support-reset-password' })
+
+    expect(response.status).toBe(401)
+  })
+
+  it('rejects a ticket minted for a different login', async () => {
+    const response = await request(app)
+      .post('/api/auth/reset-with-support-token')
+      .send({ login: 'gil', token: mint('someone-else'), newPassword: 'support-reset-password' })
+
+    expect(response.status).toBe(401)
+    expect(response.body.code).toBe('INVALID_CREDENTIALS')
+  })
+
+  it('rejects a ticket minted for a different purpose', async () => {
+    const response = await request(app)
+      .post('/api/auth/reset-with-support-token')
+      .send({ login: 'gil', token: mint('gil', 'activation'), newPassword: 'support-reset-password' })
+
+    expect(response.status).toBe(401)
+  })
+
+  it('refuses when the build has no activation config, regardless of the token', async () => {
+    delete process.env.GIROVEST_INSTALL_ID
+    delete process.env.GIROVEST_ACTIVATION_PUBKEY
+
+    const response = await request(app)
+      .post('/api/auth/reset-with-support-token')
+      .send({ login: 'gil', token: mint('gil'), newPassword: 'support-reset-password' })
+
+    expect(response.status).toBe(401)
+  })
+})
+
+describe('POST /api/auth/recovery-code/rotate', () => {
+  let locationId: string
+
+  beforeAll(async () => {
+    const location = await prisma.location.create({
+      data: { name: 'Loja Teste Rotate', address: 'Rua Teste, 8' },
+    })
+    locationId = location.id
+    await prisma.staff.create({
+      data: {
+        name: 'Helo Owner',
+        login: 'helo',
+        passwordHash: await hashPassword('correct-horse'),
+        role: 'owner',
+        locationId,
+        recoveryCodeHash: await hashRecoveryCode('OLDC-ODE0-0000-0000'),
+      },
+    })
+  })
+
+  afterAll(async () => {
+    await prisma.staff.deleteMany({ where: { locationId } })
+    await prisma.location.delete({ where: { id: locationId } })
+  })
+
+  it('requires an authenticated session', async () => {
+    const response = await request(app).post('/api/auth/recovery-code/rotate')
+    expect(response.status).toBe(401)
+  })
+
+  it('requires the current password, not just a valid session', async () => {
+    const login = await request(app).post('/api/auth/login').send({ login: 'helo', password: 'correct-horse' })
+
+    const response = await request(app)
+      .post('/api/auth/recovery-code/rotate')
+      .set('Authorization', `Bearer ${login.body.token}`)
+      .send({ currentPassword: 'wrong-password' })
+
+    // 403, not 401: this session token IS valid (requireAuth already passed)
+    // -- 401 here would make apiFetch clear it client-side regardless of
+    // suppressAuthLogoutEvent, logging her out over a mistyped password on
+    // an otherwise-fine session.
+    expect(response.status).toBe(403)
+    expect(response.body.code).toBe('INVALID_CREDENTIALS')
+  })
+
+  it('mints a fresh code for the logged-in staff, replacing the old one', async () => {
+    const login = await request(app).post('/api/auth/login').send({ login: 'helo', password: 'correct-horse' })
+
+    const response = await request(app)
+      .post('/api/auth/recovery-code/rotate')
+      .set('Authorization', `Bearer ${login.body.token}`)
+      .send({ currentPassword: 'correct-horse' })
+
+    expect(response.status).toBe(200)
+    expect(typeof response.body.recoveryCode).toBe('string')
+    expect(response.body.recoveryCode).not.toBe('OLDC-ODE0-0000-0000')
+
+    // The old code, shown once at some earlier point, no longer works.
+    const recover = await request(app)
+      .post('/api/auth/recover')
+      .send({ login: 'helo', recoveryCode: 'OLDC-ODE0-0000-0000', newPassword: 'irrelevant-password' })
+    expect(recover.status).toBe(401)
   })
 })
 

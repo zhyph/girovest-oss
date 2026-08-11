@@ -18,7 +18,7 @@ import {
 import { runManualBackup, runManualRestore, type RunManualBackupResult } from './manualBackupActions.ts'
 import { resolveInstallId } from './installId.ts'
 import { setupAutoUpdater } from './updater.ts'
-import { ensureActivated, type ActivationState } from './activation.ts'
+import { ensureActivated, resolveHostname, type ActivationState } from './activation.ts'
 import { resolveMachineHash } from './machineId.ts'
 import { activationScreenHtml } from './activationScreen.ts'
 
@@ -325,11 +325,46 @@ function attachConsoleLogging(win: BrowserWindow): void {
       return
     }
 
+    // Used to reload straight away with nothing said: whoever was mid-task
+    // (mid-login, most importantly -- see the login-lockout investigation
+    // this was changed for) saw the page flash and empty itself with zero
+    // explanation, indistinguishable from the app just doing nothing. A
+    // blocking dialog first means the reload is never silent, at the cost of
+    // one click; showErrorBox blocks this handler until dismissed, which is
+    // fine here -- there is nothing else for the main process to do until
+    // the shop has read it.
+    dialog.showErrorBox(
+      'Girovest Restarting',
+      'The application ran into a problem and this screen needs to restart. Anything you were entering (like a login attempt) was not saved -- please try again after it reloads.',
+    )
     win.webContents.reload()
   })
   win.webContents.on('unresponsive', () => {
     void logError('Renderer became unresponsive', undefined)
   })
+}
+
+// Matches the Worker's own cap (infra/update-proxy/src/worker.ts,
+// DIAGNOSTIC_LOG_MAX_CHARS) -- sending more than it will keep would just
+// waste the upload.
+const DIAGNOSTIC_LOG_MAX_CHARS = 100_000
+
+/**
+ * The tail of this run's own main.log, for the "Enviar diagnóstico" button
+ * (client/src/components/DiagnosticsButton.tsx). electron-log's own
+ * `getFile().path` is used rather than guessing the platform path, since that
+ * guess would silently drift from wherever electron-log is actually
+ * configured to write.
+ */
+async function readRecentLogTail(maxChars: number): Promise<string> {
+  try {
+    const log = (await import('electron-log')).default
+    const content = fs.readFileSync(log.transports.file.getFile().path, 'utf-8')
+    return content.slice(-maxChars)
+  } catch (error) {
+    void logError('Failed to read log tail for diagnostics:', error)
+    return ''
+  }
 }
 
 // This app ships no old build to roll back to (NSIS installs in place, no
@@ -385,6 +420,11 @@ async function startServer(): Promise<string | null> {
     GIROVEST_UPDATE_URL: GIROVEST_UPDATE_URL || '',
     GIROVEST_UPDATE_KEY: GIROVEST_UPDATE_KEY || '',
     GIROVEST_INSTALL_ID: resolveInstallId(userDataPath),
+    // Same public key the activation lock already verifies Ed25519 tokens
+    // with (see activation.ts) -- reused, not duplicated, so a support-issued
+    // password-reset ticket (server/src/auth/passwordResetTickets.ts) needs
+    // no secret of its own to check.
+    GIROVEST_ACTIVATION_PUBKEY: GIROVEST_ACTIVATION_PUBKEY || '',
   }
 
   // Captured here (rather than left as backupDatabaseIfNeeded's discarded
@@ -669,6 +709,67 @@ if (app) {
       const next = await resolveActivation(installId, userDataPath)
       loadAppOrActivation(win, next)
       return next.state
+    })
+
+    // Reachable from the login screen, not just Settings: the incident this
+    // was built for was a login that failed silently, and Settings sits
+    // behind the very login that can be broken (see DiagnosticsButton.tsx,
+    // mounted at the app root). Same product key and Worker as
+    // activation/updates -- no new config needed.
+    ipcMain.handle('diagnostics:send', async () => {
+      if (!GIROVEST_UPDATE_URL || !GIROVEST_UPDATE_KEY) {
+        return { ok: false, reason: 'not_configured' }
+      }
+      const log = await readRecentLogTail(DIAGNOSTIC_LOG_MAX_CHARS)
+      if (log === '') {
+        return { ok: false, reason: 'no_log' }
+      }
+      try {
+        const response = await fetch(`${GIROVEST_UPDATE_URL.replace(/\/+$/, '')}/diagnostics`, {
+          method: 'POST',
+          headers: { authorization: `Bearer ${GIROVEST_UPDATE_KEY}`, 'content-type': 'application/json' },
+          body: JSON.stringify({ installId, hostname: resolveHostname(), log }),
+        })
+        return { ok: response.ok }
+      } catch (error) {
+        void logError('Failed to send diagnostics:', error)
+        return { ok: false, reason: 'network' }
+      }
+    })
+
+    // Layer 2 of password recovery, for when the self-service recovery code
+    // (see recoveryCodes.ts server-side) is itself lost: same pending/poll
+    // shape as activation, minus the machine binding, plus a human on the
+    // other end -- see infra/update-proxy/src/lib/passwordReset.ts's header
+    // for the full design. Called repeatedly by SupportResetPage.tsx
+    // (a "tentar novamente" button, not a background timer): each call is
+    // both "please create/refresh my pending request" and "check whether it
+    // was approved yet" in one round trip.
+    ipcMain.handle('passwordReset:request', async (_event, args: { login: string }) => {
+      if (!GIROVEST_UPDATE_URL || !GIROVEST_UPDATE_KEY) {
+        return { status: 'unreachable' as const }
+      }
+      try {
+        const response = await fetch(`${GIROVEST_UPDATE_URL.replace(/\/+$/, '')}/password-reset`, {
+          method: 'POST',
+          headers: { authorization: `Bearer ${GIROVEST_UPDATE_KEY}`, 'content-type': 'application/json' },
+          body: JSON.stringify({ installId, login: args.login, hostname: resolveHostname() }),
+        })
+        const body = (await response.json().catch(() => ({}))) as { status?: unknown; token?: unknown; code?: unknown }
+        if (response.status === 200 && body.status === 'approved' && typeof body.token === 'string') {
+          return { status: 'approved' as const, token: body.token }
+        }
+        if (response.status === 202 && body.status === 'pending') {
+          return { status: 'pending' as const, code: typeof body.code === 'string' ? body.code : null }
+        }
+        if (response.status === 403 && body.status === 'denied') {
+          return { status: 'denied' as const }
+        }
+        return { status: 'unreachable' as const }
+      } catch (error) {
+        void logError('Failed to request password reset:', error)
+        return { status: 'unreachable' as const }
+      }
     })
 
     let backupRunPromise: Promise<RunManualBackupResult> | null = null

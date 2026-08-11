@@ -7,6 +7,7 @@ import * as p from '@clack/prompts'
 import bcrypt from 'bcrypt'
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
 import { Prisma, PrismaClient } from '../src/generated/prisma/client.js'
+import { generateRecoveryCode, hashRecoveryCode } from '../src/auth/recoveryCodes.js'
 
 const adapter = new PrismaBetterSqlite3({ url: process.env.DATABASE_URL ?? 'file:./dev.db' })
 const prisma = new PrismaClient({ adapter })
@@ -52,6 +53,9 @@ async function seedE2EAccount() {
     data: { name: 'E2E Test Location', address: '123 Test St' },
   })
   const passwordHash = await bcrypt.hash('e2e-password12', 10)
+  // A pre-existing recoveryCodeHash, not left null: without it, the first
+  // login trips the backfill+reveal screen instead of landing on the
+  // dashboard -- see seed-e2e.ts, which this duplicates.
   await prisma.staff.create({
     data: {
       name: 'E2E Staff',
@@ -59,6 +63,7 @@ async function seedE2EAccount() {
       passwordHash,
       role: 'owner',
       locationId: location.id,
+      recoveryCodeHash: await hashRecoveryCode(generateRecoveryCode()),
     },
   })
   p.log.success('Seeded Location + Staff for E2E testing (login: e2e-staff / e2e-password12).')

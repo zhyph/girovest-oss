@@ -3,7 +3,9 @@ import { z } from 'zod'
 import { prisma } from '../db/client.js'
 import { AppError } from '../errors/AppError.js'
 import { ErrorCodes } from '../errors/errorCodes.js'
-import { verifyPassword } from './passwords.js'
+import { hashPassword, verifyPassword } from './passwords.js'
+import { generateRecoveryCode, hashRecoveryCode, verifyRecoveryCode } from './recoveryCodes.js'
+import { verifyPasswordResetTicket, unsafeDecodeTicketIssuedAt } from './passwordResetTickets.js'
 import { signStaffToken } from './jwt.js'
 import { requireAuth } from './authMiddleware.js'
 
@@ -13,6 +15,66 @@ const loginSchema = z.object({
   login: z.string().min(1),
   password: z.string().min(1),
 })
+
+// Same cap as a key/install label -- also what keeps a single distinct
+// `login` value cheap to hold in the rate-limit map below.
+const LOGIN_MAX_LENGTH = 120
+
+const recoverSchema = z.object({
+  login: z.string().min(1).max(LOGIN_MAX_LENGTH),
+  recoveryCode: z.string().min(1),
+  newPassword: z.string().min(8),
+})
+
+const supportResetSchema = z.object({
+  login: z.string().min(1).max(LOGIN_MAX_LENGTH),
+  token: z.string().min(1),
+  newPassword: z.string().min(8),
+})
+
+// In-memory throttle for /recover, scoped by login. bcrypt.compare already
+// costs ~50-100ms per attempt, but a recovery code is a standalone bearer
+// secret (no second factor), so capping attempts is worth it even so.
+// Per-process and not persisted -- resets on restart, which is fine for a
+// local single-instance server; the point is blunting a script, not
+// surviving a restart mid-attack.
+const RECOVER_MAX_ATTEMPTS = 5
+const RECOVER_WINDOW_MS = 15 * 60 * 1000
+const recoverAttempts = new Map<string, number[]>()
+
+// Distinct-key cap, not just the length cap above: this endpoint is
+// unauthenticated and CORS allows any origin (the packaged app talks to it
+// cross-origin from file://, so this can't be tightened per-endpoint), so a
+// script on any page the shop's PC visits could otherwise grow this Map
+// without bound by cycling through distinct `login` values. A Map preserves
+// insertion order, so evicting the oldest key is O(1) and needs no separate
+// bookkeeping.
+const RECOVER_ATTEMPTS_MAX_KEYS = 2000
+
+// Both call sites below write to the map (even a login that turns out fine
+// still gets an entry, from isRecoverRateLimited's own bookkeeping), so the
+// eviction lives here rather than only after a failed attempt.
+function setRecoverAttempts(login: string, attempts: number[]): void {
+  recoverAttempts.set(login, attempts)
+  while (recoverAttempts.size > RECOVER_ATTEMPTS_MAX_KEYS) {
+    const oldest = recoverAttempts.keys().next().value
+    if (oldest === undefined) break
+    recoverAttempts.delete(oldest)
+  }
+}
+
+function isRecoverRateLimited(login: string): boolean {
+  const now = Date.now()
+  const attempts = (recoverAttempts.get(login) ?? []).filter((t) => now - t < RECOVER_WINDOW_MS)
+  setRecoverAttempts(login, attempts)
+  return attempts.length >= RECOVER_MAX_ATTEMPTS
+}
+
+function recordRecoverAttempt(login: string): void {
+  const attempts = recoverAttempts.get(login) ?? []
+  attempts.push(Date.now())
+  setRecoverAttempts(login, attempts)
+}
 
 authRouter.post('/login', async (req, res) => {
   const parsed = loginSchema.safeParse(req.body)
@@ -31,7 +93,125 @@ authRouter.post('/login', async (req, res) => {
   }
 
   const token = signStaffToken({ staffId: staff.id, role: staff.role as 'owner' | 'staff' })
-  res.json({ token })
+
+  // Backfill for every account that predates recovery codes (every account
+  // that existed before this feature shipped): the only moment such an
+  // account is provably in front of its own owner is a successful password
+  // login, right here. Minted at most once -- recoveryCodeHash null is the
+  // trigger, and the write below fills it, so the next login leaves it alone.
+  // A locked-out account with a wrong password never reaches this line, so
+  // this cannot retroactively rescue someone who is already unable to log
+  // in; it only prevents the NEXT person from reaching that state with no
+  // code at all.
+  let recoveryCode: string | undefined
+  if (staff.recoveryCodeHash === null) {
+    recoveryCode = generateRecoveryCode()
+    await prisma.staff.update({
+      where: { id: staff.id },
+      data: { recoveryCodeHash: await hashRecoveryCode(recoveryCode) },
+    })
+  }
+
+  res.json(recoveryCode ? { token, recoveryCode } : { token })
+})
+
+authRouter.post('/recover', async (req, res) => {
+  const parsed = recoverSchema.safeParse(req.body)
+  if (!parsed.success) {
+    throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'login, recoveryCode and newPassword are required')
+  }
+  const { login, recoveryCode, newPassword } = parsed.data
+
+  if (isRecoverRateLimited(login)) {
+    throw new AppError(ErrorCodes.RATE_LIMITED, 429, 'Too many recovery attempts. Try again later.')
+  }
+
+  const staff = await prisma.staff.findUnique({ where: { login } })
+  // Same 401 whether the login is unknown, has no recovery code yet, or the
+  // code is wrong -- distinguishing them would let an attacker probe for
+  // valid usernames.
+  const codeMatches = staff?.recoveryCodeHash
+    ? await verifyRecoveryCode(recoveryCode, staff.recoveryCodeHash)
+    : false
+  if (!staff || !codeMatches) {
+    recordRecoverAttempt(login)
+    throw new AppError(ErrorCodes.INVALID_CREDENTIALS, 401, 'Invalid login or recovery code')
+  }
+
+  // Rotate: the code that was just typed in is dead the moment it works,
+  // exactly like a 2FA backup code. The new one is the only copy that will
+  // ever exist, and it is only ever handed back once, right here.
+  const nextRecoveryCode = generateRecoveryCode()
+  await prisma.staff.update({
+    where: { id: staff.id },
+    data: {
+      passwordHash: await hashPassword(newPassword),
+      recoveryCodeHash: await hashRecoveryCode(nextRecoveryCode),
+    },
+  })
+  recoverAttempts.delete(login)
+
+  res.json({ recoveryCode: nextRecoveryCode })
+})
+
+// Layer 2 of password recovery: the fallback for when the recovery code
+// above is ALSO lost. No rate limiting here on purpose, unlike /recover --
+// the bearer secret is an unforgeable Ed25519 signature, not a human-typeable
+// code, so there is no brute-force surface to blunt; a wrong login or token
+// just fails, every time, regardless of how many times it's tried.
+authRouter.post('/reset-with-support-token', async (req, res) => {
+  const parsed = supportResetSchema.safeParse(req.body)
+  if (!parsed.success) {
+    throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'login, token and newPassword are required')
+  }
+
+  const installId = process.env.GIROVEST_INSTALL_ID
+  const publicKey = process.env.GIROVEST_ACTIVATION_PUBKEY
+  if (!installId || !publicKey) {
+    // The hosted web build, or a dev environment with no activation config:
+    // there is no possible ticket to verify against, so this path can never
+    // succeed here regardless of what's presented.
+    throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Support-mediated reset is not available in this build')
+  }
+  if (!verifyPasswordResetTicket(parsed.data.token, installId, parsed.data.login, publicKey)) {
+    throw new AppError(ErrorCodes.INVALID_CREDENTIALS, 401, 'Invalid or expired reset ticket')
+  }
+
+  // Single-use: verifyPasswordResetTicket alone only checks the signature and
+  // a 48h freshness window, not whether this exact ticket already succeeded
+  // once. Without this, the same approved ticket could reset the password an
+  // unlimited number of times inside that window. Decoding only AFTER
+  // verification passed -- this trusts the payload, verify() already proved
+  // it wasn't tampered with.
+  const ticketIssuedAt = unsafeDecodeTicketIssuedAt(parsed.data.token)
+  if (ticketIssuedAt === null) {
+    // Unreachable in practice (verify() already parsed this same payload
+    // successfully), but failing closed on a security-critical path beats
+    // assuming it can't happen.
+    throw new AppError(ErrorCodes.INVALID_CREDENTIALS, 401, 'Invalid or expired reset ticket')
+  }
+
+  const staff = await prisma.staff.findUnique({ where: { login: parsed.data.login } })
+  if (!staff) {
+    throw new AppError(ErrorCodes.INVALID_CREDENTIALS, 401, 'Invalid or expired reset ticket')
+  }
+  if (staff.lastResetTicketIssuedAt && Date.parse(ticketIssuedAt) <= staff.lastResetTicketIssuedAt.getTime()) {
+    throw new AppError(ErrorCodes.INVALID_CREDENTIALS, 401, 'Invalid or expired reset ticket')
+  }
+
+  // Same rotate-on-use as /recover: she leaves with a fresh self-service
+  // code, not dependent on support again for the next lockout.
+  const nextRecoveryCode = generateRecoveryCode()
+  await prisma.staff.update({
+    where: { id: staff.id },
+    data: {
+      passwordHash: await hashPassword(parsed.data.newPassword),
+      recoveryCodeHash: await hashRecoveryCode(nextRecoveryCode),
+      lastResetTicketIssuedAt: new Date(ticketIssuedAt),
+    },
+  })
+
+  res.json({ recoveryCode: nextRecoveryCode })
 })
 
 authRouter.get('/me', requireAuth, async (req, res) => {
@@ -50,4 +230,49 @@ authRouter.get('/me', requireAuth, async (req, res) => {
     locationName: staff.location.name,
     locale: staff.location.locale,
   })
+})
+
+// A recovery code is only ever handed back once (setup, /recover, or a
+// backfilled login), and the reveal screen has no persistence of its own --
+// close the app, crash, or dismiss it before reading it, and it's gone
+// forever with no way to get it back, ever. This is the way back: while
+// still logged in, mint a fresh one on demand, the same rotate-and-reveal
+// shape as every other path that hands one out.
+//
+// Requires the current password, not just a valid session token: without
+// this, a JWT alone (which merely proves "logged in earlier", and which
+// sliding renewal keeps alive for as long as the app stays open) could mint
+// a brand new, no-expiry bearer secret capable of resetting the password on
+// its own -- turning a stolen short-lived token into a standing one. The
+// password is the thing that actually proves it's still her.
+const rotateRecoveryCodeSchema = z.object({
+  currentPassword: z.string().min(1),
+})
+
+authRouter.post('/recovery-code/rotate', requireAuth, async (req, res) => {
+  const parsed = rotateRecoveryCodeSchema.safeParse(req.body)
+  if (!parsed.success) {
+    throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'currentPassword is required')
+  }
+
+  const staff = await prisma.staff.findUniqueOrThrow({ where: { id: req.staff!.staffId } })
+  const passwordMatches = await verifyPassword(parsed.data.currentPassword, staff.passwordHash)
+  if (!passwordMatches) {
+    // 403, deliberately not 401: this route already ran requireAuth, so the
+    // session itself is fine -- this is a business check layered on top of
+    // it. api.ts's apiFetch calls clearToken() on ANY 401 REGARDLESS of
+    // suppressAuthLogoutEvent (that flag only suppresses the global
+    // 'auth:logout' event, found the hard way -- a wrong current password
+    // here silently wiped a perfectly valid session token, so the very next
+    // attempt with the CORRECT password also failed, now with no token
+    // attached at all). 403 never enters that branch.
+    throw new AppError(ErrorCodes.INVALID_CREDENTIALS, 403, 'Invalid password')
+  }
+
+  const nextRecoveryCode = generateRecoveryCode()
+  await prisma.staff.update({
+    where: { id: staff.id },
+    data: { recoveryCodeHash: await hashRecoveryCode(nextRecoveryCode) },
+  })
+  res.json({ recoveryCode: nextRecoveryCode })
 })

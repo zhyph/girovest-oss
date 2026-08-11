@@ -7,6 +7,8 @@ import { lazy } from 'react'
 // link hover/focus, ahead of the click that actually navigates there.
 export const pageLoaders = {
   login: () => import('../features/auth/LoginPage.tsx'),
+  recoverPassword: () => import('../features/auth/RecoverPasswordPage.tsx'),
+  supportReset: () => import('../features/auth/SupportResetPage.tsx'),
   setup: () => import('../features/setup/SetupPage.tsx'),
   dashboard: () => import('../features/dashboard/DashboardPage.tsx'),
   clients: () => import('../features/clients/ClientsPage.tsx'),
@@ -28,6 +30,12 @@ export function preloadPage(key: PageLoaderKey) {
 }
 
 export const LoginPage = lazy(() => pageLoaders.login().then((m) => ({ default: m.LoginPage })))
+export const RecoverPasswordPage = lazy(() =>
+  pageLoaders.recoverPassword().then((m) => ({ default: m.RecoverPasswordPage })),
+)
+export const SupportResetPage = lazy(() =>
+  pageLoaders.supportReset().then((m) => ({ default: m.SupportResetPage })),
+)
 export const SetupPage = lazy(() => pageLoaders.setup().then((m) => ({ default: m.SetupPage })))
 export const DashboardPage = lazy(() => pageLoaders.dashboard().then((m) => ({ default: m.DashboardPage })))
 export const ClientsPage = lazy(() => pageLoaders.clients().then((m) => ({ default: m.ClientsPage })))

@@ -34,6 +34,23 @@
     "copy": "Copiar",
     "copied": "Identificador copiado."
   },
+  "recoveryCode": {
+    "title": "Código de recuperação",
+    "help": "Gera um novo código para redefinir a senha caso você a esqueça. O código anterior deixa de funcionar assim que um novo é gerado — guarde o novo em um lugar seguro.",
+    "rotate": "Gerar novo código de recuperação",
+    "confirmPasswordField": "Confirme sua senha atual",
+    "errors": {
+      "INVALID_CREDENTIALS": "Senha incorreta."
+    }
+  },
+  "diagnostics": {
+    "title": "Enviar diagnóstico",
+    "help": "Envia informações técnicas recentes do aplicativo para o suporte, sem precisar localizar nenhum arquivo. Use quando algo der errado e o suporte pedir um diagnóstico.",
+    "send": "Enviar diagnóstico",
+    "sending": "Enviando...",
+    "success": "Diagnóstico enviado ao suporte.",
+    "error": "Não foi possível enviar o diagnóstico. Verifique a internet e tente novamente."
+  },
   "maintenanceBufferHelp": "Dias em que a peça fica indisponível depois de voltar, para limpeza e reparos, antes de sair para o próximo cliente. Use 0 para liberar já no dia seguinte à devolução.",
   "shopIdentityHelp": "Nome e endereço aparecem no cabeçalho do contrato impresso e o nome também identifica a loja no menu lateral e no título da janela.",
   "changelogLink": {

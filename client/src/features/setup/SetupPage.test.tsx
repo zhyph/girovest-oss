@@ -49,7 +49,7 @@ describe('SetupPage', () => {
     // useCompleteSetup), then login()'s own POST /api/auth/login and
     // GET /api/auth/me — mocked in that order rather than by URL.
     vi.mocked(apiFetch)
-      .mockResolvedValueOnce({ locationId: 'l1', staffId: 's1' })
+      .mockResolvedValueOnce({ locationId: 'l1', staffId: 's1', recoveryCode: 'FAKE-CODE-1234-5678' })
       .mockResolvedValueOnce({ token: 'tok123' })
       .mockResolvedValueOnce({
         id: 's1', name: 'Dona Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR',
@@ -57,6 +57,11 @@ describe('SetupPage', () => {
 
     renderSetupPage()
     await fillAndSubmit()
+
+    // Setup no longer navigates straight away: the recovery code has to be
+    // shown and acknowledged first.
+    expect(await screen.findByText('FAKE-CODE-1234-5678')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Já guardei, continuar' }))
 
     await waitFor(() => expect(screen.getByText('Dashboard stub')).toBeInTheDocument())
     expect(apiFetch).toHaveBeenNthCalledWith(1, '/api/setup', expect.objectContaining({ method: 'POST' }))
@@ -67,8 +72,9 @@ describe('SetupPage', () => {
         method: 'POST',
         body: JSON.stringify({ login: 'dona-ana', password: 'fake-password-1234' }),
       }),
+      { suppressAuthLogoutEvent: true },
     )
-    expect(apiFetch).toHaveBeenNthCalledWith(3, '/api/auth/me')
+    expect(apiFetch).toHaveBeenNthCalledWith(3, '/api/auth/me', {}, { suppressAuthLogoutEvent: true })
   })
 
   it('falls back to /login if auto-login fails right after a successful setup', async () => {
@@ -76,11 +82,14 @@ describe('SetupPage', () => {
     // failing (a network hiccup, not a setup failure), which should not read
     // as "setup failed" (see the separate SETUP_ALREADY_COMPLETE case below).
     vi.mocked(apiFetch)
-      .mockResolvedValueOnce({ locationId: 'l1', staffId: 's1' })
+      .mockResolvedValueOnce({ locationId: 'l1', staffId: 's1', recoveryCode: 'FAKE-CODE-1234-5678' })
       .mockRejectedValueOnce(new Error('network error'))
 
     renderSetupPage()
     await fillAndSubmit()
+
+    expect(await screen.findByText('FAKE-CODE-1234-5678')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Já guardei, continuar' }))
 
     await waitFor(() => expect(screen.getByText('Login stub')).toBeInTheDocument())
     expect(apiFetch).toHaveBeenCalledWith(

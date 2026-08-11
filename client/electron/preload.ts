@@ -19,6 +19,15 @@ contextBridge.exposeInMainWorld('girovest', {
   // that screen is a data: URL loaded into the same window, and the preload
   // applies to it too.
   retryActivation: (): Promise<string> => ipcRenderer.invoke('activation:retry'),
+  sendDiagnostics: (): Promise<{ ok: boolean; reason?: string }> => ipcRenderer.invoke('diagnostics:send'),
+  requestPasswordReset: (
+    login: string,
+  ): Promise<
+    | { status: 'pending'; code: string | null }
+    | { status: 'approved'; token: string }
+    | { status: 'denied' }
+    | { status: 'unreachable' }
+  > => ipcRenderer.invoke('passwordReset:request', { login }),
   getBackupStatus: (): Promise<{
     lastBackupAt: string | null
     destination: string | null

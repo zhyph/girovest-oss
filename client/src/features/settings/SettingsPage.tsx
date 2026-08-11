@@ -21,6 +21,8 @@ import { locationSettingsSchema, type LocationSettingsFormValues } from './setti
 import { useLocationSettings, useUpdateLocationSettings } from './useLocationSettings.ts'
 import { BackupSection } from './BackupSection.tsx'
 import { hasGirovestBridge } from '../../lib/girovestBridge.ts'
+import { DiagnosticsButton } from '../../components/DiagnosticsButton.tsx'
+import { RecoveryCodeRotateSection } from './RecoveryCodeRotateSection.tsx'
 
 const THEME_OPTIONS: ThemePreference[] = ['system', 'light', 'dark']
 
@@ -383,6 +385,22 @@ export function SettingsPage() {
               <Button type="button" variant="secondary" size="sm" onClick={copyInstallId}>
                 {t('install.copy')}
               </Button>
+            </div>
+          </div>
+        )}
+        <div className="flex flex-col gap-2 border-t border-border pt-4">
+          <span className="text-sm font-medium">{t('recoveryCode.title')}</span>
+          <p className="text-sm text-muted-foreground">{t('recoveryCode.help')}</p>
+          <div>
+            <RecoveryCodeRotateSection />
+          </div>
+        </div>
+        {hasGirovestBridge() && (
+          <div className="flex flex-col gap-2 border-t border-border pt-4">
+            <span className="text-sm font-medium">{t('diagnostics.title')}</span>
+            <p className="text-sm text-muted-foreground">{t('diagnostics.help')}</p>
+            <div>
+              <DiagnosticsButton />
             </div>
           </div>
         )}

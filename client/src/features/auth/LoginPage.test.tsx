@@ -53,6 +53,28 @@ describe('LoginPage', () => {
     expect(await screen.findByText('Usuário ou senha inválidos.')).toBeInTheDocument()
   })
 
+  // Backfill case: an account created before recovery codes existed. The
+  // server mints one on this exact login and login() resolves with it —
+  // isLoggedIn is already true by then, so this only proves anything if the
+  // reveal actually wins the race against the redirect-to-/ branch.
+  it('shows the backfilled recovery code instead of redirecting straight to /', async () => {
+    const login = vi.fn().mockResolvedValue('V9GV-3EGF-Z6UJ-S87G')
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      staff: undefined, isLoadingStaff: false, isErrorStaff: false, refetchStaff: vi.fn(), login, logout: vi.fn(), isLoggedIn: false,
+    })
+    vi.spyOn(useSetupModule, 'useSetupStatus').mockReturnValue({
+      data: { needsSetup: false },
+    } as ReturnType<typeof useSetupModule.useSetupStatus>)
+
+    renderLoginPage()
+    await userEvent.type(screen.getByLabelText('Usuário'), 'ana')
+    await userEvent.type(screen.getByLabelText('Senha'), 'senha123')
+    await userEvent.click(screen.getByRole('button', { name: 'Entrar' }))
+
+    expect(await screen.findByText('V9GV-3EGF-Z6UJ-S87G')).toBeInTheDocument()
+    expect(screen.queryByText('Dashboard stub')).not.toBeInTheDocument()
+  })
+
   it('redirects to / once already logged in', () => {
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
       staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' },

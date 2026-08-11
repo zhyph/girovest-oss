@@ -49,6 +49,61 @@ describe('apiFetch', () => {
     await expect(apiFetch('/api/clients')).rejects.toBeInstanceOf(ApiError)
     expect(getToken()).toBeNull()
   })
+
+  // The distinction that matters: clearToken() runs on ANY 401, even with
+  // suppressAuthLogoutEvent -- that flag only suppresses the global
+  // 'auth:logout' event, not the token clear itself. A route with a valid
+  // session that fails a SEPARATE business check (e.g. "confirm your
+  // current password") has to answer with something other than 401, or a
+  // wrong answer on that unrelated check silently logs out an otherwise-
+  // still-valid session. Found via exactly that bug in
+  // POST /api/auth/recovery-code/rotate.
+  it('does NOT clear the token on a 403 response, even with a valid session', async () => {
+    setToken('still-valid-token')
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify({ code: 'INVALID_CREDENTIALS', message: 'Invalid password' }), {
+        status: 403,
+      }),
+    )
+
+    await expect(apiFetch('/api/auth/recovery-code/rotate')).rejects.toBeInstanceOf(ApiError)
+    expect(getToken()).toBe('still-valid-token')
+  })
+
+  it('dispatches auth:logout on a 401 by default', async () => {
+    const handler = vi.fn()
+    window.addEventListener('auth:logout', handler)
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify({ code: 'UNAUTHORIZED', message: 'Invalid token' }), {
+        status: 401,
+      }),
+    )
+
+    await expect(apiFetch('/api/clients')).rejects.toBeInstanceOf(ApiError)
+    expect(handler).toHaveBeenCalledOnce()
+    window.removeEventListener('auth:logout', handler)
+  })
+
+  // Used by the login flow (useAuth.ts): a 401 from the login POST itself, or
+  // from the post-login /me check, is handled locally right there and must
+  // not also fire the global session-expiry event -- that would navigate
+  // away from /login and clear the query cache mid-attempt, on top of (and
+  // racing) the local error handling.
+  it('does not dispatch auth:logout on a 401 when suppressed', async () => {
+    const handler = vi.fn()
+    window.addEventListener('auth:logout', handler)
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify({ code: 'INVALID_CREDENTIALS', message: 'Invalid login or password' }), {
+        status: 401,
+      }),
+    )
+
+    await expect(
+      apiFetch('/api/auth/login', {}, { suppressAuthLogoutEvent: true }),
+    ).rejects.toBeInstanceOf(ApiError)
+    expect(handler).not.toHaveBeenCalled()
+    window.removeEventListener('auth:logout', handler)
+  })
 })
 
 describe('apiFetch session renewal', () => {

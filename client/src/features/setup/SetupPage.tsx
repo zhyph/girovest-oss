@@ -9,6 +9,7 @@ import { Card, CardBody, CardHeader } from '../../components/ui/card.tsx'
 import { useCompleteSetup } from '../../lib/useSetup.ts'
 import { useAuth } from '../../lib/useAuth.ts'
 import { showSuccessToast } from '../../lib/toast.ts'
+import { RecoveryCodeReveal } from '../../components/RecoveryCodeReveal.tsx'
 import { setupSchema, type SetupFormValues } from './setupSchema.ts'
 
 export function SetupPage() {
@@ -17,6 +18,11 @@ export function SetupPage() {
   const { login } = useAuth()
   const navigate = useNavigate()
   const [errorCode, setErrorCode] = useState<string | null>(null)
+  // Set once setup succeeds, right up to the point the recovery-code screen's
+  // own "Continuar" is clicked -- the reveal has to survive independently of
+  // whether auto-login below succeeds, so it can't just be folded into the
+  // navigate() that used to happen immediately after login.
+  const [reveal, setReveal] = useState<{ code: string; shopName: string; loggedIn: boolean } | null>(null)
 
   const {
     register,
@@ -40,20 +46,31 @@ export function SetupPage() {
 
   async function onSubmit(values: SetupFormValues) {
     setErrorCode(null)
+    let result: { recoveryCode: string }
     try {
-      await completeSetup.mutateAsync(values)
+      result = await completeSetup.mutateAsync(values)
     } catch (error) {
       setErrorCode((error as { code?: string }).code ?? 'UNKNOWN')
       return
     }
     // The shop now exists either way, so a hiccup logging in automatically
-    // shouldn't read as "setup failed" — fall back to the login screen
-    // instead of surfacing a setup error for an already-created shop.
+    // shouldn't read as "setup failed" — the recovery-code screen's own
+    // "Continuar" falls back to /login instead of surfacing a setup error
+    // for an already-created shop.
+    let loggedIn = true
     try {
       await login(values.ownerLogin, values.ownerPassword)
-      showSuccessToast(t('setup:createdSuccess', { shopName: values.shopName }))
-      navigate('/', { replace: true })
     } catch {
+      loggedIn = false
+    }
+    setReveal({ code: result.recoveryCode, shopName: values.shopName, loggedIn })
+  }
+
+  function handleContinue() {
+    if (reveal?.loggedIn) {
+      showSuccessToast(t('setup:createdSuccess', { shopName: reveal.shopName }))
+      navigate('/', { replace: true })
+    } else {
       navigate('/login', { replace: true })
     }
   }
@@ -66,9 +83,12 @@ export function SetupPage() {
       </div>
       <Card className="w-96">
         <CardHeader>
-          <h1 className="text-lg font-semibold">{t('setup:title')}</h1>
+          <h1 className="text-lg font-semibold">{reveal ? t('setup:recoveryCodeStep') : t('setup:title')}</h1>
         </CardHeader>
         <CardBody>
+          {reveal ? (
+            <RecoveryCodeReveal code={reveal.code} onContinue={handleContinue} />
+          ) : (
           <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5">
             <fieldset className="flex flex-col gap-3">
               <legend className="mb-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
@@ -169,6 +189,7 @@ export function SetupPage() {
               {t('setup:submit')}
             </Button>
           </form>
+          )}
         </CardBody>
       </Card>
     </div>

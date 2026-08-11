@@ -1,5 +1,6 @@
 {
   "title": "Configurar loja",
+  "recoveryCodeStep": "Guarde seu código de recuperação",
   "intro": "Configure sua loja para começar a gerenciar clientes, produtos e contratos de aluguel.",
   "createdSuccess": "Loja \"{{shopName}}\" criada. Bem-vinda!",
   "sections": {

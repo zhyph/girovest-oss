@@ -35,6 +35,21 @@ model Staff {
   locationId   String
   createdAt    DateTime @default(now())
 
+  /// bcrypt hash of the current recovery code (see auth/recoveryCodes.ts),
+  /// never the plaintext. Nullable: accounts created before this feature
+  /// existed have none until they next reset, at which point one is minted.
+  /// Rotated (replaced) on every successful use of "Esqueci minha senha",
+  /// same reasoning as 2FA backup codes: a code that still works after
+  /// someone has read it once is a standing risk, not a convenience.
+  recoveryCodeHash String?
+
+  /// The `issuedAt` of the last support-issued password-reset ticket
+  /// (passwordResetTickets.ts) actually consumed for this account. A ticket
+  /// whose issuedAt is <= this value is rejected -- otherwise the same
+  /// approved ticket could reset the password an unlimited number of times
+  /// within its freshness window, since nothing else marks it as spent.
+  lastResetTicketIssuedAt DateTime?
+
   location              Location     @relation(fields: [locationId], references: [id])
   allocations           Allocation[]
   contracts             Contract[]

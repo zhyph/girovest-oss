@@ -3,6 +3,7 @@ import { prisma } from '../db/client.js'
 import { AppError } from '../errors/AppError.js'
 import { ErrorCodes } from '../errors/errorCodes.js'
 import { hashPassword } from '../auth/passwords.js'
+import { generateRecoveryCode, hashRecoveryCode } from '../auth/recoveryCodes.js'
 import { DEFAULT_CONTRACT_CLAUSES } from '../constants/defaultContractClauses.js'
 
 export interface CompleteSetupInput {
@@ -23,10 +24,16 @@ export async function needsSetup(): Promise<boolean> {
 
 export async function completeSetup(
   input: CompleteSetupInput,
-): Promise<{ locationId: string; staffId: string }> {
+): Promise<{ locationId: string; staffId: string; recoveryCode: string }> {
   const useSerializable = process.env.DB_PROVIDER === 'postgresql'
 
-  return prisma.$transaction(
+  // Generated outside the transaction: it's pure crypto/hashing, no DB
+  // access, and the plaintext only ever needs to exist in memory long enough
+  // to hash it and hand it back in the response below.
+  const recoveryCode = generateRecoveryCode()
+  const recoveryCodeHash = await hashRecoveryCode(recoveryCode)
+
+  const { locationId, staffId } = await prisma.$transaction(
     async (tx) => {
       const existing = await tx.location.count()
       if (existing > 0) {
@@ -51,6 +58,7 @@ export async function completeSetup(
           passwordHash: await hashPassword(input.ownerPassword),
           role: 'owner',
           locationId: location.id,
+          recoveryCodeHash,
         },
       })
 
@@ -58,4 +66,10 @@ export async function completeSetup(
     },
     useSerializable ? { isolationLevel: Prisma.TransactionIsolationLevel.Serializable } : undefined,
   )
+
+  // Only ever returned this once: the setup wizard's own screen is the sole
+  // place a plaintext recovery code is shown. Nothing server-side stores it
+  // or can produce it again -- losing it means the next reset has to mint
+  // (and show, once) a fresh one, exactly the flow /api/auth/recover uses.
+  return { locationId, staffId, recoveryCode }
 }

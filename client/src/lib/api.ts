@@ -24,7 +24,22 @@ export const BACKGROUND_REQUEST_INIT: RequestInit = {
   headers: { [BACKGROUND_REQUEST_HEADER]: '1' },
 }
 
-export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+export interface ApiFetchOptions {
+  // Suppresses the global 'auth:logout' side effect a 401 would otherwise
+  // fire (see below). The login flow calls apiFetch itself while already on
+  // /login and already handles its own failure locally (LoginPage's catch) —
+  // letting a 401 there also dispatch 'auth:logout' fights that local
+  // handling with an unrelated navigate()+cache-clear, which can visibly
+  // reset the form (and swallow the error message the local catch was about
+  // to show) before the user ever sees why.
+  suppressAuthLogoutEvent?: boolean
+}
+
+export async function apiFetch<T>(
+  path: string,
+  init: RequestInit = {},
+  options: ApiFetchOptions = {},
+): Promise<T> {
   const token = getToken()
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -58,7 +73,9 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   if (!response.ok) {
     if (response.status === 401) {
       clearToken()
-      window.dispatchEvent(new Event('auth:logout'))
+      if (!options.suppressAuthLogoutEvent) {
+        window.dispatchEvent(new Event('auth:logout'))
+      }
     }
     throw new ApiError(body.code ?? 'UNKNOWN', response.status, body.message ?? 'Request failed')
   }

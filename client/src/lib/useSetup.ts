@@ -29,7 +29,7 @@ export function useCompleteSetup() {
 
   return useMutation({
     mutationFn: (values: CompleteSetupInput) =>
-      apiFetch<{ locationId: string; staffId: string }>('/api/setup', {
+      apiFetch<{ locationId: string; staffId: string; recoveryCode: string }>('/api/setup', {
         method: 'POST',
         body: JSON.stringify(values),
       }),

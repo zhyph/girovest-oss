@@ -4,6 +4,7 @@ import { BrowserRouter, HashRouter } from 'react-router'
 import { AppRouter } from './app/router.tsx'
 import { useAuth } from './lib/useAuth.ts'
 import { Toaster } from './components/ui/sonner.tsx'
+import { DiagnosticsButton } from './components/DiagnosticsButton.tsx'
 import { LocaleProvider } from './lib/LocaleContext.tsx'
 import { DEFAULT_LOCALE } from './lib/locale.ts'
 import i18n from './i18n.ts'
@@ -54,6 +55,7 @@ export function App() {
         </LocaleSync>
       </Router>
       <Toaster position="bottom-right" />
+      <DiagnosticsButton floating />
     </QueryClientProvider>
   )
 }

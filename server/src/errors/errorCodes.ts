@@ -15,6 +15,7 @@ export const ErrorCodes = {
   SIGNING_TOKEN_INVALID: 'SIGNING_TOKEN_INVALID',
   PHOTO_TOKEN_INVALID: 'PHOTO_TOKEN_INVALID',
   SSE_TICKET_INVALID: 'SSE_TICKET_INVALID',
+  RATE_LIMITED: 'RATE_LIMITED',
 } as const
 
 export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes]
