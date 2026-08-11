@@ -34,7 +34,14 @@ export function DiagnosticsButton({ floating = false }: { floating?: boolean }) 
         type="button"
         variant="secondary"
         size="icon"
-        className="fixed bottom-4 left-4 z-50 rounded-full shadow-lg print:hidden"
+        // bottom-16, not bottom-4: the authenticated sidebar (Sidebar.tsx)
+        // has its own bottom-left footer (staff name + logout), sitting in
+        // roughly the same 0-40px band from the viewport bottom -- bottom-4
+        // sat directly on top of it, reported live as overlapping the staff
+        // name. The login screen (the other place this needs to be visible)
+        // has nothing at bottom-left, so the extra clearance costs nothing
+        // there.
+        className="fixed bottom-16 left-4 z-50 rounded-full shadow-lg print:hidden"
         onClick={() => void handleClick()}
         disabled={sending}
         title={t('settings:diagnostics.send')}
