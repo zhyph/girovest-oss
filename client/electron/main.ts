@@ -652,7 +652,33 @@ function loadAppOrActivation(win: BrowserWindow, state: ActivationState): void {
 // above. Guard the app bootstrap so importing this module for tests doesn't
 // try to call methods on that string. Under a real Electron process `app`
 // is always a populated object, so production behavior is unaffected.
-if (app) {
+//
+// requestSingleInstanceLock guards against a second full launch of the
+// packaged app -- a stray desktop-icon double-click, a leftover shortcut, an
+// update relaunch racing a window nobody closed. Without it, two independent
+// instances each try to spawn their own backend on the same port; the
+// second collides with EADDRINUSE and gets the "Server Stopped Unexpectedly"
+// crash dialog. Observed directly in a shop's diagnostics: the same
+// main.log carried two consecutive "[activation] activated" / "Checking for
+// update" pairs moments apart -- two instances racing to log startup at
+// once, not one process restarting. Must run before anything else in this
+// block (server spawn, userData, window creation): none of that should
+// happen for a second instance that is about to quit anyway.
+if (app && !app.requestSingleInstanceLock()) {
+  app.quit()
+} else if (app) {
+  // The instance that DID win the lock hears about every later launch
+  // attempt here instead of it silently vanishing -- bring the existing
+  // window forward so a shop clicking the icon again sees something happen,
+  // rather than what looks indistinguishable from the app being frozen.
+  app.on('second-instance', () => {
+    const win = BrowserWindow.getAllWindows()[0]
+    if (win) {
+      if (win.isMinimized()) win.restore()
+      win.focus()
+    }
+  })
+
   // Without these, an error thrown outside the explicit try/catches above
   // (e.g. inside an IPC handler, or a rejected promise nobody awaited) would
   // crash the main process with nothing recorded anywhere in a packaged

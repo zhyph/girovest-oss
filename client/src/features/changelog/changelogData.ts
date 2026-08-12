@@ -23,6 +23,20 @@ export interface ChangelogRelease {
  */
 export const RELEASES: ChangelogRelease[] = [
   {
+    version: '0.14.7',
+    date: '2026-08-12',
+    items: [
+      {
+        kind: 'improved',
+        text: 'Se a sessão for encerrada inesperadamente, agora aparece um aviso explicando o motivo antes de voltar para a tela de login.',
+      },
+      {
+        kind: 'fixed',
+        text: 'Corrigido: abrir o aplicativo duas vezes ao mesmo tempo podia travar a segunda janela em vez de simplesmente trazer a primeira para frente.',
+      },
+    ],
+  },
+  {
     version: '0.14.6',
     date: '2026-08-12',
     items: [

@@ -1,8 +1,10 @@
 import { useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
+import { useTranslation } from 'react-i18next'
 import { apiFetch } from './api.ts'
 import { getToken, setToken, clearToken } from './auth.ts'
+import { showErrorToast } from './toast.ts'
 
 export interface StaffMe {
   id: string
@@ -16,6 +18,7 @@ export interface StaffMe {
 export function useAuth() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
+  const { t } = useTranslation('auth')
 
   const staffQuery = useQuery({
     queryKey: ['auth', 'me'],
@@ -25,8 +28,19 @@ export function useAuth() {
   })
 
   useEffect(() => {
-    window.addEventListener('auth:logout', logout)
-    return () => window.removeEventListener('auth:logout', logout)
+    // Distinct from `logout` below on purpose: a real incident (401s
+    // silently invalidating a just-established session) landed as "nothing
+    // shown on screen" -- the redirect to /login happened, but nothing ever
+    // told the person WHY, so it looked like the app just broke. The 'Sair'
+    // button already calls `logout` directly and needs no explanation (she
+    // knows why); only this event -- something ending the session out from
+    // under her -- gets the toast.
+    function handleSessionExpired() {
+      logout()
+      showErrorToast(t('sessionExpired'))
+    }
+    window.addEventListener('auth:logout', handleSessionExpired)
+    return () => window.removeEventListener('auth:logout', handleSessionExpired)
   }, [queryClient])
 
   // Returns a recovery code exactly once: the server mints one on the spot
