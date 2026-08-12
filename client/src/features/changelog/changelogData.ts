@@ -23,6 +23,16 @@ export interface ChangelogRelease {
  */
 export const RELEASES: ChangelogRelease[] = [
   {
+    version: '0.14.6',
+    date: '2026-08-12',
+    items: [
+      {
+        kind: 'fixed',
+        text: 'Corrigido: em alguns casos, a sessão podia cair logo depois de entrar, mesmo com login e senha certos, obrigando a entrar de novo.',
+      },
+    ],
+  },
+  {
     version: '0.14.5',
     date: '2026-08-12',
     items: [

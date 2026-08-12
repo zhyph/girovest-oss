@@ -162,6 +162,29 @@ describe('GET /api/auth/me', () => {
     const response = await request(app).get('/api/auth/me')
     expect(response.status).toBe(401)
   })
+
+  // Regression test for a real incident: this route's response body barely
+  // changes day to day, so Express's default ETag stayed identical for a
+  // week straight, and a browser HTTP cache revalidated it as a genuine 304
+  // -- reusing headers from whenever it was FIRST cached. That silently
+  // replayed a days-old X-Renewed-Token, which api.ts's apiFetch trusted
+  // unconditionally, overwriting a session that had just been established
+  // moments earlier. no-store is what stops the browser from ever storing
+  // (and later revalidating/reusing) the response in the first place; no
+  // ETag is what stops it having anything to revalidate against even if
+  // something upstream added caching back later.
+  it('is never cacheable: no ETag, explicit no-store', async () => {
+    const login = await request(app)
+      .post('/api/auth/login')
+      .send({ login: 'bruno', password: 'correct-horse' })
+
+    const response = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${login.body.token}`)
+
+    expect(response.headers['cache-control']).toBe('no-store')
+    expect(response.headers.etag).toBeUndefined()
+  })
 })
 
 describe('POST /api/auth/login recovery-code backfill', () => {

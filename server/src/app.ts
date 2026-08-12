@@ -15,6 +15,30 @@ import { backupRouter } from './routes/backup.js'
 
 export const app = express()
 app.disable('x-powered-by')
+
+// A GET response like /api/auth/me's is small, mostly-static data (staff
+// name/role/location) that can stay byte-identical for days -- which means
+// Express's automatic ETag stays identical too, and a browser HTTP cache
+// happily revalidates it (a genuine 304, reusing its OWN stored headers)
+// long after the moment it was first cached. That silently replayed an
+// ancient X-Renewed-Token header days after it was issued, and apiFetch's
+// sliding-renewal handling (client/src/lib/api.ts) trusts ANY
+// X-Renewed-Token it sees -- overwriting a session that had JUST been
+// established with an already-expired one. Diagnosed via the token/client
+// fingerprint logging in authMiddleware.ts and api.ts: a freshly-signed
+// token was immediately overwritten by setToken() a second time, with the
+// hash of a token whose iat predated the login by nearly a week.
+// no-store, not just etag:false: this stops the browser from ever STORING
+// an /api response in the first place, which is what makes revalidation
+// (and reusing its headers) possible at all -- the safer, more general fix,
+// since every response here can carry a bearer token's fate in some header,
+// not just this one route today.
+app.disable('etag')
+app.use('/api', (_req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store')
+  next()
+})
+
 // exposedHeaders is load-bearing, not cosmetic: the packaged Electron renderer
 // loads over file:// and calls http://localhost:3000, so every API request is
 // cross-origin. A response header that is not CORS-safelisted stays invisible
