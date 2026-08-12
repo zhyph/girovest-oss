@@ -6,6 +6,7 @@ import { prisma } from '../db/client.js'
 import { hashPassword, verifyPassword } from './passwords.js'
 import { generateRecoveryCode, hashRecoveryCode } from './recoveryCodes.js'
 import { BACKGROUND_REQUEST_HEADER } from './authMiddleware.js'
+import { recoverAttempts, setRecoverAttempts, RECOVER_ATTEMPTS_MAX_KEYS } from './authRoutes.js'
 
 describe('POST /api/auth/login', () => {
   let locationId: string
@@ -398,6 +399,62 @@ describe('POST /api/auth/reset-with-support-token', () => {
       .send({ login: 'gil', token: mint('gil'), newPassword: 'support-reset-password' })
 
     expect(response.status).toBe(401)
+  })
+
+  // The sequential double-use test above proves the check catches a SECOND,
+  // later request. It does not prove the check is race-free: a plain
+  // read-then-write (findUnique, then update) lets two requests racing on
+  // the SAME still-valid ticket both read lastResetTicketIssuedAt as null
+  // before either write lands, so both would pass and both would "win" --
+  // the fix is an atomic updateMany() whose WHERE clause re-checks the
+  // freshness condition as part of the single UPDATE statement.
+  it('lets only one of two concurrent requests carrying the same ticket succeed', async () => {
+    const token = mint('gil')
+    const [first, second] = await Promise.all([
+      request(app)
+        .post('/api/auth/reset-with-support-token')
+        .send({ login: 'gil', token, newPassword: 'racer-a-password' }),
+      request(app)
+        .post('/api/auth/reset-with-support-token')
+        .send({ login: 'gil', token, newPassword: 'racer-b-password' }),
+    ])
+
+    const statuses = [first.status, second.status].sort()
+    expect(statuses).toEqual([200, 401])
+
+    const winner = first.status === 200 ? 'racer-a-password' : 'racer-b-password'
+    const loser = first.status === 200 ? 'racer-b-password' : 'racer-a-password'
+    const staff = await prisma.staff.findUniqueOrThrow({ where: { login: 'gil' } })
+    await expect(verifyPassword(winner, staff.passwordHash)).resolves.toBe(true)
+    await expect(verifyPassword(loser, staff.passwordHash)).resolves.toBe(false)
+  })
+})
+
+describe('recover-attempts rate-limit eviction', () => {
+  afterEach(() => recoverAttempts.clear())
+
+  // Reproduces the bug directly rather than driving 2000+ HTTP requests
+  // through bcrypt: fill the map to its cap, "re-touch" one early key the
+  // way a real repeated attack would (via setRecoverAttempts, same as
+  // isRecoverRateLimited/recordRecoverAttempt do), then push the map one over
+  // the cap and confirm the untouched key -- not the touched one -- is what
+  // gets evicted.
+  it('evicts the least-recently-touched key, not the first-inserted one', () => {
+    setRecoverAttempts('actively-attacked', [Date.now()])
+    for (let i = 0; i < RECOVER_ATTEMPTS_MAX_KEYS - 1; i += 1) {
+      setRecoverAttempts(`filler-${i}`, [Date.now()])
+    }
+    expect(recoverAttempts.size).toBe(RECOVER_ATTEMPTS_MAX_KEYS)
+
+    // Re-touch the target, same as a genuine repeated attempt against it
+    // would, via the exact function isRecoverRateLimited/recordRecoverAttempt
+    // both call.
+    setRecoverAttempts('actively-attacked', [Date.now()])
+    // One more distinct key pushes the map over the cap and triggers eviction.
+    setRecoverAttempts('filler-last', [Date.now()])
+
+    expect(recoverAttempts.has('actively-attacked')).toBe(true)
+    expect(recoverAttempts.has('filler-0')).toBe(false)
   })
 })
 

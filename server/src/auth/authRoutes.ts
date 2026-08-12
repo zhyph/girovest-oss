@@ -40,7 +40,10 @@ const supportResetSchema = z.object({
 // surviving a restart mid-attack.
 const RECOVER_MAX_ATTEMPTS = 5
 const RECOVER_WINDOW_MS = 15 * 60 * 1000
-const recoverAttempts = new Map<string, number[]>()
+// Exported so authRoutes.test.ts can assert the eviction ORDER directly
+// (which login got dropped) without driving 2000+ real HTTP requests through
+// bcrypt just to fill the map.
+export const recoverAttempts = new Map<string, number[]>()
 
 // Distinct-key cap, not just the length cap above: this endpoint is
 // unauthenticated and CORS allows any origin (the packaged app talks to it
@@ -49,12 +52,24 @@ const recoverAttempts = new Map<string, number[]>()
 // without bound by cycling through distinct `login` values. A Map preserves
 // insertion order, so evicting the oldest key is O(1) and needs no separate
 // bookkeeping.
-const RECOVER_ATTEMPTS_MAX_KEYS = 2000
+export const RECOVER_ATTEMPTS_MAX_KEYS = 2000
 
 // Both call sites below write to the map (even a login that turns out fine
 // still gets an entry, from isRecoverRateLimited's own bookkeeping), so the
 // eviction lives here rather than only after a failed attempt.
-function setRecoverAttempts(login: string, attempts: number[]): void {
+//
+// `delete` before `set` is not decorative: a Map's iteration order is
+// insertion order, and re-`set`-ing an EXISTING key does NOT move it to the
+// end -- only a genuinely new key is appended. Without the delete, an
+// actively re-attacked login (which calls this on every attempt) would sit
+// at whatever position it FIRST got inserted at and be the next one evicted
+// once the map fills, while a one-off flood of distinct throwaway logins
+// that are never touched again sits safely behind it. That is backwards for
+// a rate limiter: it should keep the entry someone is still hitting and
+// evict the ones nobody has touched since -- true least-recently-used
+// eviction, which requires every touch to re-append the key.
+export function setRecoverAttempts(login: string, attempts: number[]): void {
+  recoverAttempts.delete(login)
   recoverAttempts.set(login, attempts)
   while (recoverAttempts.size > RECOVER_ATTEMPTS_MAX_KEYS) {
     const oldest = recoverAttempts.keys().next().value
@@ -202,14 +217,36 @@ authRouter.post('/reset-with-support-token', async (req, res) => {
   // Same rotate-on-use as /recover: she leaves with a fresh self-service
   // code, not dependent on support again for the next lockout.
   const nextRecoveryCode = generateRecoveryCode()
-  await prisma.staff.update({
-    where: { id: staff.id },
+
+  // updateMany with the same freshness condition baked into `where`, not
+  // update() after the check above -- that check-then-write shape has a
+  // replay race: two requests carrying the SAME approved ticket, fired close
+  // together (a doubled network retry, or someone deliberately racing it),
+  // can both read the same lastResetTicketIssuedAt before either write lands,
+  // both pass the check, and both reset the password. A single UPDATE ...
+  // WHERE statement is what makes the check-and-set atomic: the database
+  // serializes concurrent writes to the same row, so whichever one commits
+  // first moves lastResetTicketIssuedAt forward, and the loser's WHERE
+  // clause no longer matches when its statement actually executes -- it
+  // affects zero rows instead of overwriting what the winner just set.
+  const result = await prisma.staff.updateMany({
+    where: {
+      id: staff.id,
+      OR: [{ lastResetTicketIssuedAt: null }, { lastResetTicketIssuedAt: { lt: new Date(ticketIssuedAt) } }],
+    },
     data: {
       passwordHash: await hashPassword(parsed.data.newPassword),
       recoveryCodeHash: await hashRecoveryCode(nextRecoveryCode),
       lastResetTicketIssuedAt: new Date(ticketIssuedAt),
     },
   })
+  if (result.count === 0) {
+    // Lost the race (or someone replayed a ticket already consumed between
+    // the read above and here): same response as any other already-used
+    // ticket, so a racing replay attempt learns nothing it couldn't already
+    // infer from the sequential case.
+    throw new AppError(ErrorCodes.INVALID_CREDENTIALS, 401, 'Invalid or expired reset ticket')
+  }
 
   res.json({ recoveryCode: nextRecoveryCode })
 })
