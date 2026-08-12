@@ -23,6 +23,16 @@ export interface ChangelogRelease {
  */
 export const RELEASES: ChangelogRelease[] = [
   {
+    version: '0.14.4',
+    date: '2026-08-12',
+    items: [
+      {
+        kind: 'improved',
+        text: 'Melhoria interna: mais detalhes no diagnóstico enviado ao suporte, para continuar investigando um problema de sessão relatado nesta semana.',
+      },
+    ],
+  },
+  {
     version: '0.14.3',
     date: '2026-08-12',
     items: [

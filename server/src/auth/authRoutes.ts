@@ -7,7 +7,7 @@ import { hashPassword, verifyPassword } from './passwords.js'
 import { generateRecoveryCode, hashRecoveryCode, verifyRecoveryCode } from './recoveryCodes.js'
 import { verifyPasswordResetTicket, unsafeDecodeTicketIssuedAt } from './passwordResetTickets.js'
 import { signStaffToken } from './jwt.js'
-import { requireAuth } from './authMiddleware.js'
+import { describeClientForLog, requireAuth } from './authMiddleware.js'
 
 export const authRouter = Router()
 
@@ -121,7 +121,9 @@ authRouter.post('/login', async (req, res) => {
     )
     throw new AppError(ErrorCodes.INVALID_CREDENTIALS, 401, 'Invalid login or password')
   }
-  console.info(`[auth] login ok for login=${describeLoginForLog(parsed.data.login)} staffId=${staff.id}`)
+  console.info(
+    `[auth] login ok for login=${describeLoginForLog(parsed.data.login)} staffId=${staff.id}; ${describeClientForLog(req)}`,
+  )
 
   const token = signStaffToken({ staffId: staff.id, role: staff.role as 'owner' | 'staff' })
 

@@ -3,7 +3,7 @@ import { prisma } from '../db/client.js'
 import { AppError } from '../errors/AppError.js'
 import { ErrorCodes } from '../errors/errorCodes.js'
 import type { VerifiedStaffToken } from './jwt.js'
-import { shouldRenewToken, signStaffToken, unsafeDecodeStaffToken, verifyStaffToken } from './jwt.js'
+import { hashTokenForLog, shouldRenewToken, signStaffToken, unsafeDecodeStaffToken, verifyStaffToken } from './jwt.js'
 
 export const RENEWED_TOKEN_HEADER = 'X-Renewed-Token'
 
@@ -25,10 +25,27 @@ export const RENEWAL_EXCLUDED_PATHS = new Set(['/api/products/events/ticket'])
 // extend one.
 export const BACKGROUND_REQUEST_HEADER = 'X-Background-Request'
 
+// Diagnostic-only: which CLIENT actually made this request. Added to rule
+// out a request coming from somewhere other than the packaged app's own
+// renderer -- e.g. a leftover browser tab from initial account setup, still
+// open and polling with its own separate localStorage/token, hitting the
+// same 127.0.0.1:3000 the Electron app talks to. The Electron renderer's
+// User-Agent always contains "Electron/"; a plain browser tab's never does,
+// so this alone is enough to tell the two apart in a log line without
+// guessing at Origin (the packaged app's file:// origin often arrives as the
+// literal string "null", same as some other non-browser callers).
+export function describeClientForLog(req: Request): string {
+  const ua = req.header('user-agent') ?? 'n/a'
+  const origin = req.header('origin') ?? 'n/a'
+  return `origin=${origin} ua=${ua}`
+}
+
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const header = req.header('authorization')
   if (!header?.startsWith('Bearer ')) {
-    console.warn(`[auth] requireAuth rejected ${req.method} ${req.originalUrl}: missing/malformed Authorization header`)
+    console.warn(
+      `[auth] requireAuth rejected ${req.method} ${req.originalUrl}: missing/malformed Authorization header; ${describeClientForLog(req)}`,
+    )
     throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Missing or malformed Authorization header')
   }
 
@@ -45,11 +62,11 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     const decoded = unsafeDecodeStaffToken(token)
     const reason = error instanceof Error ? `${error.name}: ${error.message}` : 'unknown error'
     console.warn(
-      `[auth] requireAuth rejected ${req.method} ${req.originalUrl}: ${reason}; ` +
+      `[auth] requireAuth rejected ${req.method} ${req.originalUrl}: ${reason}; tokenHash=${hashTokenForLog(token)} ` +
         (decoded
-          ? `decoded staffId=${String(decoded.staffId)} exp=${decoded.exp ?? 'n/a'} nowSec=${Math.floor(Date.now() / 1000)}`
+          ? `decoded staffId=${String(decoded.staffId)} iat=${decoded.iat ?? 'n/a'} exp=${decoded.exp ?? 'n/a'} nowSec=${Math.floor(Date.now() / 1000)}`
           : 'token did not even decode as a JWT') +
-        `; tokenLen=${token.length}`,
+        `; tokenLen=${token.length}; ${describeClientForLog(req)}`,
     )
     throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Invalid or expired token')
   }
@@ -62,7 +79,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     staff = await prisma.staff.findUniqueOrThrow({ where: { id: payload.staffId } })
   } catch {
     console.warn(
-      `[auth] requireAuth rejected ${req.method} ${req.originalUrl}: staffId=${payload.staffId} no longer exists`,
+      `[auth] requireAuth rejected ${req.method} ${req.originalUrl}: staffId=${payload.staffId} no longer exists; ${describeClientForLog(req)}`,
     )
     throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Staff account no longer exists')
   }

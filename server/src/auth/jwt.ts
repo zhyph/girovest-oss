@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken'
+import { createHash } from 'node:crypto'
 
 export interface StaffTokenPayload {
   staffId: string
@@ -24,8 +25,33 @@ function getSecret(): string {
   return secret
 }
 
+// Diagnostic-only fingerprint, same shape as infra/update-proxy's
+// hashTokenForLog for relay tokens: never the bearer value itself, just
+// enough (SHA-256, truncated to 16 hex chars) to tell "is this literally the
+// same token" apart in two separate log lines -- specifically, whether a
+// token requireAuth rejects is the one a nearby signStaffToken call actually
+// just issued, or some other token entirely. Sync (unlike the Workers
+// version, which needs the async Web Crypto API): Node's `crypto` module
+// exposes createHash synchronously.
+export function hashTokenForLog(token: string): string {
+  return createHash('sha256').update(token).digest('hex').slice(0, 16)
+}
+
 export function signStaffToken(payload: StaffTokenPayload): string {
-  return jwt.sign(payload, getSecret(), { expiresIn: SESSION_TTL_SECONDS })
+  const token = jwt.sign(payload, getSecret(), { expiresIn: SESSION_TTL_SECONDS })
+  // Diagnostic-only: added after a report where a token issued moments
+  // earlier was rejected as already-expired by the very next request, and
+  // nothing anywhere recorded what iat/exp this function actually computed
+  // at sign time to compare against. now/iat/exp are logged as both epoch
+  // seconds (exact arithmetic) and ISO instants (readable at a glance).
+  const decoded = jwt.decode(token) as { iat?: number; exp?: number } | null
+  console.info(
+    `[auth] token signed for staffId=${payload.staffId} role=${payload.role} tokenHash=${hashTokenForLog(token)} ` +
+      `nowSec=${Math.floor(Date.now() / 1000)} iat=${decoded?.iat ?? 'n/a'} exp=${decoded?.exp ?? 'n/a'} ` +
+      `iatIso=${decoded?.iat ? new Date(decoded.iat * 1000).toISOString() : 'n/a'} ` +
+      `expIso=${decoded?.exp ? new Date(decoded.exp * 1000).toISOString() : 'n/a'}`,
+  )
+  return token
 }
 
 export function verifyStaffToken(token: string): VerifiedStaffToken {
