@@ -1,4 +1,4 @@
-import { getToken, setToken, clearToken } from './auth.ts'
+import { getToken, setToken, clearToken, hashTokenForLog } from './auth.ts'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000'
 
@@ -49,6 +49,20 @@ export async function apiFetch<T>(
     headers.Authorization = `Bearer ${token}`
   }
 
+  // Diagnostic-only: added after a report where a request reached the
+  // server carrying a different (stale, days-old) token than the one a
+  // login moments earlier had just stored via setToken(). This is what lets
+  // that be checked directly -- the hash logged here, right before the
+  // request that reads it, against server/src/auth/authMiddleware.ts's own
+  // tokenHash on a rejection -- instead of trusting that getToken() did what
+  // the code says it should. Captured into main.log by
+  // client/electron/main.ts's attachConsoleLogging, same as any other
+  // console call from the renderer.
+  console.info(
+    `[client-auth] ${init.method ?? 'GET'} ${path} tokenPresent=${Boolean(token)}` +
+      (token ? ` tokenHash=${await hashTokenForLog(token)}` : ''),
+  )
+
   const response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers })
 
   // Sliding session renewal. The server re-issues the JWT on this header once
@@ -72,6 +86,10 @@ export async function apiFetch<T>(
 
   if (!response.ok) {
     if (response.status === 401) {
+      console.warn(
+        `[client-auth] 401 on ${init.method ?? 'GET'} ${path} code=${body.code ?? 'n/a'}` +
+          (token ? ` tokenHashSent=${await hashTokenForLog(token)}` : ' tokenHashSent=n/a'),
+      )
       clearToken()
       if (!options.suppressAuthLogoutEvent) {
         window.dispatchEvent(new Event('auth:logout'))
