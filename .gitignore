@@ -20,3 +20,10 @@ docs/comercial/
 # Estado local do wrangler (cache de build e sessao), gerado ao rodar
 # `wrangler deploy`/`dev` em infra/update-proxy.
 .wrangler/
+
+# Artefatos do plugin Vercel do Claude Code (hooks de sessão), sem relação
+# com este projeto -- o app é Electron + Cloudflare Worker, não há deploy
+# Vercel real aqui. .env.local carrega um VERCEL_OIDC_TOKEN de verdade;
+# sem esta entrada, nada impede um `git add .` de commitar essa credencial.
+.env.local
+.vercel/
