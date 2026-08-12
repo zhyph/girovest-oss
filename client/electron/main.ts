@@ -394,6 +394,15 @@ const EMAIL_PATTERN = /\b[\w.+-]+@[\w-]+\.[\w.-]+\b/g
 // would silently make that whole alternative never match.
 const PHONE_PATTERN = /(?:\(\d{2}\)\s?|\b\d{2}-)9?\d{4}-?\d{4}\b/g
 
+// Splits a raw stdout/stderr chunk into individual non-blank lines. A single
+// `data` event can carry a partial line, several whole lines, or both, and
+// the backend's own console.log/warn/error calls end each entry with \n --
+// this is what lets forwardServerOutput below emit one electron-log call per
+// log line instead of one per (arbitrarily-chunked) `data` event.
+export function splitLogLines(chunk: string): string[] {
+  return chunk.split(/\r?\n/).filter((line) => line.trim() !== '')
+}
+
 export function redactPersonalDataForUpload(text: string): string {
   return text
     .replace(CPF_PATTERN, '[CPF removido]')
@@ -515,6 +524,28 @@ async function startServer(): Promise<string | null> {
   }
   serverProcess.stdout?.on('data', captureOutput)
   serverProcess.stderr?.on('data', captureOutput)
+
+  // Beyond the crash-only tail above, forward every line the backend prints
+  // into main.log as it happens. Before this, the backend's own logging
+  // (e.g. server/src/auth/authRoutes.ts's auth diagnostics) was invisible in
+  // every diagnostics upload unless the process actually crashed — which is
+  // exactly why a plain 401 left no trace anywhere for support to look at.
+  // stdout/stderr only route to whether the backend itself used console.log
+  // vs console.error/warn, not to failure — an auth failure line logged with
+  // console.warn still lands on stderr, so it's forwarded at 'warn' here,
+  // same as the process's own uncaught errors would be.
+  serverProcess.stdout?.on('data', (chunk: Buffer) => {
+    void (async () => {
+      const log = (await import('electron-log')).default
+      for (const line of splitLogLines(chunk.toString())) log.info(`[backend] ${line}`)
+    })()
+  })
+  serverProcess.stderr?.on('data', (chunk: Buffer) => {
+    void (async () => {
+      const log = (await import('electron-log')).default
+      for (const line of splitLogLines(chunk.toString())) log.warn(`[backend] ${line}`)
+    })()
+  })
 
   serverProcess.on('error', (error) => {
     void logError('Backend process failed to start:', error)

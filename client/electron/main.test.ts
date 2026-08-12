@@ -19,6 +19,7 @@ import {
   recordCrashAndCheckLoop,
   buildStartupFailureDetail,
   redactPersonalDataForUpload,
+  splitLogLines,
 } from './main.ts'
 
 describe('resolveServerCwd', () => {
@@ -358,5 +359,25 @@ describe('redactPersonalDataForUpload', () => {
   it('is a no-op on text with nothing to redact', () => {
     const line = 'Backend process exited unexpectedly with code 1'
     expect(redactPersonalDataForUpload(line)).toBe(line)
+  })
+})
+
+describe('splitLogLines', () => {
+  it('splits on both bare and CRLF newlines', () => {
+    expect(splitLogLines('a\nb\r\nc')).toEqual(['a', 'b', 'c'])
+  })
+
+  it('drops blank lines, including a trailing one from a final newline', () => {
+    expect(splitLogLines('a\n\nb\n')).toEqual(['a', 'b'])
+  })
+
+  it('returns a single line unchanged when the chunk has no newline', () => {
+    expect(splitLogLines('a partial line with no terminator yet')).toEqual([
+      'a partial line with no terminator yet',
+    ])
+  })
+
+  it('returns an empty array for a chunk that is only whitespace', () => {
+    expect(splitLogLines('   \n\t\n')).toEqual([])
   })
 })

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest'
 import request from 'supertest'
 import { generateKeyPairSync, sign } from 'node:crypto'
 import { app } from '../app.js'
@@ -58,6 +58,53 @@ describe('POST /api/auth/login', () => {
 
     expect(response.status).toBe(401)
     expect(response.body.code).toBe('INVALID_CREDENTIALS')
+  })
+
+  // These lock in the diagnostic instrumentation added after a 401 report
+  // that main.log had nothing useful in it: a wrong-looking login is
+  // frequently a byte-for-byte mismatch (whitespace, case) invisible in a
+  // support call, and describeLoginForLog's JSON.stringify is what makes
+  // that visible in the shop's own uploaded log without ever touching the
+  // password itself.
+  describe('diagnostic logging', () => {
+    let warnSpy: ReturnType<typeof vi.spyOn>
+    let infoSpy: ReturnType<typeof vi.spyOn>
+
+    beforeEach(() => {
+      warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {})
+    })
+
+    afterEach(() => {
+      warnSpy.mockRestore()
+      infoSpy.mockRestore()
+    })
+
+    it('logs the exact (JSON-escaped) login on a successful login, never the password', async () => {
+      await request(app).post('/api/auth/login').send({ login: 'ana', password: 'correct-horse' })
+
+      expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining('login ok'))
+      const line = infoSpy.mock.calls.map((call: unknown[]) => String(call[0])).join('\n')
+      expect(line).toContain('login="ana"')
+      expect(line).not.toContain('correct-horse')
+    })
+
+    it('logs a distinguishable reason for an unknown login vs a wrong password', async () => {
+      await request(app).post('/api/auth/login').send({ login: 'nobody', password: 'whatever' })
+      await request(app).post('/api/auth/login').send({ login: 'ana', password: 'wrong-password' })
+
+      const lines: string[] = warnSpy.mock.calls.map((call: unknown[]) => String(call[0]))
+      expect(lines.some((line) => line.includes('no staff') && line.includes('login="nobody"'))).toBe(true)
+      expect(lines.some((line) => line.includes('wrong password') && line.includes('login="ana"'))).toBe(true)
+      expect(lines.join('\n')).not.toContain('wrong-password')
+    })
+
+    it('surfaces a whitespace-padded login as distinct from the trimmed one', async () => {
+      await request(app).post('/api/auth/login').send({ login: 'ana ', password: 'correct-horse' })
+
+      const lines: string[] = warnSpy.mock.calls.map((call: unknown[]) => String(call[0]))
+      expect(lines.some((line) => line.includes('login="ana "'))).toBe(true)
+    })
   })
 })
 

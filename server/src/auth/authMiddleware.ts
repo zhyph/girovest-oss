@@ -3,7 +3,7 @@ import { prisma } from '../db/client.js'
 import { AppError } from '../errors/AppError.js'
 import { ErrorCodes } from '../errors/errorCodes.js'
 import type { VerifiedStaffToken } from './jwt.js'
-import { shouldRenewToken, signStaffToken, verifyStaffToken } from './jwt.js'
+import { shouldRenewToken, signStaffToken, unsafeDecodeStaffToken, verifyStaffToken } from './jwt.js'
 
 export const RENEWED_TOKEN_HEADER = 'X-Renewed-Token'
 
@@ -28,6 +28,7 @@ export const BACKGROUND_REQUEST_HEADER = 'X-Background-Request'
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const header = req.header('authorization')
   if (!header?.startsWith('Bearer ')) {
+    console.warn(`[auth] requireAuth rejected ${req.method} ${req.originalUrl}: missing/malformed Authorization header`)
     throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Missing or malformed Authorization header')
   }
 
@@ -35,7 +36,21 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   let payload: VerifiedStaffToken
   try {
     payload = verifyStaffToken(token)
-  } catch {
+  } catch (error) {
+    // Diagnostic-only, never the token itself: decode (unverified) tells us
+    // WHICH of the ways this can fail actually happened -- a token that
+    // decodes fine with a plausible exp but still fails verify() points at a
+    // wrong/rotated JWT_SECRET (e.g. two backend processes momentarily alive
+    // with different secrets), not a garbled or foreign token.
+    const decoded = unsafeDecodeStaffToken(token)
+    const reason = error instanceof Error ? `${error.name}: ${error.message}` : 'unknown error'
+    console.warn(
+      `[auth] requireAuth rejected ${req.method} ${req.originalUrl}: ${reason}; ` +
+        (decoded
+          ? `decoded staffId=${String(decoded.staffId)} exp=${decoded.exp ?? 'n/a'} nowSec=${Math.floor(Date.now() / 1000)}`
+          : 'token did not even decode as a JWT') +
+        `; tokenLen=${token.length}`,
+    )
     throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Invalid or expired token')
   }
 
@@ -46,6 +61,9 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   try {
     staff = await prisma.staff.findUniqueOrThrow({ where: { id: payload.staffId } })
   } catch {
+    console.warn(
+      `[auth] requireAuth rejected ${req.method} ${req.originalUrl}: staffId=${payload.staffId} no longer exists`,
+    )
     throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Staff account no longer exists')
   }
   req.staff = { staffId: staff.id, role: staff.role as 'owner' | 'staff', locationId: staff.locationId }

@@ -32,6 +32,23 @@ export function verifyStaffToken(token: string): VerifiedStaffToken {
   return jwt.verify(token, getSecret()) as VerifiedStaffToken
 }
 
+// Diagnostic-only: reads the claims out of a token WITHOUT checking its
+// signature, purely so a rejected token's own failure log (authMiddleware.ts)
+// can say WHICH of the several ways verifyStaffToken can fail actually
+// happened -- malformed/truncated (this returns null), expired (exp is in
+// the past despite decoding fine, i.e. signature was actually valid), or
+// signed with a different secret (decodes fine, has a plausible exp, but
+// verifyStaffToken still threw). Never trust the returned claims for
+// anything but a log line; nothing here proves the token wasn't tampered
+// with.
+export function unsafeDecodeStaffToken(token: string): { staffId?: unknown; exp?: number; iat?: number } | null {
+  try {
+    return jwt.decode(token) as { staffId?: unknown; exp?: number; iat?: number } | null
+  } catch {
+    return null
+  }
+}
+
 // Half-life rule: renew once the token has burned more than half of its own
 // lifetime. Both operands come from the token's server-issued iat/exp, so a
 // wrong clock on the client can neither extend nor truncate a session, and a

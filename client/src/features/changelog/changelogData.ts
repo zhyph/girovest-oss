@@ -23,6 +23,16 @@ export interface ChangelogRelease {
  */
 export const RELEASES: ChangelogRelease[] = [
   {
+    version: '0.14.3',
+    date: '2026-08-12',
+    items: [
+      {
+        kind: 'improved',
+        text: 'Melhoria interna: o diagnóstico enviado ao suporte agora registra mais detalhes sobre falhas de login e de recuperação de senha, para agilizar o atendimento em caso de problema.',
+      },
+    ],
+  },
+  {
     version: '0.14.2',
     date: '2026-08-12',
     items: [

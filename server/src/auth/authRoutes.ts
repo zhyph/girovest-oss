@@ -11,6 +11,17 @@ import { requireAuth } from './authMiddleware.js'
 
 export const authRouter = Router()
 
+// Diagnostic-only descriptor for a login string in a log line. JSON.stringify
+// surfaces leading/trailing whitespace, case, and non-printable characters
+// that would otherwise be invisible in a log -- exactly the kind of mismatch
+// that makes a correct-looking login fail an exact-match DB lookup -- without
+// ever touching the password/recovery code/reset token themselves. These
+// lines only ever reach a shop's own main.log, uploaded solely on the
+// explicit "send diagnostics" action (see client/electron/main.ts).
+function describeLoginForLog(login: string): string {
+  return JSON.stringify(login)
+}
+
 const loginSchema = z.object({
   login: z.string().min(1),
   password: z.string().min(1),
@@ -99,13 +110,18 @@ authRouter.post('/login', async (req, res) => {
 
   const staff = await prisma.staff.findUnique({ where: { login: parsed.data.login } })
   if (!staff) {
+    console.warn(`[auth] login failed: no staff for login=${describeLoginForLog(parsed.data.login)}`)
     throw new AppError(ErrorCodes.INVALID_CREDENTIALS, 401, 'Invalid login or password')
   }
 
   const passwordMatches = await verifyPassword(parsed.data.password, staff.passwordHash)
   if (!passwordMatches) {
+    console.warn(
+      `[auth] login failed: wrong password for login=${describeLoginForLog(parsed.data.login)} staffId=${staff.id}`,
+    )
     throw new AppError(ErrorCodes.INVALID_CREDENTIALS, 401, 'Invalid login or password')
   }
+  console.info(`[auth] login ok for login=${describeLoginForLog(parsed.data.login)} staffId=${staff.id}`)
 
   const token = signStaffToken({ staffId: staff.id, role: staff.role as 'owner' | 'staff' })
 
@@ -138,20 +154,26 @@ authRouter.post('/recover', async (req, res) => {
   const { login, recoveryCode, newPassword } = parsed.data
 
   if (isRecoverRateLimited(login)) {
+    console.warn(`[auth] recover blocked: rate limited for login=${describeLoginForLog(login)}`)
     throw new AppError(ErrorCodes.RATE_LIMITED, 429, 'Too many recovery attempts. Try again later.')
   }
 
   const staff = await prisma.staff.findUnique({ where: { login } })
   // Same 401 whether the login is unknown, has no recovery code yet, or the
   // code is wrong -- distinguishing them would let an attacker probe for
-  // valid usernames.
+  // valid usernames. The log line below is diagnostic-only (main.log, never
+  // returned to the client) so it can afford to be specific where the
+  // response deliberately isn't.
   const codeMatches = staff?.recoveryCodeHash
     ? await verifyRecoveryCode(recoveryCode, staff.recoveryCodeHash)
     : false
   if (!staff || !codeMatches) {
     recordRecoverAttempt(login)
+    const reason = !staff ? 'no staff' : !staff.recoveryCodeHash ? 'no recovery code set' : 'bad code'
+    console.warn(`[auth] recover failed: ${reason} for login=${describeLoginForLog(login)}`)
     throw new AppError(ErrorCodes.INVALID_CREDENTIALS, 401, 'Invalid login or recovery code')
   }
+  console.info(`[auth] recover ok for login=${describeLoginForLog(login)} staffId=${staff.id}`)
 
   // Rotate: the code that was just typed in is dead the moment it works,
   // exactly like a 2FA backup code. The new one is the only copy that will
@@ -186,9 +208,13 @@ authRouter.post('/reset-with-support-token', async (req, res) => {
     // The hosted web build, or a dev environment with no activation config:
     // there is no possible ticket to verify against, so this path can never
     // succeed here regardless of what's presented.
+    console.warn('[auth] support-reset unavailable: missing GIROVEST_INSTALL_ID/GIROVEST_ACTIVATION_PUBKEY')
     throw new AppError(ErrorCodes.UNAUTHORIZED, 401, 'Support-mediated reset is not available in this build')
   }
   if (!verifyPasswordResetTicket(parsed.data.token, installId, parsed.data.login, publicKey)) {
+    console.warn(
+      `[auth] support-reset failed: signature/purpose/freshness check failed for login=${describeLoginForLog(parsed.data.login)} installId=${installId}`,
+    )
     throw new AppError(ErrorCodes.INVALID_CREDENTIALS, 401, 'Invalid or expired reset ticket')
   }
 
@@ -208,9 +234,18 @@ authRouter.post('/reset-with-support-token', async (req, res) => {
 
   const staff = await prisma.staff.findUnique({ where: { login: parsed.data.login } })
   if (!staff) {
+    // The ticket's signature and embedded login checked out above (against
+    // whatever was typed into the request form), but that login doesn't
+    // match any account here -- a typo/case/whitespace difference between
+    // the request form and the real Staff.login is exactly what this line is
+    // for catching, since describeLoginForLog would show it.
+    console.warn(`[auth] support-reset failed: no staff for login=${describeLoginForLog(parsed.data.login)}`)
     throw new AppError(ErrorCodes.INVALID_CREDENTIALS, 401, 'Invalid or expired reset ticket')
   }
   if (staff.lastResetTicketIssuedAt && Date.parse(ticketIssuedAt) <= staff.lastResetTicketIssuedAt.getTime()) {
+    console.warn(
+      `[auth] support-reset failed: ticket already used for login=${describeLoginForLog(parsed.data.login)} staffId=${staff.id}`,
+    )
     throw new AppError(ErrorCodes.INVALID_CREDENTIALS, 401, 'Invalid or expired reset ticket')
   }
 
@@ -245,8 +280,12 @@ authRouter.post('/reset-with-support-token', async (req, res) => {
     // the read above and here): same response as any other already-used
     // ticket, so a racing replay attempt learns nothing it couldn't already
     // infer from the sequential case.
+    console.warn(
+      `[auth] support-reset failed: lost race/already consumed for login=${describeLoginForLog(parsed.data.login)} staffId=${staff.id}`,
+    )
     throw new AppError(ErrorCodes.INVALID_CREDENTIALS, 401, 'Invalid or expired reset ticket')
   }
+  console.info(`[auth] support-reset ok for login=${describeLoginForLog(parsed.data.login)} staffId=${staff.id}`)
 
   res.json({ recoveryCode: nextRecoveryCode })
 })
