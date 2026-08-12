@@ -23,6 +23,50 @@ export interface ChangelogRelease {
  */
 export const RELEASES: ChangelogRelease[] = [
   {
+    version: '0.14.2',
+    date: '2026-08-12',
+    items: [
+      { kind: 'improved', text: 'Reforços de segurança na recuperação de senha e no envio de diagnóstico ao suporte, sem mudanças na forma de uso.' },
+      { kind: 'improved', text: 'O envio de diagnóstico agora filtra automaticamente CPF, telefone e e-mail do trecho enviado, como proteção extra.' },
+    ],
+  },
+  {
+    version: '0.14.1',
+    date: '2026-08-11',
+    items: [
+      { kind: 'fixed', text: 'Corrigido: o botão de diagnóstico ficava sobreposto ao rodapé do menu lateral (nome do usuário e sair).' },
+      { kind: 'fixed', text: 'Corrigido: algumas instalações mais antigas podiam ser bloqueadas por engano ao verificar a chave do produto.' },
+    ],
+  },
+  {
+    version: '0.14.0',
+    date: '2026-08-11',
+    headline: 'Recuperação de senha e diagnóstico com um clique.',
+    items: [
+      { kind: 'new', text: 'Esqueceu a senha? Agora dá para recuperar o acesso com um código gerado no cadastro, sem perder nenhum dado.' },
+      { kind: 'new', text: 'Se o código também se perder, o suporte pode liberar um novo acesso remotamente.' },
+      { kind: 'new', text: 'Botão de diagnóstico: envia o log do aplicativo para o suporte com um clique, direto da tela de login ou das Configurações.' },
+      { kind: 'fixed', text: 'Corrigido: uma falha ao entrar podia deixar a tela travada sem nenhuma mensagem de erro.' },
+    ],
+  },
+  {
+    version: '0.13.0',
+    date: '2026-08-06',
+    items: [
+      { kind: 'new', text: '"Assinar remotamente" virou um botão principal do contrato, em vez de ficar escondido no menu "•••".' },
+      { kind: 'new', text: 'Pagamentos: em vez de definir parcelas fixas por data, agora é só registrar o que a cliente pagou e quando — e editar ou apagar depois, sem restrição de data.' },
+      { kind: 'new', text: 'Peças disponíveis agora avisam quando já têm uma reserva futura, com data, cliente e contrato.' },
+      { kind: 'improved', text: 'O "a receber" do painel deixou de ter janela de datas: mostra tudo que ainda falta, com link direto para os contratos.' },
+    ],
+  },
+  {
+    version: '0.12.2',
+    date: '2026-08-05',
+    items: [
+      { kind: 'fixed', text: 'Corrigido: o seletor de fotos ainda não abria no Linux, mesmo depois da correção da versão anterior.' },
+    ],
+  },
+  {
     version: '0.12.1',
     date: '2026-08-05',
     items: [
