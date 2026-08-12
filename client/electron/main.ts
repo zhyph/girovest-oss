@@ -367,6 +367,40 @@ async function readRecentLogTail(maxChars: number): Promise<string> {
   }
 }
 
+// Patterns matched against the diagnostic log tail right before it leaves
+// this computer (the 'diagnostics:send' handler below), never against the
+// log FILE on disk -- main.log stays full-fidelity locally, since 6.2's "no
+// client data leaves this computer" promise is about the network egress,
+// not what a shop's own support tech can read from their own machine.
+//
+// Defense in depth, not a data source: nothing in this app deliberately logs
+// client names, phones, CPFs, or addresses (validation failures throw a
+// generic AppError, e.g. server/src/routes/clients.ts, never an echo of the
+// bad payload). The real risk this guards is indirect -- e.g. a backend
+// crash forwarding raw stdout/stderr into main.log (see `recentOutput`
+// below), where an unexpected driver/library error could in principle
+// stringify something it shouldn't. Best-effort pattern matching over free
+// text, not a guarantee: see docs/comercial/minuta-licenca-uso.md clause
+// 6.2.1(iv), which is careful to say so rather than promise more than this
+// can actually deliver.
+const CPF_PATTERN = /\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/g
+const EMAIL_PATTERN = /\b[\w.+-]+@[\w-]+\.[\w.-]+\b/g
+// Requires an area-code-shaped prefix (parens, or a bare-digit pair followed
+// by a dash) so this doesn't also eat UUIDs, timestamps, or port numbers,
+// which are all over a technical log and share the same run of bare digits
+// otherwise. \b only goes in front of the \d{2}- alternative -- a `(` is
+// its own unambiguous delimiter and \b does not match the boundary between
+// a space and `(` (neither side is a word character), so requiring it there
+// would silently make that whole alternative never match.
+const PHONE_PATTERN = /(?:\(\d{2}\)\s?|\b\d{2}-)9?\d{4}-?\d{4}\b/g
+
+export function redactPersonalDataForUpload(text: string): string {
+  return text
+    .replace(CPF_PATTERN, '[CPF removido]')
+    .replace(EMAIL_PATTERN, '[email removido]')
+    .replace(PHONE_PATTERN, '[telefone removido]')
+}
+
 // This app ships no old build to roll back to (NSIS installs in place, no
 // downgrade path), and the packaged app never carries the Prisma CLI (see
 // migrationRunner.ts) -- so "run prisma migrate resolve" is a dead end for
@@ -728,7 +762,7 @@ if (app) {
         const response = await fetch(`${GIROVEST_UPDATE_URL.replace(/\/+$/, '')}/diagnostics`, {
           method: 'POST',
           headers: { authorization: `Bearer ${GIROVEST_UPDATE_KEY}`, 'content-type': 'application/json' },
-          body: JSON.stringify({ installId, hostname: resolveHostname(), log }),
+          body: JSON.stringify({ installId, hostname: resolveHostname(), log: redactPersonalDataForUpload(log) }),
         })
         return { ok: response.ok }
       } catch (error) {

@@ -18,6 +18,7 @@ import {
   waitForFileWritable,
   recordCrashAndCheckLoop,
   buildStartupFailureDetail,
+  redactPersonalDataForUpload,
 } from './main.ts'
 
 describe('resolveServerCwd', () => {
@@ -324,5 +325,38 @@ describe('buildStartupFailureDetail', () => {
       '/data/backups/0.11.0',
     )
     expect(detail).not.toMatch(/prisma migrate resolve/i)
+  })
+})
+
+describe('redactPersonalDataForUpload', () => {
+  it('removes a CPF regardless of punctuation', () => {
+    expect(redactPersonalDataForUpload('cliente CPF 123.456.789-01 cadastrado')).not.toContain('123.456.789-01')
+    expect(redactPersonalDataForUpload('cpf sem pontuacao 12345678901 ok')).not.toContain('12345678901')
+    expect(redactPersonalDataForUpload('cpf 123.456.789-01')).toContain('[CPF removido]')
+  })
+
+  it('removes an email address', () => {
+    const redacted = redactPersonalDataForUpload('contato: ana.silva+loja@example.com.br falhou')
+    expect(redacted).not.toContain('ana.silva+loja@example.com.br')
+    expect(redacted).toContain('[email removido]')
+  })
+
+  it('removes a Brazilian phone number with an area code', () => {
+    expect(redactPersonalDataForUpload('telefone (11) 98765-4321 informado')).not.toContain('98765-4321')
+    expect(redactPersonalDataForUpload('telefone 11-987654321 informado')).not.toContain('987654321')
+  })
+
+  // The tightened phone pattern (area-code-shaped prefix required) exists
+  // specifically so this technical log -- full of UUIDs, timestamps, and
+  // port numbers -- doesn't get mangled by a pattern greedy enough to treat
+  // any 8-9 digit run as a phone number.
+  it('leaves technical log content untouched: install UUIDs, timestamps, port numbers', () => {
+    const line = '[2026-08-12 09:14:02.331] [info] server listening on port 41230, install b2a4f6c8-1111-4222-8333-444455556666'
+    expect(redactPersonalDataForUpload(line)).toBe(line)
+  })
+
+  it('is a no-op on text with nothing to redact', () => {
+    const line = 'Backend process exited unexpectedly with code 1'
+    expect(redactPersonalDataForUpload(line)).toBe(line)
   })
 })
