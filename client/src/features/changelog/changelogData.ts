@@ -23,6 +23,16 @@ export interface ChangelogRelease {
  */
 export const RELEASES: ChangelogRelease[] = [
   {
+    version: '0.14.9',
+    date: '2026-08-14',
+    items: [
+      {
+        kind: 'fixed',
+        text: 'Corrigido: em um caso raro, depois de atualizar o aplicativo podia abrir como se fosse uma instalação nova, pedindo ativação de novo e mostrando tudo vazio. Os dados nunca foram apagados — o aplicativo estava simplesmente olhando para a pasta errada. Com esta atualização ele volta a abrir a pasta certa, com os dados de sempre.',
+      },
+    ],
+  },
+  {
     version: '0.14.8',
     date: '2026-08-14',
     items: [

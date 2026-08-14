@@ -681,6 +681,25 @@ function loadAppOrActivation(win: BrowserWindow, state: ActivationState): void {
 // try to call methods on that string. Under a real Electron process `app`
 // is always a populated object, so production behavior is unaffected.
 //
+// MUST run before requestSingleInstanceLock, not just before whenReady(): the
+// lock isn't just bookkeeping, Electron's ProcessSingleton places its lock and
+// socket files inside userData, so calling it is itself a first read of that
+// path. app.getName() (what an unset name falls back to) still returns the
+// packaged product name at that point -- client/package.json's
+// "girovest-client" -- not this override, and Electron caches userData for
+// the rest of the process once resolved. A build shipped with setName() after
+// the lock call (2026-08-12 through v0.14.8) silently ran every install
+// against userData/girovest-client instead of userData/girovest from its very
+// first launch: same failure this comment used to warn about below for
+// startServer(), reintroduced from the requestSingleInstanceLock call added
+// alongside it, which nothing here was watching for. The old directory is not
+// deleted by this -- it's simply not the one being read anymore -- so any
+// install already running on .../girovest-client has real data to reconcile,
+// not just a path to fix going forward.
+if (app) {
+  app.setName('girovest')
+}
+
 // requestSingleInstanceLock guards against a second full launch of the
 // packaged app -- a stray desktop-icon double-click, a leftover shortcut, an
 // update relaunch racing a window nobody closed. Without it, two independent
@@ -689,9 +708,9 @@ function loadAppOrActivation(win: BrowserWindow, state: ActivationState): void {
 // crash dialog. Observed directly in a shop's diagnostics: the same
 // main.log carried two consecutive "[activation] activated" / "Checking for
 // update" pairs moments apart -- two instances racing to log startup at
-// once, not one process restarting. Must run before anything else in this
-// block (server spawn, userData, window creation): none of that should
-// happen for a second instance that is about to quit anyway.
+// once, not one process restarting. Must run before anything else past this
+// point (server spawn, window creation): none of that should happen for a
+// second instance that is about to quit anyway.
 if (app && !app.requestSingleInstanceLock()) {
   app.quit()
 } else if (app) {
@@ -723,13 +742,6 @@ if (app && !app.requestSingleInstanceLock()) {
   process.on('unhandledRejection', (reason) => {
     void logError('Unhandled promise rejection in main process:', reason)
   })
-
-  // Must run before app.whenReady() resolves: Electron resolves the default
-  // userData path from package.json's name as soon as it's ready, so setting
-  // the name any later (e.g. inside startServer(), which used to run this
-  // after whenReady()) is a no-op and userData silently lands in the wrong
-  // directory (girovest-client instead of girovest).
-  app.setName('girovest')
 
   // Left on by default: most machines render fine with GPU acceleration, and
   // disabling it for everyone costs smoothness for a problem most installs
