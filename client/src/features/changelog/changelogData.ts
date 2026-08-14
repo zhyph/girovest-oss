@@ -23,6 +23,16 @@ export interface ChangelogRelease {
  */
 export const RELEASES: ChangelogRelease[] = [
   {
+    version: '0.14.8',
+    date: '2026-08-14',
+    items: [
+      {
+        kind: 'improved',
+        text: 'Melhoria interna: o aplicativo agora registra no diagnóstico onde exatamente guarda os dados a cada abertura, para identificar mais rápido um caso raro em que a loja parecia "resetada" depois de uma atualização.',
+      },
+    ],
+  },
+  {
     version: '0.14.7',
     date: '2026-08-12',
     items: [
