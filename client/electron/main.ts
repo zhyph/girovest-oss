@@ -3,6 +3,7 @@ import { spawn, type ChildProcess } from 'child_process'
 import crypto from 'crypto'
 import fs from 'fs'
 import net from 'net'
+import os from 'os'
 import path from 'path'
 import { backupDatabaseIfNeeded, writeBackupMarker } from './backup.ts'
 import { runCreateArchive, runExtractArchive } from './archiveRunner.ts'
@@ -17,6 +18,7 @@ import {
 } from './manualBackup.ts'
 import { runManualBackup, runManualRestore, type RunManualBackupResult } from './manualBackupActions.ts'
 import { resolveInstallId } from './installId.ts'
+import { checkAndRecordUserDataPath } from './userDataBreadcrumb.ts'
 import { setupAutoUpdater } from './updater.ts'
 import { ensureActivated, resolveHostname, type ActivationState } from './activation.ts'
 import { resolveMachineHash } from './machineId.ts'
@@ -442,6 +444,32 @@ export function buildStartupFailureDetail(
 // Returns null on success, or the failure detail to show/log otherwise.
 async function startServer(): Promise<string | null> {
   const userDataPath = app.getPath('userData')
+
+  // Diagnostic tripwire for the "app looks completely reset after an update"
+  // failure mode: install-id, activation-token, dev.db, jwt-secret and
+  // product-photos/ are ALL resolved off userDataPath, so if it ever points
+  // somewhere different than last boot on this same machine, every one of
+  // them independently comes up empty at once and looks like data loss with
+  // no error anywhere. Logged unconditionally (not just on a mismatch) so a
+  // support log always shows what path this boot actually used, who it ran
+  // as, and whether install-id/dev.db already existed here -- see
+  // userDataBreadcrumb.ts for why the comparison itself is safe to trust.
+  const installIdExisted = fs.existsSync(path.join(userDataPath, 'install-id'))
+  const dbExisted = fs.existsSync(resolveDatabaseUrl(userDataPath).replace(/^file:/, ''))
+  const { previousPath, changed: userDataChanged } = checkAndRecordUserDataPath(userDataPath)
+  await logInfo(
+    `Boot: userData="${userDataPath}" home="${os.homedir()}" user="${os.userInfo().username}" ` +
+      `version=${app.getVersion()} installIdExisted=${installIdExisted} dbExisted=${dbExisted} ` +
+      `previousUserData=${previousPath ?? 'none'} userDataChanged=${userDataChanged}`,
+  )
+  if (userDataChanged) {
+    await logError(
+      'userData path changed since the last recorded boot on this machine -- this is the same ' +
+        'mechanism as install-id/activation/database all appearing freshly reset at once.',
+      { previousPath, userDataPath },
+    )
+  }
+
   const serverCwd = resolveServerRuntimeCwd(app.isPackaged, app.getAppPath(), process.resourcesPath)
   // Best-effort: a locked file (e.g. Windows AV holding a handle) must not
   // block startup — the stale copy is only wasted disk, and the next launch
