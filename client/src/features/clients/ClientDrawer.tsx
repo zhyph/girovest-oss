@@ -16,7 +16,7 @@ import { useLocale } from '../../lib/LocaleContext.tsx'
 import { useUnsavedChangesGuard } from '../../lib/useUnsavedChangesGuard.ts'
 import { getClientFieldTemplate } from '../../lib/clientFieldTemplates.ts'
 import { getFieldMask } from '../../lib/clientFieldMasks.ts'
-import { normalizeToSuggestion } from '../../lib/autocompleteMatch.ts'
+import { foldForSearch, normalizeToSuggestion } from '../../lib/autocompleteMatch.ts'
 import { clientSchema, type Client, type ClientFormValues } from './clientSchemas.ts'
 import { useClients, useCreateClient, useUpdateClient, useDeleteClient } from './useClients.ts'
 
@@ -88,14 +88,37 @@ export function ClientDrawer({
       .filter((value): value is string => Boolean(value))
   }
 
-  // The CPF/RG/address rows seeded from the location's field template look
-  // locked (read-only, muted label) to signal they're expected fields; a
-  // stray click on the same-size remove icon shouldn't be able to drop one
-  // without at least one chance to back out. Freely-added extra rows carry
-  // no such expectation and remove immediately.
+  /**
+   * Whether a row is one of the location's expected fields.
+   *
+   * By LABEL, never by array position. Stored rows come back in insertion
+   * order, so a client saved with RG but no CPF shifts every later row up by
+   * one — and an index comparison then said RG was not a template field. It
+   * rendered white and editable instead of grey and locked, and one click on
+   * ✕ wiped it with no confirmation. An address saved without "Endereço"
+   * unlocked Bairro, Cidade and Estado all at once.
+   *
+   * The unlocked label is the second-order damage: she can retype "Bairro" as
+   * "Barrio", and clientReadiness matches by label, so Contratos then reports
+   * a missing field on a fully filled address.
+   */
+  // Case- and accent-insensitively, matching how clientReadiness decides the
+  // same question. Comparing exactly meant a stored `cpf` row counted as
+  // FILLED for readiness while rendering unlocked here — so she could rename
+  // it and break the very invariant this protects.
+  function isTemplateDocument(label: string) {
+    return template.identityDocuments.some((entry) => foldForSearch(entry.label) === foldForSearch(label))
+  }
+
+  function isTemplateAddressLine(label: string) {
+    return template.addressLines.some((entry) => foldForSearch(entry.label) === foldForSearch(label))
+  }
+
+  // A stray click on the same-size remove icon shouldn't be able to drop an
+  // expected field without at least one chance to back out. Freely-added
+  // extra rows carry no such expectation and remove immediately.
   function requestRemoveIdentityDocument(index: number) {
-    const isDefaultField = template.identityDocuments[index]?.label === identityDocuments.fields[index].label
-    if (isDefaultField) {
+    if (isTemplateDocument(identityDocuments.fields[index].label)) {
       setConfirmingRemoveField({ kind: 'identityDocuments', index })
     } else {
       identityDocuments.remove(index)
@@ -103,8 +126,7 @@ export function ClientDrawer({
   }
 
   function requestRemoveAddressLine(index: number) {
-    const isDefaultField = template.addressLines[index]?.label === addressLines.fields[index].label
-    if (isDefaultField) {
+    if (isTemplateAddressLine(addressLines.fields[index].label)) {
       setConfirmingRemoveField({ kind: 'addressLines', index })
     } else {
       addressLines.remove(index)
@@ -129,7 +151,7 @@ export function ClientDrawer({
 
   function showError(error: unknown) {
     const code = (error as { code?: string }).code ?? 'UNKNOWN'
-    showErrorToast(t(`errors.${code}`, { defaultValue: t('common:errors.UNKNOWN', { ns: 'common' }) }))
+    showErrorToast(t([`errors.${code}`, `common:errors.${code}`, 'common:errors.UNKNOWN']))
   }
 
   /**
@@ -209,6 +231,8 @@ export function ClientDrawer({
           <span>{t('fields.name')}<RequiredMark /></span>
           <Input
             {...register('name')}
+            // The most-opened drawer in the app; it opened with focus on the ✕.
+            autoFocus
             aria-required="true"
             aria-invalid={errors.name ? true : undefined}
             aria-describedby={errors.name ? 'client-name-error' : undefined}
@@ -252,7 +276,7 @@ export function ClientDrawer({
         <div className="flex flex-col gap-2">
           <span className="text-sm font-medium">{t('identityDocuments.title')}</span>
           {identityDocuments.fields.map((field, index) => {
-            const isDefaultField = template.identityDocuments[index]?.label === field.label
+            const isDefaultField = isTemplateDocument(field.label)
             const labelError = errors.identityDocuments?.[index]?.label
             return (
             <div key={field.id} className="flex flex-col gap-1">
@@ -310,7 +334,7 @@ export function ClientDrawer({
         <div className="flex flex-col gap-2">
           <span className="text-sm font-medium">{t('addressLines.title')}</span>
           {addressLines.fields.map((field, index) => {
-            const isDefaultField = template.addressLines[index]?.label === field.label
+            const isDefaultField = isTemplateAddressLine(field.label)
             const labelError = errors.addressLines?.[index]?.label
             return (
             <div key={field.id} className="flex flex-col gap-1">

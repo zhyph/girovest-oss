@@ -24,6 +24,12 @@ export function LoginPage() {
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
     setErrorCode(null)
+    // Checked here rather than left to the server: an empty field came back
+    // as the same generic sentence a wrong password does.
+    if (!loginValue.trim() || !password) {
+      setErrorCode('VALIDATION_ERROR')
+      return
+    }
     try {
       const recoveryCode = await login(loginValue, password)
       if (recoveryCode) setBackfilledCode(recoveryCode)
@@ -63,6 +69,33 @@ export function LoginPage() {
     return <Navigate to="/configurar-loja" replace />
   }
 
+  /*
+   * On a fresh install the login form is a dead end until this check resolves:
+   * no staff row exists, so every attempt answers 401. `useSetupStatus` is
+   * deliberately `retry: false` (a retrying gate would stall first launch),
+   * which means one failed request — the bundled server still booting — left
+   * `data` undefined for good, with no message and no route to the wizard.
+   * Recovery was accidental, via refetchOnWindowFocus on the next alt-tab.
+   */
+  if (setupStatus.isPending) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-secondary border-t-primary" />
+      </div>
+    )
+  }
+
+  if (setupStatus.isError) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-4 text-center">
+        <p className="text-sm text-muted-foreground">{t('auth:setupCheckError')}</p>
+        <Button variant="secondary" onClick={() => void setupStatus.refetch()}>
+          {t('common:actions.retry')}
+        </Button>
+      </div>
+    )
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center">
       <Card className="w-80">
@@ -85,7 +118,7 @@ export function LoginPage() {
             </label>
             {errorCode && (
               <p className="text-sm text-destructive">
-                {t(`auth:errors.${errorCode}`, { defaultValue: t('common:errors.UNKNOWN') })}
+                {t([`auth:errors.${errorCode}`, `common:errors.${errorCode}`, 'common:errors.UNKNOWN'])}
               </p>
             )}
             <Button type="submit">{t('auth:submit')}</Button>

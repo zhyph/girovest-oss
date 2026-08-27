@@ -27,7 +27,8 @@
   "errors": {
     "UNKNOWN": "Algo deu errado. Tente novamente.",
     "chunkLoadFailed": "Não foi possível carregar esta parte do aplicativo.",
-    "unexpected": "Ocorreu um erro inesperado no aplicativo."
+    "unexpected": "Ocorreu um erro inesperado no aplicativo.",
+    "NETWORK_ERROR": "Não foi possível falar com o sistema da loja. Confira se ele está aberto e tente de novo."
   },
   "profileLoadError": "Não foi possível carregar seu perfil.",
   "confirmDelete": {
@@ -37,7 +38,8 @@
   "confirmCancelAllocation": {
     "title": "Cancelar esta alocação?",
     "message": "A reserva será cancelada e o produto ficará disponível novamente.",
-    "confirm": "Sim, cancelar"
+    "confirm": "Sim, cancelar",
+    "keep": "Manter peça"
   },
   "confirmDiscard": {
     "title": "Descartar alterações?",

@@ -23,6 +23,8 @@ import { BackupSection } from './BackupSection.tsx'
 import { hasGirovestBridge } from '../../lib/girovestBridge.ts'
 import { DiagnosticsButton } from '../../components/DiagnosticsButton.tsx'
 import { RecoveryCodeRotateSection } from './RecoveryCodeRotateSection.tsx'
+import { RequiredMark } from '../../components/ui/required-mark.tsx'
+import { ConfirmDialog } from '../../components/ui/confirm-dialog.tsx'
 
 const THEME_OPTIONS: ThemePreference[] = ['system', 'light', 'dark']
 
@@ -109,6 +111,10 @@ export function SettingsPage() {
   }
 
   const [section, setSection] = useState<SettingsSection>('shop')
+  // "Descartar" sits directly beside Salvar and threw the whole form away
+  // instantly. Every drawer in the app already confirms this; the one screen
+  // holding the shop's own identity and its contract clauses did not.
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false)
   // The section nav is always mounted, so this needs no readiness gate: the
   // one thing the tour points at is on screen before the settings query
   // resolves.
@@ -145,7 +151,7 @@ export function SettingsPage() {
       showSuccessToast(t('saved'))
     } catch (error) {
       const code = (error as { code?: string }).code ?? 'UNKNOWN'
-      showErrorToast(t(`common:errors.${code}`, { ns: 'common', defaultValue: t('common:errors.UNKNOWN', { ns: 'common' }) }))
+      showErrorToast(t([`common:errors.${code}`, `common:errors.${code}`, 'common:errors.UNKNOWN'], { ns: 'common' }))
     }
   }
 
@@ -230,7 +236,10 @@ export function SettingsPage() {
             renamed itself had no way to correct either.
           */}
           <label className="flex max-w-sm flex-col gap-1 text-sm">
-            {t('fields.name')}
+            <span>
+              {t('fields.name')}
+              <RequiredMark />
+            </span>
             <Input
               aria-label={t('fields.name')}
               aria-describedby="shop-identity-help"
@@ -240,7 +249,10 @@ export function SettingsPage() {
             <FieldError>{formState.errors.name && t('validation.required')}</FieldError>
           </label>
           <label className="flex max-w-sm flex-col gap-1 text-sm">
-            {t('fields.address')}
+            <span>
+              {t('fields.address')}
+              <RequiredMark />
+            </span>
             <Input
               aria-label={t('fields.address')}
               aria-describedby="shop-identity-help"
@@ -363,7 +375,7 @@ export function SettingsPage() {
             ) : (
               <span className="mr-auto text-meta text-muted-foreground">{t('unsaved')}</span>
             )}
-            <Button type="button" variant="secondary" onClick={() => reset()}>
+            <Button type="button" variant="secondary" onClick={() => setConfirmingDiscard(true)}>
               {t('discard')}
             </Button>
             <Button type="submit" disabled={updateSettings.isPending}>
@@ -371,6 +383,19 @@ export function SettingsPage() {
             </Button>
           </div>
         )}
+        <ConfirmDialog
+          open={confirmingDiscard}
+          title={t('common:confirmDiscard.title', { ns: 'common' })}
+          message={t('common:confirmDiscard.message', { ns: 'common' })}
+          confirmLabel={t('common:confirmDiscard.confirm', { ns: 'common' })}
+          cancelLabel={t('common:confirmDiscard.cancel', { ns: 'common' })}
+          confirmVariant="danger"
+          onConfirm={() => {
+            setConfirmingDiscard(false)
+            reset()
+          }}
+          onCancel={() => setConfirmingDiscard(false)}
+        />
         </form>
         {/* Outside the <form> on purpose: this is not editable shop data, it is
             a read-only identifier. Disappears entirely on the web build, where

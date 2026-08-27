@@ -72,6 +72,34 @@ describe('ClientDrawer', () => {
     expect(createImpl).toHaveBeenCalled()
   })
 
+  it('CRITICAL: keeps template rows locked when an earlier one was never filled', async () => {
+    // Both the lock and the delete-confirm compared by ARRAY POSITION, and
+    // stored rows come back in insertion order — so a client saved with RG but
+    // no CPF shifted every later row up by one, and RG rendered white and
+    // editable with one click on ✕ wiping it, no confirmation. The unlocked
+    // label is the second-order damage: retyping "Bairro" as "Barrio" makes
+    // clientReadiness report a missing field on a fully filled address.
+    const withGap: Client = {
+      ...client,
+      identityDocuments: [{ id: 'd1', label: 'RG', value: '12.345.678-9', maskKey: 'br-rg' }],
+    }
+    mockClientHooks()
+    renderWithToast(<ClientDrawer client={withGap} onClose={vi.fn()} />)
+
+    const labelField = screen.getAllByLabelText('Rótulo do documento').at(0)!
+    expect(labelField).toHaveAttribute('readonly')
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Remover documento' }).at(0)!)
+    // Confirmed, not dropped on the spot.
+    expect(screen.getByRole('heading', { name: 'Remover "RG"?' })).toBeInTheDocument()
+  })
+
+  it('opens with focus on the field she came to fill', () => {
+    mockClientHooks()
+    renderWithToast(<ClientDrawer client={null} onClose={vi.fn()} />)
+    expect(screen.getByLabelText('Nome')).toHaveFocus()
+  })
+
   it('ignores initialName when editing an existing client', () => {
     mockClientHooks()
     renderWithToast(<ClientDrawer client={client} initialName="Deveria Ser Ignorado" onClose={vi.fn()} />)

@@ -38,7 +38,8 @@
     "action": "Cancelar contrato",
     "confirmTitle": "Cancelar este contrato?",
     "confirmMessage": "Isso cancela todas as peças ainda reservadas neste contrato. Peças já retiradas ou devolvidas não são afetadas.",
-    "confirm": "Cancelar contrato"
+    "confirm": "Cancelar contrato",
+    "keep": "Manter contrato"
   },
   "clientCombobox": {
     "createNew": "Criar cliente \"{{name}}\"",

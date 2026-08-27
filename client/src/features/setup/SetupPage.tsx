@@ -182,7 +182,7 @@ export function SetupPage() {
             </fieldset>
             {errorCode && (
               <p className="text-sm text-destructive">
-                {t(`setup:errors.${errorCode}`, { defaultValue: t('common:errors.UNKNOWN') })}
+                {t([`setup:errors.${errorCode}`, `common:errors.${errorCode}`, 'common:errors.UNKNOWN'])}
               </p>
             )}
             <Button type="submit" disabled={completeSetup.isPending}>

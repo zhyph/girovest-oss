@@ -9,6 +9,7 @@ import { RowActions, DropdownMenuItem } from '../../components/ui/dropdown-menu.
 import { showErrorToast } from '../../lib/toast.ts'
 import { useSectionTour } from '../onboarding/useSectionTour.ts'
 import { useProducts } from '../products/useProducts.ts'
+import { foldForSearch } from '../../lib/autocompleteMatch.ts'
 import { useClients, useDeleteClient } from './useClients.ts'
 import { QueryState } from '../../components/QueryState.tsx'
 import { ClientDrawer } from './ClientDrawer.tsx'
@@ -63,14 +64,24 @@ export function ClientsPage() {
   )
 
   const filteredClients = useMemo(() => {
-    const query = search.trim().toLowerCase()
+    const raw = search.trim()
+    // Folded, because Brazilian first names are heavily accented: plain
+    // lowercasing meant "jose" never found José and "antonio" never found
+    // Antônio — a daily miss. Worse, the client PICKER on the contract screen
+    // already folds (entity-combobox via foldForSearch), so the same query
+    // worked there and not here, which is what makes her conclude the client
+    // was never registered.
+    const query = foldForSearch(raw)
+    // Phone numbers are stored formatted and pasted unformatted, so both
+    // sides are reduced to digits before comparing.
+    const queryDigits = raw.replace(/\D/g, '')
     const matching = !query
       ? (clients ?? [])
       : (clients ?? []).filter(
           (client) =>
-            client.name.toLowerCase().includes(query) ||
-            client.phone.toLowerCase().includes(query) ||
-            client.email.toLowerCase().includes(query),
+            foldForSearch(client.name).includes(query) ||
+            foldForSearch(client.email).includes(query) ||
+            (queryDigits.length > 0 && client.phone.replace(/\D/g, '').includes(queryDigits)),
         )
     return sortByName(matching)
   }, [clients, search])
@@ -108,7 +119,7 @@ export function ClientsPage() {
       if (selectedId === deleting.id) setSelectedId(null)
     } catch (error) {
       const code = (error as { code?: string }).code ?? 'UNKNOWN'
-      showErrorToast(t(`errors.${code}`, { defaultValue: t('common:errors.UNKNOWN', { ns: 'common' }) }))
+      showErrorToast(t([`errors.${code}`, `common:errors.${code}`, 'common:errors.UNKNOWN']))
     } finally {
       setDeleting(null)
     }
@@ -263,7 +274,14 @@ export function ClientsPage() {
           <ClientDetailPanel
             client={selected}
             onEdit={(client) => setEditing(client)}
-            onDelete={(client) => setDeleting(client)}
+            // Offered only when it could actually succeed. Nearly every
+            // client has allocation history, and deleting one is refused
+            // server-side — so she was steeling herself for "não pode ser
+            // desfeita" on an action that was never possible. That is how
+            // confirmations stop being read, which matters because two in
+            // this app are genuinely irreversible. The drawer already gates
+            // on this same flag.
+            onDelete={selected?.hasAllocationHistory ? undefined : (client) => setDeleting(client)}
             // Carries the client through, so the contract form opens with
             // the person already chosen rather than making staff retype the
             // name they just had selected.

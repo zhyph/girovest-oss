@@ -49,7 +49,25 @@ export async function apiFetch<T>(
     headers.Authorization = `Bearer ${token}`
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers })
+  // A rejected fetch means the app could not REACH its own server. On this
+  // machine that is a local process which genuinely goes down, and it was
+  // surfacing as the very same "Algo deu errado. Tente novamente." a typo
+  // gets — the wrong advice for the most likely cause, identical to the
+  // advice for the least likely. Given its own code, callers can say so.
+  let response: Response
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers })
+  } catch (cause) {
+    // Logged, not swallowed. Not every rejection here is the network: a token
+    // containing a newline (getToken is an unvalidated localStorage read), an
+    // invalid header, or an aborted request all land here too, and the
+    // corrupted-token case is otherwise unrecoverable from inside the app —
+    // clearToken() only runs on a 401 RESPONSE, which can never arrive. The
+    // renderer console is captured into main.log, so this reaches the
+    // diagnostics upload.
+    console.error(`[client-api] request to ${path} could not be sent`, cause)
+    throw new ApiError('NETWORK_ERROR', 0, 'Could not reach the server')
+  }
 
   // Sliding session renewal. The server re-issues the JWT on this header once
   // the presented one is past its half-life, so someone who keeps working is

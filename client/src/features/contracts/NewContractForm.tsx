@@ -225,7 +225,7 @@ export function NewContractForm({
       onClose()
     } catch (error) {
       const code = (error as { code?: string }).code ?? 'UNKNOWN'
-      showErrorToast(t(`errors.${code}`, { defaultValue: t('common:errors.UNKNOWN', { ns: 'common' }) }))
+      showErrorToast(t([`errors.${code}`, `common:errors.${code}`, 'common:errors.UNKNOWN']))
     }
   }
 

@@ -74,7 +74,7 @@ export function RecoveryCodeRotateSection() {
         </label>
         {errorCode && (
           <p className="text-sm text-destructive">
-            {t(`recoveryCode.errors.${errorCode}`, { defaultValue: t('common:errors.UNKNOWN') })}
+            {t([`recoveryCode.errors.${errorCode}`, `common:errors.${errorCode}`, 'common:errors.UNKNOWN'])}
           </p>
         )}
         <div className="flex gap-2">

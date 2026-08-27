@@ -9,6 +9,45 @@ import { verifyPasswordResetTicket, unsafeDecodeTicketIssuedAt } from './passwor
 import { signStaffToken } from './jwt.js'
 import { describeClientForLog, requireAuth } from './authMiddleware.js'
 
+/**
+ * How a login string is turned into a lookup key.
+ *
+ * Every read here is an exact-match `findUnique`, so a leading space or a
+ * capital letter chosen once at setup used to lock the account permanently —
+ * login AND recovery, since both do the same match.
+ */
+function normalizeLogin(login: string): string {
+  return login.trim().toLowerCase()
+}
+
+/**
+ * Resolves a typed login to its Staff row, however either was capitalised or
+ * padded.
+ *
+ * Normalising only the INPUT would have been worse than the bug it fixes:
+ * `Staff.login` is a plain binary unique index with no NOCASE collation and
+ * there is no data migration, so an account created before this — the exact
+ * person this is for — stored `Maria`, and a normalised lookup for `maria`
+ * misses it. All three auth paths would 401 at once, with no way back in.
+ *
+ * So: exact first (the common case, and the only one for a normalised
+ * account), then normalised, then a scan comparing normalised forms. The scan
+ * is safe because this is one shop's staff table — single digits of rows —
+ * and it is what guarantees no account can ever be locked out by the shape of
+ * its stored name.
+ */
+async function findStaffByLogin(login: string) {
+  const exact = await prisma.staff.findUnique({ where: { login } })
+  if (exact) return exact
+
+  const normalized = normalizeLogin(login)
+  const byNormalized = await prisma.staff.findUnique({ where: { login: normalized } })
+  if (byNormalized) return byNormalized
+
+  const all = await prisma.staff.findMany()
+  return all.find((staff) => normalizeLogin(staff.login) === normalized) ?? null
+}
+
 export const authRouter = Router()
 
 // Diagnostic-only descriptor for a login string in a log line. JSON.stringify
@@ -79,7 +118,15 @@ export const RECOVER_ATTEMPTS_MAX_KEYS = 2000
 // a rate limiter: it should keep the entry someone is still hitting and
 // evict the ones nobody has touched since -- true least-recently-used
 // eviction, which requires every touch to re-append the key.
-export function setRecoverAttempts(login: string, attempts: number[]): void {
+export function setRecoverAttempts(rawLogin: string, attempts: number[]): void {
+  // Keyed on the NORMALISED login, matching what the lookup resolves. Keyed
+  // raw, `maria`, `Maria`, `MARIA` and ` maria` all reach the same account
+  // while each collects its own 5-attempt bucket — and `trim()` makes the
+  // distinct-key space effectively unbounded. The recovery code is a
+  // standalone bearer secret, so this throttle is its only brute-force
+  // defence. Harmless before this change only because a `MARIA` attempt could
+  // never have succeeded anyway.
+  const login = normalizeLogin(rawLogin)
   recoverAttempts.delete(login)
   recoverAttempts.set(login, attempts)
   while (recoverAttempts.size > RECOVER_ATTEMPTS_MAX_KEYS) {
@@ -91,13 +138,13 @@ export function setRecoverAttempts(login: string, attempts: number[]): void {
 
 function isRecoverRateLimited(login: string): boolean {
   const now = Date.now()
-  const attempts = (recoverAttempts.get(login) ?? []).filter((t) => now - t < RECOVER_WINDOW_MS)
+  const attempts = (recoverAttempts.get(normalizeLogin(login)) ?? []).filter((t) => now - t < RECOVER_WINDOW_MS)
   setRecoverAttempts(login, attempts)
   return attempts.length >= RECOVER_MAX_ATTEMPTS
 }
 
 function recordRecoverAttempt(login: string): void {
-  const attempts = recoverAttempts.get(login) ?? []
+  const attempts = recoverAttempts.get(normalizeLogin(login)) ?? []
   attempts.push(Date.now())
   setRecoverAttempts(login, attempts)
 }
@@ -108,7 +155,7 @@ authRouter.post('/login', async (req, res) => {
     throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'login and password are required')
   }
 
-  const staff = await prisma.staff.findUnique({ where: { login: parsed.data.login } })
+  const staff = await findStaffByLogin(parsed.data.login)
   if (!staff) {
     console.warn(`[auth] login failed: no staff for login=${describeLoginForLog(parsed.data.login)}`)
     throw new AppError(ErrorCodes.INVALID_CREDENTIALS, 401, 'Invalid login or password')
@@ -160,7 +207,7 @@ authRouter.post('/recover', async (req, res) => {
     throw new AppError(ErrorCodes.RATE_LIMITED, 429, 'Too many recovery attempts. Try again later.')
   }
 
-  const staff = await prisma.staff.findUnique({ where: { login } })
+  const staff = await findStaffByLogin(login)
   // Same 401 whether the login is unknown, has no recovery code yet, or the
   // code is wrong -- distinguishing them would let an attacker probe for
   // valid usernames. The log line below is diagnostic-only (main.log, never
@@ -234,7 +281,7 @@ authRouter.post('/reset-with-support-token', async (req, res) => {
     throw new AppError(ErrorCodes.INVALID_CREDENTIALS, 401, 'Invalid or expired reset ticket')
   }
 
-  const staff = await prisma.staff.findUnique({ where: { login: parsed.data.login } })
+  const staff = await findStaffByLogin(parsed.data.login)
   if (!staff) {
     // The ticket's signature and embedded login checked out above (against
     // whatever was typed into the request form), but that login doesn't

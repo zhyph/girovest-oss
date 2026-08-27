@@ -116,6 +116,54 @@ describe('ClientsPage', () => {
     expect(refetch).toHaveBeenCalledTimes(1)
   })
 
+  it('CRITICAL: finds accented names and pasted phone numbers', async () => {
+    // Brazilian first names are heavily accented, so plain lowercasing was a
+    // daily miss — and the client PICKER on the contract screen already folds,
+    // so the same query worked there and not here. That inconsistency is what
+    // makes her conclude the client was never registered and create a second.
+    vi.spyOn(useClientsModule, 'useClients').mockReturnValue({
+      data: [
+        makeClient({ id: '1', name: 'José Ferreira', phone: '(11) 98765-4321' }),
+        makeClient({ id: '2', name: 'Antônio Prado', phone: '(11) 91111-2222' }),
+      ],
+      isLoading: false,
+    } as never)
+    renderWithQueryClient(<ClientsPage />)
+
+    await userEvent.type(screen.getByPlaceholderText(/Buscar/), 'jose')
+    expect(screen.getByText('José Ferreira')).toBeInTheDocument()
+    expect(screen.queryByText('Antônio Prado')).not.toBeInTheDocument()
+
+    await userEvent.clear(screen.getByPlaceholderText(/Buscar/))
+    await userEvent.type(screen.getByPlaceholderText(/Buscar/), 'antonio')
+    expect(screen.getByText('Antônio Prado')).toBeInTheDocument()
+
+    // Pasted from a phone's contact list, unformatted.
+    await userEvent.clear(screen.getByPlaceholderText(/Buscar/))
+    await userEvent.type(screen.getByPlaceholderText(/Buscar/), '11987654321')
+    expect(screen.getByText('José Ferreira')).toBeInTheDocument()
+  })
+
+  it('CRITICAL: does not offer Excluir on a client who can never be deleted', async () => {
+    // Nearly every client has allocation history and the server refuses the
+    // delete, so she was steeling herself for "não pode ser desfeita" on an
+    // action that was never possible. That is how confirmations stop being
+    // read, which matters because two in this app are genuinely irreversible.
+    vi.spyOn(useClientsModule, 'useClients').mockReturnValue({
+      data: [makeClient({ id: '1', name: 'Maria Silva', hasAllocationHistory: true })],
+      isLoading: false,
+    } as never)
+    renderWithQueryClient(<ClientsPage />)
+
+    await userEvent.click(screen.getByText('Maria Silva'))
+    const panel = document.querySelector('aside') as HTMLElement
+
+    // The whole menu trigger is gone, not just the item — there is nothing
+    // else behind it.
+    expect(within(panel).queryByRole('button', { name: 'Mais ações' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Excluir')).not.toBeInTheDocument()
+  })
+
   it('lists clients and opens the drawer in create mode when "Novo" is clicked', async () => {
     vi.spyOn(useClientsModule, 'useClients').mockReturnValue({
       data: [makeClient({ id: '1', name: 'Maria Silva' })],

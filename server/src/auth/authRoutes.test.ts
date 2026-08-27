@@ -99,11 +99,51 @@ describe('POST /api/auth/login', () => {
       expect(lines.join('\n')).not.toContain('wrong-password')
     })
 
-    it('surfaces a whitespace-padded login as distinct from the trimmed one', async () => {
-      await request(app).post('/api/auth/login').send({ login: 'ana ', password: 'correct-horse' })
+    // This used to assert the padded login was LOGGED verbatim, so an operator
+    // could see the padding that was locking someone out. It is not a lookup
+    // failure any more: the padding is normalised away on both write and read,
+    // so the login simply works and there is nothing to diagnose. The verbatim
+    // echo still matters for a genuinely unknown login, which the test above
+    // covers.
+    it('CRITICAL: an account STORED with padding or capitals can still log in', async () => {
+      /*
+        The inverse of the case below, and the one that actually matters:
+        normalising only the INPUT would have been worse than the bug. There is
+        no data migration and `Staff.login` is a plain binary unique index, so
+        the account created before this — the exact person it is for — is
+        stored as "Maria", and a normalised lookup for "maria" misses it.
+        Login, recover and support-reset would all 401 at once, with no way
+        back in.
+      */
+      const location = await prisma.location.create({ data: { name: 'Loja Legada', address: 'Rua Velha, 1' } })
+      await prisma.staff.create({
+        data: {
+          name: 'Maria Legada',
+          login: ' Maria ',
+          passwordHash: await hashPassword('correct-horse'),
+          role: 'owner',
+          locationId: location.id,
+        },
+      })
+      try {
+        for (const typed of [' Maria ', 'Maria', 'maria', 'MARIA']) {
+          const response = await request(app).post('/api/auth/login').send({ login: typed, password: 'correct-horse' })
+          expect(response.status, `typed=${JSON.stringify(typed)}`).toBe(200)
+        }
+      } finally {
+        await prisma.staff.deleteMany({ where: { locationId: location.id } })
+        await prisma.location.delete({ where: { id: location.id } })
+      }
+    })
 
-      const lines: string[] = warnSpy.mock.calls.map((call: unknown[]) => String(call[0]))
-      expect(lines.some((line) => line.includes('login="ana "'))).toBe(true)
+    it('CRITICAL: accepts a whitespace-padded or miscased login rather than locking the account', async () => {
+      // "maria " pasted once at setup used to be permanent: every later lookup
+      // is an exact-match findUnique, so login AND recovery both failed, and
+      // the deliberately vague error pointed her at her password.
+      for (const login of ['ana ', ' ana', 'ANA', 'Ana ']) {
+        const response = await request(app).post('/api/auth/login').send({ login, password: 'correct-horse' })
+        expect(response.status, `login=${JSON.stringify(login)}`).toBe(200)
+      }
     })
   })
 })

@@ -154,7 +154,7 @@ export function AllocationActions({ allocation }: { allocation: Allocation }) {
 
   function showActionError(error: unknown) {
     const code = resolveErrorCode(error)
-    showErrorToast(t(`errors.${code}`, { defaultValue: t('common:errors.UNKNOWN', { ns: 'common' }) }))
+    showErrorToast(t([`errors.${code}`, `common:errors.${code}`, 'common:errors.UNKNOWN']))
   }
 
   async function handleCheckOut() {
@@ -281,7 +281,8 @@ export function AllocationActions({ allocation }: { allocation: Allocation }) {
           title={t('common:confirmCancelAllocation.title', { ns: 'common' })}
           message={t('common:confirmCancelAllocation.message', { ns: 'common' })}
           confirmLabel={t('common:confirmCancelAllocation.confirm', { ns: 'common' })}
-          cancelLabel={t('common:actions.cancel', { ns: 'common' })}
+          cancelLabel={t('common:confirmCancelAllocation.keep', { ns: 'common' })}
+          confirmVariant="danger"
           confirmDisabled={cancel.isPending}
           onConfirm={handleCancel}
           onCancel={() => setShowCancelConfirm(false)}
@@ -571,7 +572,7 @@ function ContractHeaderActions({ contract }: { contract: Contract }) {
       setShowCancelConfirm(false)
     } catch (error) {
       showErrorToast(
-        t(`errors.${resolveErrorCode(error)}`, { defaultValue: t('common:errors.UNKNOWN', { ns: 'common' }) }),
+        t([`errors.${resolveErrorCode(error)}`, `common:errors.${resolveErrorCode(error)}`, 'common:errors.UNKNOWN']),
       )
     }
   }
@@ -626,7 +627,11 @@ function ContractHeaderActions({ contract }: { contract: Contract }) {
         title={t('cancelContract.confirmTitle')}
         message={t('cancelContract.confirmMessage')}
         confirmLabel={t('cancelContract.confirm')}
-        cancelLabel={t('common:actions.cancel', { ns: 'common' })}
+        // "Manter contrato", not "Cancelar": beside an action literally called
+        // "Cancelar contrato", a dismiss button reading "Cancelar" is
+        // genuinely ambiguous about which cancel it means.
+        cancelLabel={t('cancelContract.keep')}
+        confirmVariant="danger"
         confirmDisabled={cancelContract.isPending}
         onConfirm={handleCancel}
         onCancel={() => setShowCancelConfirm(false)}

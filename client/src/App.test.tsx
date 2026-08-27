@@ -10,13 +10,26 @@ import { setToken, clearToken } from './lib/auth.ts'
 
 describe('App', () => {
   it('renders the login screen when logged out', async () => {
+    // The setup check has to SUCCEED for the login form to be the right
+    // answer. It used to render regardless, which is the bug: on a fresh
+    // install no staff row exists, so every attempt answers 401 — and
+    // `useSetupStatus` is `retry: false`, so one failed request left the
+    // login form as the app's terminal state with no route to the wizard.
+    vi.spyOn(api, 'apiFetch').mockResolvedValue({ needsSetup: false } as never)
     render(<App />)
-    // "Entrar" appears both as the page title and the submit button text,
-    // so assert on the button specifically rather than getByText (which
-    // would throw on finding two matches). LoginPage is now a lazy-loaded
-    // route chunk, so its first render is behind the router's Suspense
-    // fallback — wait for it instead of asserting synchronously.
     await waitFor(() => expect(screen.getByRole('button', { name: 'Entrar' })).toBeInTheDocument())
+  })
+
+  it('CRITICAL: offers a way out when the setup check itself fails', async () => {
+    vi.spyOn(api, 'apiFetch').mockRejectedValue(new Error('server still booting'))
+    render(<App />)
+
+    await waitFor(() =>
+      expect(screen.getByText('Não foi possível verificar se a loja já foi configurada.')).toBeInTheDocument(),
+    )
+    expect(screen.getByRole('button', { name: 'Tentar novamente' })).toBeInTheDocument()
+    // Not the login form, which could only ever answer 401 here.
+    expect(screen.queryByRole('button', { name: 'Entrar' })).not.toBeInTheDocument()
   })
 })
 

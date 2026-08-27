@@ -54,7 +54,10 @@ export async function completeSetup(
       const staff = await tx.staff.create({
         data: {
           name: input.ownerName,
-          login: input.ownerLogin,
+          // Normalised on the way in, matching how every later lookup reads
+          // it — see normalizeLogin in authRoutes. A name chosen with a stray
+          // space here is an account that can never be logged into again.
+          login: input.ownerLogin.trim().toLowerCase(),
           passwordHash: await hashPassword(input.ownerPassword),
           role: 'owner',
           locationId: location.id,

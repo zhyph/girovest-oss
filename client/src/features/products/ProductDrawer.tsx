@@ -65,6 +65,8 @@ export function ProductDrawer({
    */
   const [photos, setPhotos] = useState<string[]>(product?.photos ?? [])
   const [addAnotherAfterSave, setAddAnotherAfterSave] = useState(false)
+  /** How many picked files are still being decoded — 0 when nothing is. */
+  const [convertingCount, setConvertingCount] = useState(0)
   /**
    * Set the moment a NEW product's row is created, before its photos are
    * uploaded. If the upload then fails (oversized batch, network drop), the
@@ -128,6 +130,15 @@ export function ProductDrawer({
 
   async function addPickedPhotos(files: FileList | null) {
     if (!files || files.length === 0) return
+    // Decoding a dozen full-size photos takes seconds and the picker showed
+    // NOTHING while it ran, so she picked the same files again thinking the
+    // first click had missed.
+    // Only the ones that will actually be decoded — counting files about to be
+    // rejected as oversized or non-image promised work that never happens.
+    const decodable = Array.from(files).filter(
+      (file) => file.type.startsWith('image/') && file.size <= MAX_PHOTO_FILE_BYTES,
+    )
+    setConvertingCount(decodable.length)
     const converted: string[] = []
     for (const file of Array.from(files)) {
       if (!file.type.startsWith('image/')) {
@@ -149,6 +160,7 @@ export function ProductDrawer({
     if (converted.length > 0) {
       setPhotos((current) => [...current, ...converted])
     }
+    setConvertingCount(0)
     // Cleared so picking the same file twice in a row still fires a change.
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
@@ -235,7 +247,7 @@ export function ProductDrawer({
 
   function showError(error: unknown) {
     const code = (error as { code?: string }).code ?? 'UNKNOWN'
-    showErrorToast(t(`errors.${code}`, { defaultValue: t('common:errors.UNKNOWN', { ns: 'common' }) }))
+    showErrorToast(t([`errors.${code}`, `common:errors.${code}`, 'common:errors.UNKNOWN']))
   }
 
   async function onSubmit(values: ProductFormValues) {
@@ -507,10 +519,17 @@ export function ProductDrawer({
             onChange={(event) => void addPickedPhotos(event.target.files)}
           />
           <div className="flex items-center gap-2">
-            <Button type="button" variant="secondary" onClick={() => fileInputRef.current?.click()}>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={convertingCount > 0}
+              onClick={() => fileInputRef.current?.click()}
+            >
               {t('photos.add')}
             </Button>
-            <span className="text-xs text-muted-foreground">{t('photos.hint')}</span>
+            <span className="text-xs text-muted-foreground">
+              {convertingCount > 0 ? t('photos.converting', { count: convertingCount }) : t('photos.hint')}
+            </span>
           </div>
           {photos.length === 0 ? (
             <span className="mt-1 text-xs text-muted-foreground">{t('photos.empty')}</span>
@@ -584,7 +603,12 @@ export function ProductDrawer({
             <Button type="button" variant="secondary" onClick={discardGuard.requestClose}>
               {t('common:actions.cancel', { ns: 'common' })}
             </Button>
-            <Button type="submit" disabled={createProduct.isPending || updateProduct.isPending}>
+            <Button
+              type="submit"
+              disabled={
+                createProduct.isPending || updateProduct.isPending || uploadPhotos.isPending || convertingCount > 0
+              }
+            >
               {t('common:actions.save', { ns: 'common' })}
             </Button>
           </div>

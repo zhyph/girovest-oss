@@ -90,7 +90,7 @@ export function RecoverPasswordPage() {
                 <p className="text-sm text-destructive">
                   {errorCode === 'PASSWORD_MISMATCH'
                     ? t('auth:recover.passwordMismatch')
-                    : t(`auth:recover.errors.${errorCode}`, { defaultValue: t('common:errors.UNKNOWN') })}
+                    : t([`auth:recover.errors.${errorCode}`, `common:errors.${errorCode}`, 'common:errors.UNKNOWN'])}
                 </p>
               )}
               <Button type="submit" disabled={isSubmitting}>
