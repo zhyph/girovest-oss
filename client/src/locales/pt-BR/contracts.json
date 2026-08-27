@@ -67,7 +67,10 @@
     "signatureLabel": "Assinatura do Cliente",
     "signedAt": "Assinado em {{date}}",
     "loadError": "Não foi possível carregar este contrato.",
-    "depositCollected": "Caução recebida"
+    "depositCollected": "Caução recebida",
+    "outstanding": "Saldo a pagar",
+    "settled": "Contrato quitado",
+    "refundDue": "Valor a devolver à cliente"
   },
   "sign": {
     "action": "Assinar remotamente",

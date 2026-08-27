@@ -93,6 +93,14 @@ export interface PaymentInput {
   method: string
   /** ISO date-only string, e.g. "2026-08-04". */
   paidAt: string
+  /**
+   * One id per dialog open, so a resubmitted request collapses onto the row
+   * it already created instead of taking the money twice — see
+   * Payment.clientRequestId in models.prisma. The dialog prefills the whole
+   * outstanding balance, which made a duplicate the DEFAULT outcome of two
+   * people acting on one contract, not a rare interleaving.
+   */
+  clientRequestId?: string
 }
 
 export function useCreatePayment() {

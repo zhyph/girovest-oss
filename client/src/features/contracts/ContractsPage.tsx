@@ -31,6 +31,7 @@ import {
   useCheckOutAllocation,
   useReturnAllocation,
   useCancelAllocation,
+  useRepriceAllocation,
 } from '../allocations/useAllocations.ts'
 import type { Allocation } from '../allocations/allocationSchemas.ts'
 import {
@@ -97,11 +98,14 @@ export function AllocationActions({ allocation }: { allocation: Allocation }) {
   const checkOut = useCheckOutAllocation()
   const returnAllocation = useReturnAllocation()
   const cancel = useCancelAllocation()
+  const reprice = useRepriceAllocation()
   const { locale } = useLocale()
   const [showCheckOutDialog, setShowCheckOutDialog] = useState(false)
   const [showEarlyConfirm, setShowEarlyConfirm] = useState(false)
   const [showReturnDialog, setShowReturnDialog] = useState(false)
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
+  const [showRepriceDialog, setShowRepriceDialog] = useState(false)
+  const [newPrice, setNewPrice] = useState(allocation.priceCharged)
   const [conditionNotesOut, setConditionNotesOut] = useState('')
   const [depositCollected, setDepositCollected] = useState(0)
   const [conditionNotesIn, setConditionNotesIn] = useState('')
@@ -194,6 +198,20 @@ export function AllocationActions({ allocation }: { allocation: Allocation }) {
     }
   }
 
+  function openRepriceDialog() {
+    setNewPrice(allocation.priceCharged)
+    setShowRepriceDialog(true)
+  }
+
+  async function handleReprice() {
+    try {
+      await reprice.mutateAsync({ id: allocation.id, priceCharged: newPrice })
+      setShowRepriceDialog(false)
+    } catch (error) {
+      showActionError(error)
+    }
+  }
+
   async function handleCancel() {
     try {
       await cancel.mutateAsync(allocation.id)
@@ -212,6 +230,11 @@ export function AllocationActions({ allocation }: { allocation: Allocation }) {
           dialog rendered inside it before it ever painted.
         */}
         <RowActions label={t('actions.more')}>
+          {/* Only while reserved — once the piece has gone out the client has
+              signed paper for the figure, and the server refuses. */}
+          <DropdownMenuItem disabled={reprice.isPending} onSelect={openRepriceDialog}>
+            {t('actions.reprice')}
+          </DropdownMenuItem>
           <DropdownMenuItem disabled={checkOut.isPending} onSelect={() => setShowCheckOutDialog(true)}>
             {t('actions.checkOut')}
           </DropdownMenuItem>
@@ -275,6 +298,25 @@ export function AllocationActions({ allocation }: { allocation: Allocation }) {
               {t('checkOutDialog.earlyConfirm')}
             </Button>
           </div>
+          </DialogContent>
+        </Dialog>
+        <Dialog open={showRepriceDialog} onOpenChange={(next) => !next && setShowRepriceDialog(false)}>
+          <DialogContent showCloseButton={false} className="max-w-sm gap-0 p-5">
+            <DialogTitle className="mb-3 text-heading">{t('repriceDialog.title')}</DialogTitle>
+            <div className="flex flex-col gap-3">
+              <label className="flex flex-col gap-1 text-sm">
+                {t('fields.priceCharged')}
+                <CurrencyInput value={newPrice} onChange={setNewPrice} aria-label={t('fields.priceCharged')} />
+              </label>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="secondary" onClick={() => setShowRepriceDialog(false)}>
+                  {t('common:actions.cancel', { ns: 'common' })}
+                </Button>
+                <Button type="button" onClick={handleReprice} disabled={reprice.isPending || newPrice <= 0}>
+                  {t('common:actions.save', { ns: 'common' })}
+                </Button>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
         <ConfirmDialog
@@ -787,7 +829,19 @@ function ContractDetailPanel({
                     <StatusBadge state={allocation.status as EntityState} />
                   </span>
                 </span>
-                <span className="tabular text-right text-[13.5px]">
+                {/*
+                  A cancelled piece keeps its row — that is deliberate history
+                  — but struck through, because its price used to be formatted
+                  exactly like the ones being charged. A three-piece contract
+                  with one cancelled showed 1.000 + 500 + 800 above a total of
+                  1.500, and every number was individually correct.
+                */}
+                <span
+                  className={cn(
+                    'tabular text-right text-[13.5px]',
+                    allocation.status === 'cancelled' && 'text-muted-foreground line-through',
+                  )}
+                >
                   {formatCurrency(allocation.priceCharged, locale, currency)}
                 </span>
                 <AllocationActions allocation={allocation} />

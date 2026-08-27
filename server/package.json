@@ -16,7 +16,7 @@
     "build": "tsc -p tsconfig.json",
     "build:electron-bundle": "esbuild dist/server.js --bundle --platform=node --format=esm --outfile=dist-bundle/server-bundle.mjs --external:bcrypt --external:better-sqlite3 --external:pg-native --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\" && esbuild dist/migrate-cli.js --bundle --platform=node --format=esm --outfile=dist-bundle/migrate.mjs --external:better-sqlite3 --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\"",
     "start": "node dist/server.js",
-    "test:setup": "dotenv -e .env.test -- npm run db:generate && dotenv -e .env.test -- prisma db push",
+    "test:setup": "dotenv -e .env.test -- npm run db:generate && dotenv -e .env.test -- prisma db push --accept-data-loss",
     "pretest": "npm run test:setup",
     "test": "dotenv -e .env.test -- vitest run",
     "test:watch": "dotenv -e .env.test -- vitest",

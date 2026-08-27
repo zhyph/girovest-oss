@@ -114,6 +114,10 @@ const createPaymentSchema = z.object({
   amount: z.number().positive(),
   method: z.string().min(1),
   paidAt: isoDate,
+  // One id per dialog open, so a resubmitted request collapses onto the row
+  // it already created rather than taking the money a second time. Optional:
+  // a client that does not send one gets the old behaviour.
+  clientRequestId: z.string().min(1).max(128).optional(),
 })
 
 contractsRouter.post('/:contractId/payments', async (req, res) => {
@@ -123,7 +127,7 @@ contractsRouter.post('/:contractId/payments', async (req, res) => {
     throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'Invalid payment payload')
   }
   const locationId = req.staff.locationId
-  res.status(201).json(await createPayment(req.params.contractId, locationId, parsed.data))
+  res.status(201).json(await createPayment(req.params.contractId, locationId, req.staff.staffId, parsed.data))
 })
 
 const updatePaymentSchema = z.object({

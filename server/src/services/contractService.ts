@@ -24,6 +24,22 @@ export interface CreateContractInput {
   items: CreateContractItemInput[]
 }
 
+/**
+ * How a contract's payments are always read.
+ *
+ * `paidAt` is freely backdatable, so insertion order and chronology routinely
+ * diverge: log today's R$ 500,00, then remember a R$ 300,00 taken in cash last
+ * month, and the panel — and the Pagamentos table on the sheet the client
+ * signs — read 15/09 above 12/08. Every other include in this service is
+ * explicitly ordered; this one was the exception.
+ */
+const PAYMENTS_IN_ORDER = {
+  // paidAt alone is not deterministic: a deposit and the balance on the same
+  // date is the normal case, and on Postgres a row corrected via updatePayment
+  // jumped to the bottom of the table on the sheet the client signs.
+  orderBy: [{ paidAt: 'asc' }, { createdAt: 'asc' }],
+} satisfies { orderBy: Prisma.PaymentOrderByWithRelationInput[] }
+
 export async function createContract(input: CreateContractInput) {
   if (input.items.length === 0) {
     throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'A contract needs at least one item')
@@ -143,7 +159,7 @@ export async function createContract(input: CreateContractInput) {
                 })),
               },
             },
-            include: { allocations: true, payments: true },
+            include: { allocations: true, payments: PAYMENTS_IN_ORDER },
           })
         },
         useSerializable ? { isolationLevel: Prisma.TransactionIsolationLevel.Serializable } : undefined,
@@ -181,7 +197,7 @@ export async function cancelContract(id: string, locationId: string) {
 
   return prisma.contract.findUniqueOrThrow({
     where: { id },
-    include: { allocations: true, payments: true },
+    include: { allocations: true, payments: PAYMENTS_IN_ORDER },
   })
 }
 
@@ -276,7 +292,7 @@ async function outstandingContracts(searched: Prisma.ContractWhereInput) {
   const contracts = await prisma.contract.findMany({
     where: { ...searched, ...NOT_CANCELLED },
     orderBy: { createdAt: 'desc' },
-    include: { allocations: true, payments: true },
+    include: { allocations: true, payments: PAYMENTS_IN_ORDER },
   })
   return contracts.filter((contract) => contractOutstandingCentavos(contract) > 0)
 }
@@ -345,7 +361,7 @@ export async function listContracts(
     prisma.contract.findMany({
       where,
       orderBy: { createdAt: 'desc' },
-      include: { allocations: true, payments: true },
+      include: { allocations: true, payments: PAYMENTS_IN_ORDER },
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
@@ -371,7 +387,7 @@ export async function getClientContracts(locationId: string, clientId: string) {
   return prisma.contract.findMany({
     where: { locationId, clientId },
     orderBy: { createdAt: 'desc' },
-    include: { allocations: true, payments: true },
+    include: { allocations: true, payments: PAYMENTS_IN_ORDER },
   })
 }
 
@@ -380,7 +396,7 @@ export async function getContract(id: string, locationId: string) {
     where: { id },
     include: {
       allocations: { include: { product: true } },
-      payments: true,
+      payments: PAYMENTS_IN_ORDER,
       client: { include: { identityDocuments: true, addressLines: { orderBy: { sortOrder: 'asc' } } } },
       location: { include: { contractClauses: { orderBy: { sortOrder: 'asc' } } } },
     },
@@ -428,19 +444,85 @@ export async function sumOutstanding(locationId: string): Promise<OutstandingSum
 export async function createPayment(
   contractId: string,
   locationId: string,
-  data: { amount: number; method: string; paidAt: Date },
+  staffId: string,
+  data: { amount: number; method: string; paidAt: Date; clientRequestId?: string },
 ) {
   const contract = await prisma.contract.findUnique({ where: { id: contractId } })
   if (!contract || contract.locationId !== locationId) {
     throw new AppError(ErrorCodes.NOT_FOUND, 404, `Contract ${contractId} not found`)
+  }
+
+  /*
+   * A resubmitted request collapses onto the row it already created.
+   *
+   * The dialog prefills the whole outstanding balance, so two people acting on
+   * one contract — or one person whose first Salvar appeared to hang — was the
+   * DEFAULT route to charging twice, not a rare interleaving. Checked before
+   * the insert AND enforced by a unique index, so a genuine race loses at the
+   * database rather than here.
+   */
+  if (data.clientRequestId) {
+    const existing = await prisma.payment.findUnique({ where: { clientRequestId: data.clientRequestId } })
+    if (existing) {
+      /*
+       * The id is unique GLOBALLY, so a hit does not by itself mean "this
+       * contract's payment already landed". Returning the requested contract
+       * unchanged made a reused id swallow a payment silently and answer 201:
+       * money the shop took, never recorded, with nothing on screen to say so.
+       */
+      if (existing.contractId !== contractId) {
+        throw new AppError(
+          ErrorCodes.VALIDATION_ERROR,
+          400,
+          'clientRequestId already belongs to a different contract',
+        )
+      }
+      /*
+       * A resubmit must be the SAME submission. The id is minted per dialog
+       * OPEN and the dialog stays open when a save fails visibly — so a first
+       * Salvar that failed after the server had committed left her correcting
+       * the amount and resubmitting under the same id. Collapsing that
+       * silently discarded the correction.
+       */
+      if (toCentavos(existing.amount) !== toCentavos(data.amount) || existing.method !== data.method) {
+        throw new AppError(
+          ErrorCodes.VALIDATION_ERROR,
+          409,
+          'clientRequestId already used for a different payment',
+        )
+      }
+      return getContract(contractId, locationId)
+    }
   }
   // Quantised on the way in, so the ledger holds only whole centavos no
   // matter what a client sends. An untouched PaymentDialog prefill used to
   // arrive as 300.29999999999995 — a value that displays as R$ 300,30, is
   // right to any 2-decimal reading, and then joins every later `paid` sum and
   // spreads its drift to contracts that had none.
-  await prisma.payment.create({ data: { contractId, ...data, amount: quantiseToCentavos(data.amount) } })
+  try {
+    await prisma.payment.create({
+      data: {
+        contractId,
+        ...data,
+        amount: quantiseToCentavos(data.amount),
+        // Cash moving with nobody's name on it is the gap this closes: the
+        // ledger recorded what and when, never who.
+        recordedByStaffId: staffId,
+      },
+    })
+  } catch (error) {
+    // The unique index fired, i.e. the same submission arrived twice and the
+    // check above lost the race. That is the outcome we wanted, not a failure
+    // — but only when we actually sent an id, so a P2002 from anything else
+    // can never be swallowed into a 201.
+    if (!data.clientRequestId || !isUniqueConstraintError(error)) throw error
+  }
   return getContract(contractId, locationId)
+}
+
+/** Prisma's P2002, i.e. a unique index rejected the row. */
+function isUniqueConstraintError(error: unknown): boolean {
+  return (error as { code?: string })?.code === 'P2002'
 }
 
 /** Rounds a reais amount to a whole number of centavos, keeping it in reais. */

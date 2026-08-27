@@ -339,7 +339,7 @@ describe('cancelContract', () => {
 describe('listContracts', () => {
   it('lists contracts with their allocations and payments', async () => {
     const contract = await createContract(baseInput())
-    await createPayment(contract.id, locationId, { amount: 50, method: 'PIX', paidAt: new Date('2026-09-25') })
+    await createPayment(contract.id, locationId, staffId, { amount: 50, method: 'PIX', paidAt: new Date('2026-09-25') })
 
     const { contracts } = await listContracts(locationId)
 
@@ -554,7 +554,7 @@ describe('createPayment / updatePayment / deletePayment', () => {
   it('logs a payment against a contract', async () => {
     const contract = await createContract(baseInput())
 
-    const updated = await createPayment(contract.id, locationId, {
+    const updated = await createPayment(contract.id, locationId, staffId, {
       amount: 100,
       method: 'PIX',
       paidAt: new Date('2026-09-25'),
@@ -567,7 +567,7 @@ describe('createPayment / updatePayment / deletePayment', () => {
   it('allows logging more than what is outstanding, rather than capping it', async () => {
     const contract = await createContract(baseInput())
 
-    const updated = await createPayment(contract.id, locationId, {
+    const updated = await createPayment(contract.id, locationId, staffId, {
       amount: 9999,
       method: 'Dinheiro',
       paidAt: new Date('2026-09-25'),
@@ -581,13 +581,13 @@ describe('createPayment / updatePayment / deletePayment', () => {
     const otherLocation = await prisma.location.create({ data: { name: 'Outra', address: 'B' } })
 
     await expect(
-      createPayment(contract.id, otherLocation.id, { amount: 100, method: 'PIX', paidAt: new Date() }),
+      createPayment(contract.id, otherLocation.id, staffId, { amount: 100, method: 'PIX', paidAt: new Date() }),
     ).rejects.toThrow(AppError)
   })
 
   it('corrects a logged payment', async () => {
     const contract = await createContract(baseInput())
-    const withPayment = await createPayment(contract.id, locationId, {
+    const withPayment = await createPayment(contract.id, locationId, staffId, {
       amount: 100,
       method: 'PIX',
       paidAt: new Date('2026-09-25'),
@@ -600,7 +600,7 @@ describe('createPayment / updatePayment / deletePayment', () => {
 
   it('removes a logged payment', async () => {
     const contract = await createContract(baseInput())
-    const withPayment = await createPayment(contract.id, locationId, {
+    const withPayment = await createPayment(contract.id, locationId, staffId, {
       amount: 100,
       method: 'PIX',
       paidAt: new Date('2026-09-25'),
@@ -613,7 +613,7 @@ describe('createPayment / updatePayment / deletePayment', () => {
 
   it('refuses to touch a payment belonging to another location', async () => {
     const contract = await createContract(baseInput())
-    const withPayment = await createPayment(contract.id, locationId, {
+    const withPayment = await createPayment(contract.id, locationId, staffId, {
       amount: 100,
       method: 'PIX',
       paidAt: new Date('2026-09-25'),
@@ -630,7 +630,7 @@ describe('createPayment / updatePayment / deletePayment', () => {
 
   it('refuses a payment that belongs to a different contract', async () => {
     const first = await createContract(baseInput())
-    const firstPayment = await createPayment(first.id, locationId, {
+    const firstPayment = await createPayment(first.id, locationId, staffId, {
       amount: 100,
       method: 'PIX',
       paidAt: new Date('2026-09-25'),
@@ -658,14 +658,14 @@ describe('sumOutstanding', () => {
 
   it('subtracts logged payments from the total owed', async () => {
     const contract = await createContract(baseInput())
-    await createPayment(contract.id, locationId, { amount: 40, method: 'PIX', paidAt: new Date('2026-09-25') })
+    await createPayment(contract.id, locationId, staffId, { amount: 40, method: 'PIX', paidAt: new Date('2026-09-25') })
 
     expect(await sumOutstanding(locationId)).toEqual({ total: 60, count: 1 })
   })
 
   it('floors a single contract at zero rather than letting it offset another contract\'s balance, and leaves it out of the count', async () => {
     const overpaid = await createContract(baseInput())
-    await createPayment(overpaid.id, locationId, { amount: 500, method: 'PIX', paidAt: new Date('2026-09-25') })
+    await createPayment(overpaid.id, locationId, staffId, { amount: 500, method: 'PIX', paidAt: new Date('2026-09-25') })
     await createContract(
       baseInput({
         items: [
@@ -835,7 +835,7 @@ describe('listContracts status filters and counts', () => {
         ],
       }),
     )
-    await createPayment(settled.id, locationId, { amount: 150, method: 'PIX', paidAt: new Date('2026-09-25') })
+    await createPayment(settled.id, locationId, staffId, { amount: 150, method: 'PIX', paidAt: new Date('2026-09-25') })
 
     const result = await listContracts(locationId, { status: 'outstanding' })
 

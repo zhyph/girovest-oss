@@ -56,6 +56,21 @@ function seedReservedAllocation(
   })
 }
 
+/** Like seedReservedAllocation, but with the status and price under test. */
+function seedAllocation({ status, priceCharged }: { status: string; priceCharged: number }) {
+  return prisma.allocation.create({
+    data: {
+      productId,
+      clientId,
+      staffId,
+      checkoutDate: FUTURE_CHECKOUT,
+      dueDate: FUTURE_DUE,
+      status,
+      priceCharged,
+    },
+  })
+}
+
 describe('POST /api/allocations/:id/check-out', () => {
   it('requires authentication', async () => {
     const allocation = await seedReservedAllocation()
@@ -272,5 +287,54 @@ describe('allocations routes cross-location isolation', () => {
 
     expect(response.status).toBe(200)
     expect(response.body.map((a: { id: string }) => a.id)).toEqual([ownAllocation.id])
+  })
+})
+
+describe('PATCH /api/allocations/:id/price', () => {
+  it('CRITICAL: corrects a mistyped price without cancelling the contract', async () => {
+    /*
+      R$ 4.500,00 typed for R$ 450,00 read on the list row, in the panel, on
+      the sheet the client signs, and added R$ 4.050,00 of phantom receivables
+      to the Painel. The only fix was cancelling the whole contract and
+      re-entering it — irreversible, and it burns the contract number the shop
+      uses to refer to the job.
+    */
+    const allocation = await seedAllocation({ status: 'reserved', priceCharged: 4500 })
+
+    const response = await request(app)
+      .patch(`/api/allocations/${allocation.id}/price`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({ priceCharged: 450 })
+
+    expect(response.status).toBe(200)
+    expect(response.body.priceCharged).toBe(450)
+  })
+
+  it('refuses once the piece has gone out, when paper has been signed for the figure', async () => {
+    const allocation = await seedAllocation({ status: 'checked_out', priceCharged: 4500 })
+
+    const response = await request(app)
+      .patch(`/api/allocations/${allocation.id}/price`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({ priceCharged: 450 })
+
+    expect(response.status).toBe(409)
+  })
+
+  it('quantises to whole centavos like every other money write', async () => {
+    const allocation = await seedAllocation({ status: 'reserved', priceCharged: 100 })
+
+    const response = await request(app)
+      .patch(`/api/allocations/${allocation.id}/price`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({ priceCharged: 300.29999999999995 })
+
+    expect(response.body.priceCharged).toBe(300.3)
+  })
+
+  it('requires authentication', async () => {
+    const allocation = await seedAllocation({ status: 'reserved', priceCharged: 100 })
+    const response = await request(app).patch(`/api/allocations/${allocation.id}/price`).send({ priceCharged: 450 })
+    expect(response.status).toBe(401)
   })
 })

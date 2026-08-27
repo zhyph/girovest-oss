@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { formatDate, parseDateOnly } from '../../lib/date.ts'
 import { formatCurrency, getLocaleConfig } from '../../lib/locale.ts'
-import { contractTotal, liveAllocations, type ContractDetail } from './contractSchemas.ts'
+import { contractTotal, contractTotalCentavos, liveAllocations, type ContractDetail } from './contractSchemas.ts'
 import { fromCentavos, sumCentavos } from '../../lib/money.ts'
 
 const DATE_FORMAT_OPTIONS: Intl.DateTimeFormatOptions = { day: '2-digit', month: '2-digit', year: 'numeric' }
@@ -25,6 +25,10 @@ export function ContractPrintView({ contract }: ContractPrintViewProps) {
   const items = liveAllocations(contract.allocations)
   const total = contractTotal(contract)
   const depositCollected = fromCentavos(sumCentavos(items.map((allocation) => allocation.depositCollected ?? 0)))
+  // Centavos, like every other comparison — see lib/money.ts.
+  const outstanding = fromCentavos(
+    contractTotalCentavos(contract) - sumCentavos(contract.payments.map((payment) => payment.amount)),
+  )
 
   return (
     // Deliberate exception to the semantic-token rule: a printed/signed
@@ -101,6 +105,21 @@ export function ContractPrintView({ contract }: ContractPrintViewProps) {
             {t('print.depositCollected')}: {formatCurrency(depositCollected, locale, currency)}
           </p>
         )}
+        {/*
+          What she still owes, stated on the paper she signs.
+          The sheet listed the total and the payments received and left her to
+          subtract — while a clause committed her to "a última parcela"
+          without saying what it is. The shop's only figure for the balance
+          lived on a screen the client never sees.
+        */}
+        <p className="text-right font-medium">
+          {outstanding > 0 && `${t('print.outstanding')}: ${formatCurrency(outstanding, locale, currency)}`}
+          {outstanding === 0 && t('print.settled')}
+          {/* Three states, matching the panel exactly. Two states printed
+              "Contrato quitado" on a contract the screen beside it was
+              reporting as overpaid, with a refund owed. */}
+          {outstanding < 0 && `${t('print.refundDue')}: ${formatCurrency(-outstanding, locale, currency)}`}
+        </p>
       </section>
 
       <section className="flex flex-col gap-2">

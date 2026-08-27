@@ -65,6 +65,25 @@ export function useCancelAllocation() {
   })
 }
 
+/**
+ * Corrects a piece's charged price while it is still reserved.
+ *
+ * The only previous fix for a typo was cancelling the contract and re-entering
+ * it, which is irreversible and burns the contract number. Once the piece has
+ * gone out the client has signed paper for the figure, so the server refuses.
+ */
+export function useRepriceAllocation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, priceCharged }: { id: string; priceCharged: number }) =>
+      apiFetch<Allocation>(`/api/allocations/${id}/price`, {
+        method: 'PATCH',
+        body: JSON.stringify({ priceCharged }),
+      }),
+    onSuccess: () => invalidateAfterMutation(queryClient),
+  })
+}
+
 export function useProductAvailability(productId: string, checkoutDate: string, dueDate: string) {
   return useQuery({
     queryKey: ['availability', productId, checkoutDate, dueDate],

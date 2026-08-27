@@ -160,6 +160,34 @@ model Payment {
   /** When it was actually paid — she can date it in the past (collected it yesterday, logging it today) or edit it after the fact. */
   paidAt     DateTime
   createdAt  DateTime @default(now())
+  /**
+   * Who recorded it. Nullable because every payment written before this
+   * column existed has no answer, and the shop-PC migration runner has no
+   * transactions — additive, nullable columns only. Treat a null as
+   * "recorded before we tracked it", never as "nobody".
+   */
+  /*
+   * A plain column, deliberately NOT a Prisma relation.
+   *
+   * Declaring `recordedBy Staff?` adds a foreign key, and Prisma implements
+   * that on SQLite as RedefineTables: create new_Payment, copy, DROP TABLE
+   * Payment, rename. The shop-PC migration runner has no transactions, so a
+   * crash in that window destroys the payment ledger outright. As a bare
+   * nullable column this is one ALTER TABLE ADD COLUMN, which cannot lose
+   * anything. Joined in application code where it is needed.
+   */
+  recordedByStaffId String?
+  /**
+   * One-per-dialog-open id, unique so a resubmitted request collapses onto
+   * the row it already created instead of taking the money twice.
+   *
+   * The dialog prefills the full outstanding balance, so two people acting on
+   * one contract — or one person whose first Salvar appeared to hang — was
+   * the DEFAULT path to a duplicate, not a rare interleaving. Nullable for
+   * the same reason as above, and because a client that does not send one
+   * simply gets the old behaviour.
+   */
+  clientRequestId String? @unique
 
   contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
 }

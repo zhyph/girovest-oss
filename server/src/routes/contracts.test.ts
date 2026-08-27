@@ -434,6 +434,197 @@ describe('GET /api/contracts/outstanding', () => {
     expect(list.body.contracts.map((c: { id: string }) => c.id)).not.toContain(created.body.id)
   })
 
+  it('CRITICAL: the same submission twice takes the money once', async () => {
+    /*
+      The dialog prefills the whole outstanding balance, so a duplicate was the
+      DEFAULT outcome of two people acting on one contract — or of one person
+      whose first Salvar appeared to hang — not a rare interleaving. There was
+      no idempotency, no version check and no cap, so both writes landed and
+      the only exits were deleting a payment or refunding money never received.
+    */
+    const product = await prisma.product.create({
+      data: { locationId, name: 'Vestido Idem', category: 'festa', size: 'M', color: 'lilás', rentalPrice: 500, depositAmount: 0 },
+    })
+    const created = await request(app)
+      .post('/api/contracts')
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({
+        clientId,
+        eventDate: '2027-01-10',
+        paymentMethod: 'PIX',
+        items: [{ productId: product.id, checkoutDate: '2027-01-08', dueDate: '2027-01-12', priceCharged: 500 }],
+      })
+
+    const body = { amount: 500, method: 'PIX', paidAt: '2027-01-05', clientRequestId: 'dialog-open-abc' }
+    const first = await request(app)
+      .post(`/api/contracts/${created.body.id}/payments`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send(body)
+    const second = await request(app)
+      .post(`/api/contracts/${created.body.id}/payments`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send(body)
+
+    expect(first.status).toBe(201)
+    expect(second.status).toBe(201)
+    expect(await prisma.payment.count({ where: { contractId: created.body.id } })).toBe(1)
+    // And the contract is settled once, not overpaid.
+    expect(second.body.payments).toHaveLength(1)
+  })
+
+  it('CRITICAL: refuses a request id that belongs to another contract, rather than silently dropping the payment', async () => {
+    /*
+      The id is unique GLOBALLY, so a hit did not by itself mean "this
+      contract's payment already landed" — the server returned the requested
+      contract unchanged with a 201, having written nothing. Money the shop
+      took, never recorded, nothing on screen to say so.
+    */
+    const make = async (name: string) => {
+      const product = await prisma.product.create({
+        data: { locationId, name, category: 'festa', size: 'M', color: 'azul', rentalPrice: 300, depositAmount: 0 },
+      })
+      const created = await request(app)
+        .post('/api/contracts')
+        .set('Authorization', `Bearer ${staffToken}`)
+        .send({
+          clientId,
+          eventDate: '2027-04-10',
+          paymentMethod: 'PIX',
+          items: [{ productId: product.id, checkoutDate: '2027-04-08', dueDate: '2027-04-12', priceCharged: 300 }],
+        })
+      return created.body.id as string
+    }
+    const [a, b] = [await make('Peça A'), await make('Peça B')]
+    const body = { amount: 300, method: 'PIX', paidAt: '2027-04-05', clientRequestId: 'shared-id' }
+
+    await request(app).post(`/api/contracts/${a}/payments`).set('Authorization', `Bearer ${staffToken}`).send(body)
+    const reused = await request(app)
+      .post(`/api/contracts/${b}/payments`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send(body)
+
+    expect(reused.status).toBe(400)
+    expect(await prisma.payment.count({ where: { contractId: b } })).toBe(0)
+  })
+
+  it('refuses the same id resent with a different amount, rather than discarding the correction', async () => {
+    // The id is minted per dialog OPEN and the dialog stays open when a save
+    // fails visibly — so a first Salvar that failed after the server committed
+    // left her correcting the amount under the same id.
+    const product = await prisma.product.create({
+      data: { locationId, name: 'Peça Correção', category: 'festa', size: 'M', color: 'azul', rentalPrice: 300, depositAmount: 0 },
+    })
+    const created = await request(app)
+      .post('/api/contracts')
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({
+        clientId,
+        eventDate: '2027-05-10',
+        paymentMethod: 'PIX',
+        items: [{ productId: product.id, checkoutDate: '2027-05-08', dueDate: '2027-05-12', priceCharged: 300 }],
+      })
+    const send = (amount: number) =>
+      request(app)
+        .post(`/api/contracts/${created.body.id}/payments`)
+        .set('Authorization', `Bearer ${staffToken}`)
+        .send({ amount, method: 'PIX', paidAt: '2027-05-05', clientRequestId: 'same-dialog' })
+
+    await send(100)
+    const corrected = await send(55)
+
+    expect(corrected.status).toBe(409)
+    const stored = await prisma.payment.findFirst({ where: { contractId: created.body.id } })
+    expect(stored?.amount).toBe(100)
+  })
+
+  it('orders same-day payments deterministically, by when they were recorded', async () => {
+    // A deposit and the balance on the same date is the normal case, and on
+    // Postgres a row corrected via updatePayment jumped to the bottom of the
+    // table on the sheet the client signs.
+    const product = await prisma.product.create({
+      data: { locationId, name: 'Peça Mesmo Dia', category: 'festa', size: 'M', color: 'azul', rentalPrice: 300, depositAmount: 0 },
+    })
+    const created = await request(app)
+      .post('/api/contracts')
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({
+        clientId,
+        eventDate: '2027-06-10',
+        paymentMethod: 'PIX',
+        items: [{ productId: product.id, checkoutDate: '2027-06-08', dueDate: '2027-06-12', priceCharged: 300 }],
+      })
+    for (const amount of [10, 20, 30]) {
+      await request(app)
+        .post(`/api/contracts/${created.body.id}/payments`)
+        .set('Authorization', `Bearer ${staffToken}`)
+        .send({ amount, method: 'PIX', paidAt: '2027-06-01' })
+    }
+    const first = await prisma.payment.findFirst({ where: { contractId: created.body.id }, orderBy: { createdAt: 'asc' } })
+    await request(app)
+      .patch(`/api/contracts/${created.body.id}/payments/${first!.id}`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({ amount: 11 })
+
+    const detail = await request(app)
+      .get(`/api/contracts/${created.body.id}`)
+      .set('Authorization', `Bearer ${staffToken}`)
+    expect(detail.body.payments.map((p: { amount: number }) => p.amount)).toEqual([11, 20, 30])
+  })
+
+  it('records who took the payment', async () => {
+    // Cash moved with nobody's name on it: the ledger recorded what and when,
+    // never who.
+    const product = await prisma.product.create({
+      data: { locationId, name: 'Vestido Autor', category: 'festa', size: 'M', color: 'creme', rentalPrice: 200, depositAmount: 0 },
+    })
+    const created = await request(app)
+      .post('/api/contracts')
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({
+        clientId,
+        eventDate: '2027-02-10',
+        paymentMethod: 'PIX',
+        items: [{ productId: product.id, checkoutDate: '2027-02-08', dueDate: '2027-02-12', priceCharged: 200 }],
+      })
+    await request(app)
+      .post(`/api/contracts/${created.body.id}/payments`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({ amount: 200, method: 'PIX', paidAt: '2027-02-05' })
+
+    const stored = await prisma.payment.findFirst({ where: { contractId: created.body.id } })
+    expect(stored?.recordedByStaffId).toBe(staffId)
+  })
+
+  it('returns payments in date order, not insertion order', async () => {
+    // paidAt is freely backdatable: log today's, then remember a cash one from
+    // last month, and the panel — and the sheet the client signs — read 15/09
+    // above 12/08.
+    const product = await prisma.product.create({
+      data: { locationId, name: 'Vestido Ordem', category: 'festa', size: 'M', color: 'bege', rentalPrice: 800, depositAmount: 0 },
+    })
+    const created = await request(app)
+      .post('/api/contracts')
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({
+        clientId,
+        eventDate: '2027-03-10',
+        paymentMethod: 'PIX',
+        items: [{ productId: product.id, checkoutDate: '2027-03-08', dueDate: '2027-03-12', priceCharged: 800 }],
+      })
+    for (const paidAt of ['2027-03-05', '2027-01-20']) {
+      await request(app)
+        .post(`/api/contracts/${created.body.id}/payments`)
+        .set('Authorization', `Bearer ${staffToken}`)
+        .send({ amount: 100, method: 'PIX', paidAt })
+    }
+
+    const detail = await request(app)
+      .get(`/api/contracts/${created.body.id}`)
+      .set('Authorization', `Bearer ${staffToken}`)
+    const dates = detail.body.payments.map((payment: { paidAt: string }) => payment.paidAt.slice(0, 10))
+    expect(dates).toEqual(['2027-01-20', '2027-03-05'])
+  })
+
   it('CRITICAL: never lets a sub-centavo amount into the ledger', async () => {
     // The dialog's untouched prefill for "R$ 500,20 minus R$ 199,90" was
     // 300.29999999999995 — correct to any 2-decimal reading, so nothing looked

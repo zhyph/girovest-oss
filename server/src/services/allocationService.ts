@@ -3,6 +3,7 @@ import { scopedDb } from '../db/scopedClient.js'
 import { AppError } from '../errors/AppError.js'
 import { ErrorCodes } from '../errors/errorCodes.js'
 import { isOccupiedForRange, derivedAvailability } from '../domain/occupancy.js'
+import { fromCentavos, toCentavos } from '../lib/money.js'
 import {
   blockingAllocationsWhere,
   loadBlockingWindows,
@@ -120,6 +121,42 @@ export async function returnAllocation(locationId: string, id: string, data: Ret
       conditionNotesIn: data.conditionNotesIn,
       depositReturned: data.depositReturned,
     },
+  })
+  if (result.count === 0) {
+    throw new AppError(
+      ErrorCodes.INVALID_ALLOCATION_TRANSITION,
+      409,
+      'Allocation status changed concurrently; refresh and try again',
+    )
+  }
+  return prisma.allocation.findUniqueOrThrow({ where: { id } })
+}
+
+/**
+ * Corrects a piece's charged price.
+ *
+ * The only way to fix a typo was to cancel the whole contract and re-enter it
+ * — and cancelling is irreversible, which also burns the contract number the
+ * shop uses to refer to the job. Meanwhile R$ 4.500,00 typed for R$ 450,00
+ * reads on the list row, in the panel, on the sheet the client signs, and
+ * contributes R$ 4.050,00 of phantom receivables to the Painel.
+ *
+ * Only while the piece is still `reserved`: once it has gone out the client
+ * has signed paper for a figure, and changing it behind that is a different
+ * decision from fixing a number nobody has acted on yet.
+ */
+export async function repriceAllocation(locationId: string, id: string, priceCharged: number) {
+  const allocation = await getAllocationOrThrow(locationId, id)
+  if (allocation.status !== 'reserved') {
+    throw new AppError(
+      ErrorCodes.INVALID_ALLOCATION_TRANSITION,
+      409,
+      `Cannot reprice an allocation with status ${allocation.status}`,
+    )
+  }
+  const result = await prisma.allocation.updateMany({
+    where: { id, status: 'reserved' },
+    data: { priceCharged: fromCentavos(toCentavos(priceCharged)) },
   })
   if (result.count === 0) {
     throw new AppError(

@@ -8,6 +8,7 @@ import {
   checkOutAllocation,
   returnAllocation,
   cancelAllocation,
+  repriceAllocation,
   getProductAvailability,
   isProductAvailableForRange,
   listAllocations,
@@ -47,6 +48,18 @@ allocationsRouter.post('/:id/return', async (req, res) => {
     throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'Invalid return payload')
   }
   res.json(await returnAllocation(req.staff!.locationId, req.params.id, parsed.data))
+})
+
+// nonnegative, matching what creation accepts (routes/contracts.ts) — a
+// courtesy piece booked at R$ 0 must be correctable back to R$ 0.
+const repriceSchema = z.object({ priceCharged: z.number().nonnegative() })
+
+allocationsRouter.patch('/:id/price', async (req, res) => {
+  const parsed = repriceSchema.safeParse(req.body)
+  if (!parsed.success) {
+    throw new AppError(ErrorCodes.VALIDATION_ERROR, 400, 'Invalid price payload')
+  }
+  res.json(await repriceAllocation(req.staff!.locationId, req.params.id, parsed.data.priceCharged))
 })
 
 allocationsRouter.post('/:id/cancel', async (req, res) => {
