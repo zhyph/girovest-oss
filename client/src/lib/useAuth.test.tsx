@@ -54,15 +54,23 @@ describe('useAuth', () => {
     expect(result.current.isLoggedIn).toBe(false)
   })
 
-  it('logs out and clears the token on the auth:logout event', async () => {
-    vi.spyOn(api, 'apiFetch').mockResolvedValue({ id: '1', name: 'Ana', role: 'owner', locationId: 'l1' } as never)
+  // The token is cleared by apiFetch itself on a 401, not by a listener here.
+  // useAuth deliberately no longer reacts to 'auth:logout' at all — see
+  // SessionExpiryProvider, and SessionExpiredDialog.test.tsx for what happens
+  // instead of the old navigate-away.
+  it('does not navigate or clear the cache on the auth:logout event', async () => {
+    vi.spyOn(api, 'apiFetch').mockResolvedValue({ id: '1', name: 'Ana', login: 'ana', role: 'owner', locationId: 'l1' } as never)
     const { setToken } = await import('./auth.ts')
     setToken('existing-token')
 
-    renderHook(() => useAuth(), { wrapper })
+    const { result } = renderHook(() => useAuth(), { wrapper })
+    await waitFor(() => expect(result.current.staff?.name).toBe('Ana'))
+
     act(() => window.dispatchEvent(new Event('auth:logout')))
 
-    expect(getToken()).toBeNull()
+    // Still cached: the re-auth dialog names the account from it, and the
+    // screen underneath must not be torn down.
+    expect(result.current.staff?.name).toBe('Ana')
   })
 
   it('navigates to /login when logout() is called, not just clearing the token', async () => {
@@ -96,25 +104,32 @@ describe('useAuth', () => {
     expect(getToken()).toBeNull()
   })
 
-  // Regression test for a real incident: a session invalidated out from
-  // under someone (see auth:logout below) redirected to /login with
-  // nothing explaining why, which read as "the app just broke." The 'Sair'
-  // button calls logout() directly and needs no explanation -- only the
-  // auth:logout event (something ELSE ending the session) should ever show
-  // this toast.
-  it('shows a toast on auth:logout, but not on a direct logout() call', async () => {
-    vi.spyOn(api, 'apiFetch').mockResolvedValue({ id: '1', name: 'Ana', role: 'owner', locationId: 'l1' } as never)
+  // The original incident behind this: a session invalidated out from under
+  // someone redirected to /login with nothing explaining why, which read as
+  // "the app just broke". A toast was the first answer; it stacked one copy
+  // per mounted useAuth consumer, and it still did not stop the redirect from
+  // destroying whatever she was in the middle of. The explanation now lives in
+  // the re-auth dialog, which is also the way back.
+  //
+  // This asserts what actually changed — that useAuth no longer REACTS to the
+  // event at all. An earlier version asserted "no toast appears", which could
+  // not fail: the string it searched for had been deleted from the locale in
+  // the same change, so even the old listener would have rendered a raw key
+  // and matched nothing.
+  it('does not navigate away when the session expires', async () => {
+    vi.spyOn(api, 'apiFetch').mockResolvedValue({ id: '1', name: 'Ana', login: 'ana', role: 'owner', locationId: 'l1' } as never)
     const { setToken } = await import('./auth.ts')
     setToken('existing-token')
 
     function Probe() {
-      const { logout } = useAuth()
-      return <button onClick={logout}>sair manual</button>
+      const location = useLocation()
+      useAuth()
+      return <span data-testid="path">{location.pathname}</span>
     }
 
     const queryClient = new QueryClient()
     render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={['/contratos']}>
         <QueryClientProvider client={queryClient}>
           <Probe />
           <Toaster />
@@ -122,10 +137,10 @@ describe('useAuth', () => {
       </MemoryRouter>,
     )
 
-    await userEvent.click(screen.getByText('sair manual'))
-    expect(screen.queryByText(/sessão expirou/i)).not.toBeInTheDocument()
-
     act(() => window.dispatchEvent(new Event('auth:logout')))
-    expect(await screen.findByText(/sessão expirou/i)).toBeInTheDocument()
+
+    // The old listener called logout(), which navigates. Nothing here may.
+    expect(screen.getByTestId('path')).toHaveTextContent('/contratos')
+    expect(screen.queryByText(/sessão expirou/i)).not.toBeInTheDocument()
   })
 })

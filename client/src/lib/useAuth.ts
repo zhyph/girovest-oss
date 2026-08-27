@@ -1,14 +1,13 @@
-import { useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
-import { useTranslation } from 'react-i18next'
 import { apiFetch } from './api.ts'
 import { getToken, setToken, clearToken } from './auth.ts'
-import { showErrorToast } from './toast.ts'
 
 export interface StaffMe {
   id: string
   name: string
+  /** Her own username, used to name the account in the re-auth dialog. */
+  login: string
   role: 'owner' | 'staff'
   locationId: string
   locationName: string
@@ -18,7 +17,6 @@ export interface StaffMe {
 export function useAuth() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
-  const { t } = useTranslation('auth')
 
   const staffQuery = useQuery({
     queryKey: ['auth', 'me'],
@@ -27,21 +25,17 @@ export function useAuth() {
     retry: false,
   })
 
-  useEffect(() => {
-    // Distinct from `logout` below on purpose: a real incident (401s
-    // silently invalidating a just-established session) landed as "nothing
-    // shown on screen" -- the redirect to /login happened, but nothing ever
-    // told the person WHY, so it looked like the app just broke. The 'Sair'
-    // button already calls `logout` directly and needs no explanation (she
-    // knows why); only this event -- something ending the session out from
-    // under her -- gets the toast.
-    function handleSessionExpired() {
-      logout()
-      showErrorToast(t('sessionExpired'))
-    }
-    window.addEventListener('auth:logout', handleSessionExpired)
-    return () => window.removeEventListener('auth:logout', handleSessionExpired)
-  }, [queryClient])
+  /*
+   * The 'auth:logout' listener used to live here, in every single useAuth()
+   * consumer: it called logout() (which navigates, unmounting the protected
+   * tree and every half-filled form in it) and raised a toast — one per mounted
+   * consumer, so five identical red toasts stacked up.
+   *
+   * It now lives once, in SessionExpiryProvider, which turns the event into
+   * state instead of a navigation so ProtectedRoute can float a re-auth dialog
+   * over the work rather than throwing it away. `logout` below is unchanged and
+   * still the right thing for the 'Sair' button and for leaving deliberately.
+   */
 
   // Returns a recovery code exactly once: the server mints one on the spot
   // for any account that predates the recovery-code feature (see
@@ -74,6 +68,15 @@ export function useAuth() {
       clearToken()
       throw error
     }
+    // Every OTHER query 401'd while the session was down and is sitting in
+    // `error` with its retries spent; nothing in TanStack refetches on a token
+    // change, and the window is already focused so no focus event will do it.
+    // Without this she gets her form back surrounded by error panels on a
+    // perfectly healthy session.
+    void queryClient.invalidateQueries()
+    // Clears any armed session-expiry state, wherever the login came from —
+    // see SessionExpiryProvider.
+    window.dispatchEvent(new Event('auth:login'))
     return recoveryCode ?? null
   }
 

@@ -165,6 +165,24 @@ describe('apiFetch session renewal', () => {
     expect(getToken()).toBeNull()
   })
 
+  it('CRITICAL: does not wipe a token issued while an older request was in flight', async () => {
+    // The re-auth dialog keeps the app alive through a lapsed session, and
+    // useProductPhotoEvents retries its ticket POST every 5s for as long as it
+    // is open. A 401 for the DEAD token can therefore land after the fresh one
+    // has been stored — and clearing unconditionally logged her straight back
+    // out, making a correct password look rejected.
+    setToken('dead-token')
+    vi.mocked(fetch).mockImplementation(async () => {
+      // Re-auth completes while this request is in flight.
+      setToken('fresh-token')
+      return new Response(JSON.stringify({ code: 'UNAUTHORIZED', message: 'Invalid token' }), { status: 401 })
+    })
+
+    await expect(apiFetch('/api/products/events/ticket')).rejects.toBeInstanceOf(ApiError)
+
+    expect(getToken()).toBe('fresh-token')
+  })
+
   // Other suites mock fetch with a bare { ok, status, json } object that has no
   // headers at all; reading them unguarded would break those tests.
   it('tolerates a response object with no headers', async () => {

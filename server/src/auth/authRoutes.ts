@@ -303,6 +303,10 @@ authRouter.get('/me', requireAuth, async (req, res) => {
   res.json({
     id: staff.id,
     name: staff.name,
+    // Her own username, echoed back so the client can name the account whose
+    // session lapsed and ask only for the password. Not a secret, and not new
+    // exposure: it is the value this very caller authenticated with.
+    login: staff.login,
     role: staff.role,
     locationId: staff.locationId,
     locationName: staff.location.name,

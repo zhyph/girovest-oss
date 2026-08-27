@@ -116,7 +116,7 @@ describe('tour anchors match rendered DOM', () => {
       isLoading: false,
     } as never)
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
-      staff: { id: '1', name: 'Ana', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' },
+      staff: { id: '1', name: 'Ana', login: 'lojista', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' },
       isLoadingStaff: false, isErrorStaff: false, refetchStaff: vi.fn(), login: vi.fn(), logout: vi.fn(), isLoggedIn: true,
     })
 

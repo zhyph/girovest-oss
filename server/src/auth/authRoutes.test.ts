@@ -146,6 +146,24 @@ describe('GET /api/auth/me', () => {
     expect(response.body).toMatchObject({ name: 'Bruno Staff', role: 'staff', locationId })
   })
 
+  it("returns the caller's own login, so the client can name a lapsed session's account", async () => {
+    // Consumed by SessionExpiredDialog, which re-authenticates in place rather
+    // than navigating away and destroying whatever was on screen. Without this
+    // it would have to ask for the username again too.
+    const login = await request(app)
+      .post('/api/auth/login')
+      .send({ login: 'bruno', password: 'correct-horse' })
+
+    const response = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${login.body.token}`)
+
+    expect(response.body.login).toBe('bruno')
+    // Never the credential itself, only the identifier.
+    expect(response.body).not.toHaveProperty('passwordHash')
+    expect(response.body).not.toHaveProperty('recoveryCodeHash')
+  })
+
   it('returns the location locale, defaulting to pt-BR', async () => {
     const login = await request(app)
       .post('/api/auth/login')

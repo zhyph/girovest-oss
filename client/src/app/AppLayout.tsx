@@ -5,6 +5,7 @@ import { RouteFallback } from '../components/RouteFallback.tsx'
 import { Sidebar } from './Sidebar.tsx'
 import { Button } from '../components/ui/button.tsx'
 import { useAuth } from '../lib/useAuth.ts'
+import { useSessionExpiry } from '../lib/SessionExpiryContext.tsx'
 import { useProductPhotoEvents } from '../features/products/useProductPhotoEvents.ts'
 
 export function AppLayout() {
@@ -15,6 +16,7 @@ export function AppLayout() {
 
   const { t } = useTranslation('common')
   const { staff, isLoadingStaff, isErrorStaff, refetchStaff, logout } = useAuth()
+  const { isExpired } = useSessionExpiry()
 
   // Guards the moment right after a hard reload / deep link: the auth
   // token is already known (ProtectedRoute let us in), but the shop's
@@ -35,7 +37,19 @@ export function AppLayout() {
   // spinner above forever, with no nav and no way to log out. Falls back
   // to this same state if `staff` is ever undefined without an explicit
   // error too (e.g. a disabled query), so there's always a way out.
-  if (isErrorStaff || !staff) {
+  //
+  // `isErrorStaff` is IGNORED while the session is expired, as long as a
+  // cached profile is still around to render the shell from. A 401 on /me is
+  // the expected state then, not a failure — and taking this branch would
+  // unmount Sidebar AND Outlet, destroying the half-filled form the re-auth
+  // dialog exists to preserve. The staff query is `retry: false` with
+  // TanStack's default `refetchOnWindowFocus`, so the most ordinary way a
+  // lapsed session is discovered — she comes back to the machine and clicks
+  // the window — went straight through here.
+  //
+  // `!staff` still wins unconditionally: with no cached profile there is
+  // nothing to preserve and nothing to render the shell from.
+  if (!staff || (isErrorStaff && !isExpired)) {
     return (
       <div className="flex h-screen flex-col items-center justify-center gap-4 px-4 text-center">
         <p className="text-sm text-muted-foreground">{t('profileLoadError')}</p>

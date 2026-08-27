@@ -8,7 +8,7 @@ import * as useAuthModule from '../lib/useAuth.ts'
 
 function mockLoadedStaff() {
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
-    staff: { id: '1', name: 'Ana Owner', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' },
+    staff: { id: '1', name: 'Ana Owner', login: 'lojista', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' },
     isLoadingStaff: false,
     isErrorStaff: false,
     refetchStaff: vi.fn(),

@@ -76,7 +76,26 @@ export async function apiFetch<T>(
         `[client-auth] 401 on ${init.method ?? 'GET'} ${path} code=${body.code ?? 'n/a'}` +
           (token ? ` tokenHashSent=${await hashTokenForLog(token)}` : ' tokenHashSent=n/a'),
       )
-      clearToken()
+      // Clear only if what is on disk still belongs to THIS request.
+      //
+      // Re-authentication can land between a request going out and its 401
+      // coming back, and clearing unconditionally would wipe the FRESH token
+      // on behalf of a dead one. That used to be unreachable — the tree
+      // unmounted within a frame of the first 401, so nothing kept generating
+      // them — but the re-auth dialog now keeps the app alive, and
+      // useProductPhotoEvents retries its ticket POST every 5s for as long as
+      // the dialog is open. The window is one round-trip wide, it recurs on
+      // every attempt, and the symptom is the correct password being rejected.
+      //
+      // `renewedToken ?? token`, NOT `token`: this very response may have
+      // renewed the token a few lines above, and that renewal is still this
+      // request's own. Comparing against the pre-renewal value would leave it
+      // in place — which is exactly the resurrection bug the renewal-on-401
+      // test guards, and a session-bearing header replayed off a cached 304
+      // is how that reached a real client once.
+      if (getToken() === (renewedToken ?? token)) {
+        clearToken()
+      }
       if (!options.suppressAuthLogoutEvent) {
         window.dispatchEvent(new Event('auth:logout'))
       }
