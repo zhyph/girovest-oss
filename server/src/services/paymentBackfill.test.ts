@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, afterEach, vi } from 'vitest'
 import { prisma } from '../db/client.js'
 import { runPaymentBackfill } from './paymentBackfill.js'
 
@@ -89,6 +89,52 @@ describe('runPaymentBackfill', () => {
     await runPaymentBackfill()
 
     expect(await prisma.payment.count()).toBe(1)
+  })
+
+  it('CRITICAL: a crash between the Payment insert and the Installment delete duplicates nothing', async () => {
+    /*
+      This runs before app.listen, unattended, on a shop PC: a forced Windows
+      update, a power cut, or the owner closing a window that looks stuck can
+      land exactly between the two writes. With bare sequential awaits the
+      Payment was written and the Installment survived, so the NEXT boot
+      converted it a second time — a R$ 100,00 parcel counted twice, the shop
+      under-collecting or a settled contract flipping to "Devolver". The doc
+      comment asserted idempotency the whole time; only atomicity provides it.
+    */
+    const contract = await seedContract()
+    await prisma.installment.create({
+      data: { contractId: contract.id, dueDate: new Date('2026-08-01'), amount: 100, paid: true, paidAt: new Date('2026-08-01') },
+    })
+
+    // Runs the REAL transaction, but hands the callback a client whose
+    // installment.delete dies — so the rollback under test is a genuine
+    // database rollback, not a mocked one.
+    const realTransaction = prisma.$transaction.bind(prisma)
+    const spy = vi.spyOn(prisma, '$transaction').mockImplementationOnce(((run: (client: unknown) => Promise<void>) =>
+      realTransaction(async (tx) => {
+        await run({
+          payment: tx.payment,
+          installment: {
+            delete: () => {
+              throw new Error('process died mid-conversion')
+            },
+          },
+        })
+      })) as never)
+
+    await expect(runPaymentBackfill()).rejects.toThrow(/mid-conversion/)
+
+    // The interrupted attempt left NOTHING behind: no orphan Payment to be
+    // re-created on the next boot.
+    expect(await prisma.payment.count()).toBe(0)
+    expect(await prisma.installment.count()).toBe(1)
+
+    spy.mockRestore()
+
+    // And the retry that a real reboot performs converts it exactly once.
+    await runPaymentBackfill()
+    expect(await prisma.payment.count()).toBe(1)
+    expect(await prisma.installment.count()).toBe(0)
   })
 
   it('does nothing when there are no installments left to convert', async () => {

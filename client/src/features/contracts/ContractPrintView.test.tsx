@@ -107,6 +107,28 @@ describe('ContractPrintView', () => {
     expect(screen.queryAllByText(brl(880))).toHaveLength(0)
   })
 
+  it('CRITICAL: prints the caução the client handed over, as her only receipt for it', () => {
+    // Real cash, taken at checkout and stored on the allocation, appeared on
+    // no screen and on no document afterwards. The signed contract she took
+    // home did not mention it at all, so nothing outside the shop's memory
+    // recorded that R$ 300,00 had changed hands.
+    const withDeposit: ContractDetail = {
+      ...baseContract,
+      allocations: [{ ...baseContract.allocations[0], depositCollected: 300 }],
+    }
+    render(<ContractPrintView contract={withDeposit} />)
+
+    expect(screen.getByText(/Caução recebida/)).toBeInTheDocument()
+    // Separate from the total — never folded into what she owes.
+    const total = screen.getByText(/Total/).textContent?.replace(/\u00a0/g, ' ')
+    expect(total).toContain('R$ 380,00')
+  })
+
+  it('says nothing about caução when none was taken', () => {
+    render(<ContractPrintView contract={baseContract} />)
+    expect(screen.queryByText(/Caução/)).not.toBeInTheDocument()
+  })
+
   it('renders the signature image when the contract is signed', () => {
     const signedContract: ContractDetail = {
       ...baseContract,

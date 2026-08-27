@@ -21,7 +21,9 @@
   },
   "returnDialog": {
     "title": "Devolução",
-    "confirm": "Confirmar devolução"
+    "confirm": "Confirmar devolução",
+    "depositHeld": "Você recebeu {{amount}} de caução na saída.",
+    "noDepositHeld": "Nenhuma caução foi registrada na saída desta peça."
   },
   "status": {
     "reserved": "Reservado",

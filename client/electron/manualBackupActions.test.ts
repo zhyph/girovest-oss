@@ -24,12 +24,11 @@ const SQLITE_HEADER = 'SQLite format 3\0'
  * `marker` is carried in the page body so a test can still prove which file
  * ended up where.
  */
-function sqliteFile(marker: string): Buffer {
-  const pageSize = 512
+function sqliteFile(marker: string, pageSize = 512, rawPageSize = pageSize): Buffer {
   const pageCount = 2
   const buffer = Buffer.alloc(pageSize * pageCount)
   buffer.write(SQLITE_HEADER, 0, 'latin1')
-  buffer.writeUInt16BE(pageSize, 16)
+  buffer.writeUInt16BE(rawPageSize, 16)
   buffer.writeUInt32BE(7, 24) // change counter
   buffer.writeUInt32BE(pageCount, 28) // size in pages
   buffer.writeUInt32BE(7, 92) // version-valid-for, must equal the change counter
@@ -437,6 +436,37 @@ describe('runManualRestore', () => {
             const forged = sqliteFile('restored-db-bytes')
             forged.writeUInt16BE(999, 16) // not a power of two
             fs.writeFileSync(path.join(destDir, 'dev.db'), forged)
+          },
+        }),
+      ),
+    ).rejects.toThrow(/valid dev\.db/)
+
+    expect(fs.readFileSync(path.join(userDataPath, 'dev.db'), 'utf-8')).toBe('old-db')
+  })
+
+  it('accepts the 65536 page size, which the header encodes as 1', async () => {
+    // Both arms of the page-size rule survived mutation testing against the
+    // rest of this file. Dropping the `=== 1 ? 65536` decode would make every
+    // 65536-page-size database permanently unrestorable — the exact
+    // false-rejection failure this check is most exposed to — with no test
+    // noticing.
+    await runManualRestore(
+      baseDeps({
+        extractArchive: async (_zipPath, destDir) => {
+          fs.writeFileSync(path.join(destDir, 'dev.db'), sqliteFile('restored-db-bytes', 65536, 1))
+        },
+      }),
+    )
+
+    expect(markerOf(path.join(userDataPath, 'dev.db'))).toBe('restored-db-bytes')
+  })
+
+  it('refuses a page size below the 512 minimum', async () => {
+    await expect(
+      runManualRestore(
+        baseDeps({
+          extractArchive: async (_zipPath, destDir) => {
+            fs.writeFileSync(path.join(destDir, 'dev.db'), sqliteFile('restored-db-bytes', 256))
           },
         }),
       ),

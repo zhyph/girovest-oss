@@ -14,6 +14,8 @@ import { getPaymentMethods } from '../../lib/paymentMethodTemplate.ts'
 import { showErrorToast } from '../../lib/toast.ts'
 import { useCreatePayment, useUpdatePayment } from './useContracts.ts'
 import type { Contract, ContractPayment } from './contractSchemas.ts'
+import { contractTotalCentavos } from './contractSchemas.ts'
+import { fromCentavos, sumCentavos, toCentavos } from '../../lib/money.ts'
 
 /**
  * Logs a new payment, or corrects an existing one — same form either way,
@@ -41,14 +43,21 @@ export function PaymentDialog({
   const updatePayment = useUpdatePayment()
   const isPending = createPayment.isPending || updatePayment.isPending
 
-  const total = contract.allocations
-    .filter((allocation) => allocation.status !== 'cancelled')
-    .reduce((sum, allocation) => sum + allocation.priceCharged, 0)
-  const paidTotal = contract.payments.reduce((sum, entry) => sum + entry.amount, 0)
+  // Through the shared helper rather than a fourth hand-rolled copy of the
+  // same sum: the contract's total, the list row, the detail panel and this
+  // dialog must agree, and they only do if there is one definition.
+  //
+  // Computed in centavos for the same reason the panel is — "R$ 500,20 minus
+  // R$ 199,90" as floats is 300.29999999999995, and seeding the field with
+  // that put a sub-centavo amount into the ledger the moment she accepted the
+  // suggestion without touching it. CurrencyInput only quantises on a
+  // keystroke, so an untouched prefill never normalised itself.
+  const totalCentavos = contractTotalCentavos(contract)
+  const paidCentavos = sumCentavos(contract.payments.map((entry) => entry.amount))
   // What's outstanding right now, with this payment's own old amount backed
   // out first when editing — otherwise correcting a row would double-count it
   // against itself in the suggested/preview figures below.
-  const outstandingExcludingThis = total - (paidTotal - (payment?.amount ?? 0))
+  const outstandingExcludingThis = fromCentavos(totalCentavos - (paidCentavos - toCentavos(payment?.amount ?? 0)))
 
   const [amount, setAmount] = useState(payment?.amount ?? Math.max(0, outstandingExcludingThis))
   const [paidAt, setPaidAt] = useState(payment?.paidAt.slice(0, 10) ?? toIsoDateOnly(new Date()))

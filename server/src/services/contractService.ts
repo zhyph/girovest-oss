@@ -4,6 +4,7 @@ import { AppError } from '../errors/AppError.js'
 import { ErrorCodes } from '../errors/errorCodes.js'
 import { isOccupiedForRange, type AllocationWindow, type AllocationStatus } from '../domain/occupancy.js'
 import { blockingAllocationsWhere, maintenanceBufferForLocation, toWindow } from './occupancyQuery.js'
+import { fromCentavos, sumCentavos, toCentavos } from '../lib/money.js'
 
 const MAX_WRITE_CONFLICT_RETRIES = 5
 
@@ -238,15 +239,29 @@ function statusWhere(status: QueryableStatus, asOf: Date) {
   }
 }
 
-/** A contract's live pieces total minus what has been paid against it, floored at zero. Shared by sumOutstanding and the `outstanding` list filter below, so the two can never disagree about which contracts count. */
-function contractOutstanding(contract: {
+/**
+ * A contract's live pieces total minus what has been paid against it, in
+ * WHOLE CENTAVOS, floored at zero. Shared by sumOutstanding and the
+ * `outstanding` list filter below, so the two can never disagree about which
+ * contracts count.
+ *
+ * Centavos, not reais, because the caller's only question is `> 0`. Summing
+ * the floats left a settled contract holding a 2.27e-13 residue that survived
+ * `Math.max(0, …)` and answered yes — so it stayed in the receivables list and
+ * the Painel's count forever, a phone call to a client who owes nothing. See
+ * lib/money.ts, and note the client's outstandingState decides the same
+ * question and must stay in step.
+ */
+function contractOutstandingCentavos(contract: {
   allocations: { status: string; priceCharged: number }[]
   payments: { amount: number }[]
 }): number {
-  const owed = contract.allocations
-    .filter((allocation) => allocation.status !== 'cancelled')
-    .reduce((sum, allocation) => sum + allocation.priceCharged, 0)
-  const paid = contract.payments.reduce((sum, payment) => sum + payment.amount, 0)
+  const owed = sumCentavos(
+    contract.allocations
+      .filter((allocation) => allocation.status !== 'cancelled')
+      .map((allocation) => allocation.priceCharged),
+  )
+  const paid = sumCentavos(contract.payments.map((payment) => payment.amount))
   return Math.max(0, owed - paid)
 }
 
@@ -263,7 +278,7 @@ async function outstandingContracts(searched: Prisma.ContractWhereInput) {
     orderBy: { createdAt: 'desc' },
     include: { allocations: true, payments: true },
   })
-  return contracts.filter((contract) => contractOutstanding(contract) > 0)
+  return contracts.filter((contract) => contractOutstandingCentavos(contract) > 0)
 }
 
 export async function listContracts(
@@ -397,8 +412,11 @@ export interface OutstandingSummary {
  */
 export async function sumOutstanding(locationId: string): Promise<OutstandingSummary> {
   const withBalance = await outstandingContracts({ locationId })
-  const total = withBalance.reduce((sum, contract) => sum + contractOutstanding(contract), 0)
-  return { total, count: withBalance.length }
+  // Accumulated as integers and divided once at the end, so a hundred
+  // contracts cannot compound a hundred representation errors into the one
+  // figure the shop reads off the Painel.
+  const totalCentavos = withBalance.reduce((sum, contract) => sum + contractOutstandingCentavos(contract), 0)
+  return { total: fromCentavos(totalCentavos), count: withBalance.length }
 }
 
 /**
@@ -416,8 +434,18 @@ export async function createPayment(
   if (!contract || contract.locationId !== locationId) {
     throw new AppError(ErrorCodes.NOT_FOUND, 404, `Contract ${contractId} not found`)
   }
-  await prisma.payment.create({ data: { contractId, ...data } })
+  // Quantised on the way in, so the ledger holds only whole centavos no
+  // matter what a client sends. An untouched PaymentDialog prefill used to
+  // arrive as 300.29999999999995 — a value that displays as R$ 300,30, is
+  // right to any 2-decimal reading, and then joins every later `paid` sum and
+  // spreads its drift to contracts that had none.
+  await prisma.payment.create({ data: { contractId, ...data, amount: quantiseToCentavos(data.amount) } })
   return getContract(contractId, locationId)
+}
+
+/** Rounds a reais amount to a whole number of centavos, keeping it in reais. */
+function quantiseToCentavos(amount: number): number {
+  return fromCentavos(toCentavos(amount))
 }
 
 /** Scoped through the contract so a payment belonging to another location or a different contract both read as NOT_FOUND. */
@@ -440,7 +468,12 @@ export async function updatePayment(
   data: { amount?: number; method?: string; paidAt?: Date },
 ) {
   await findOwnedPayment(contractId, paymentId, locationId)
-  await prisma.payment.update({ where: { id: paymentId }, data })
+  // Same quantisation as create — a correction must not be the way a
+  // sub-centavo amount gets in.
+  await prisma.payment.update({
+    where: { id: paymentId },
+    data: data.amount === undefined ? data : { ...data, amount: quantiseToCentavos(data.amount) },
+  })
   return getContract(contractId, locationId)
 }
 

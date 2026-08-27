@@ -15,11 +15,16 @@ import type { Contract } from './contractSchemas.ts'
 
 function renderWithProviders(ui: React.ReactElement) {
   const queryClient = new QueryClient()
-  return render(
-    <MemoryRouter>
-      <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
-    </MemoryRouter>,
-  )
+  // The wrapper goes through `wrapper` rather than being inlined, so a
+  // `rerender` keeps the Router and QueryClient in place — re-rendering the
+  // bare page would drop them and throw out of useSearchParams.
+  return render(ui, {
+    wrapper: ({ children }) => (
+      <MemoryRouter>
+        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      </MemoryRouter>
+    ),
+  })
 }
 
 // Contract actions moved out of the list and into the detail panel: only
@@ -462,6 +467,69 @@ describe('ContractsPage allocation dialogs', () => {
     expect(currencyValue('Caução devolvida')).toBe('R$ 0,00')
   })
 
+  it('CRITICAL: the return dialog suggests exactly what was taken at checkout', async () => {
+    // It opened at R$ 0,00 with no reminder of the R$ 300,00 collected weeks
+    // earlier, so the operator handed back whatever she remembered — and
+    // nothing in the app ever compared the two numbers.
+    const withDeposit = {
+      ...checkedOutContract,
+      allocations: [{ ...checkedOutContract.allocations[0], depositCollected: 300 }],
+    }
+    mockHooks({ contracts: [withDeposit] })
+    mockAllocationHooks()
+    await renderAndSelect(<ContractsPage />)
+
+    await openReturnDialog()
+
+    expect(currencyValue('Caução devolvida')).toBe('R$ 300,00')
+    expect(screen.getByText(/Você recebeu .*300,00 de caução/)).toBeInTheDocument()
+  })
+
+  it('CRITICAL: the prefill survives the row outliving a check-out', async () => {
+    /*
+      AllocationActions is keyed by allocation id and survives the refetch
+      after check-out, so useState's initializer had already run with
+      depositCollected still null. The field then read R$ 0,00 directly above
+      a hint saying R$ 300,00 — the dialog contradicting itself — and the
+      unsaved-changes guard saw 0 !== 300 and prompted "Descartar alterações?"
+      on every close with nothing typed. Both are the pre-fix behaviour,
+      reached without ever leaving the screen.
+    */
+    const reserved = {
+      ...checkedOutContract,
+      allocations: [{ ...checkedOutContract.allocations[0], status: 'reserved' as const, depositCollected: null }],
+    }
+    mockHooks({ contracts: [reserved] })
+    mockAllocationHooks()
+    const { rerender } = await renderAndSelect(<ContractsPage />)
+
+    // The piece goes out with caução, and the row re-renders in place.
+    mockHooks({
+      contracts: [
+        {
+          ...checkedOutContract,
+          allocations: [{ ...checkedOutContract.allocations[0], depositCollected: 300 }],
+        },
+      ],
+    })
+    mockAllocationHooks()
+    rerender(<ContractsPage />)
+
+    await openReturnDialog()
+
+    expect(currencyValue('Caução devolvida')).toBe('R$ 300,00')
+  })
+
+  it('says plainly when no caução was taken, rather than suggesting zero silently', async () => {
+    mockHooks({ contracts: [checkedOutContract] })
+    mockAllocationHooks()
+    await renderAndSelect(<ContractsPage />)
+
+    await openReturnDialog()
+
+    expect(screen.getByText('Nenhuma caução foi registrada na saída desta peça.')).toBeInTheDocument()
+  })
+
   it('does not guard the pure cancel-allocation confirmation, which carries no input', async () => {
     mockHooks()
     const cancelAllocationImpl = vi.fn().mockResolvedValue(undefined)
@@ -536,6 +604,99 @@ describe('payments summary', () => {
     // Counting the cancelled 500 left the contract reading R$ 500,00 still to
     // collect on a dress that never left the shop.
     expect(figureUnder('Em aberto')).toBe('R$ 0,00')
+  })
+
+  it('CRITICAL: a contract paid to the centavo reads as settled, not as an urgent R$ 0,00', async () => {
+    /*
+      Two pieces at 679,90 and 1.249,90 sum, as floats, to
+      1929.8000000000001819; typing "1929,80" into CurrencyInput produces
+      1929.7999999999999545. The difference is 2.27e-13, and the old
+      `outstanding > 0` test said yes — so a contract paid exactly showed
+      Total R$ 1.929,80 / Pago R$ 1.929,80 / an URGENT "Em aberto R$ 0,00",
+      with the badge agreeing and the figures beside it disagreeing. Roughly
+      7% of settled contracts, and no user would ever discover the recovery.
+    */
+    mockHooks({
+      contracts: [
+        {
+          ...contract,
+          allocations: [
+            { ...contract.allocations[0], id: 'a1', priceCharged: 679.9 },
+            { ...contract.allocations[0], id: 'a2', productId: 'p2', priceCharged: 1249.9 },
+          ],
+          payments: [
+            { id: 'pm1', contractId: 'ct1', amount: 1929.8, method: 'PIX', paidAt: '2026-09-20', createdAt: '2026-09-20' },
+          ],
+        },
+      ],
+    })
+    await renderAndSelect(<ContractsPage />)
+
+    const panel = document.querySelector('aside') as HTMLElement
+    const figureUnder = (label: string) =>
+      within(within(panel).getByText(label).parentElement as HTMLElement)
+        .getByText(/R\$/)
+        .textContent?.replace(/\u00a0/g, ' ')
+
+    expect(figureUnder('Total')).toBe('R$ 1.929,80')
+    expect(figureUnder('Pago')).toBe('R$ 1.929,80')
+    expect(within(panel).getByText('Quitado')).toBeInTheDocument()
+    expect(within(panel).queryByText('Pago a mais')).not.toBeInTheDocument()
+  })
+
+  it('a contract overpaid only by float residue is not reported as overpaid', async () => {
+    // The mirror of the case above: 899,90 + 299,90 + 449,90 settled by two
+    // payments of 824,85 lands at -2.27e-13, which used to render
+    // "Pago a mais" and the note "pagou R$ 0,00 além do total".
+    mockHooks({
+      contracts: [
+        {
+          ...contract,
+          allocations: [
+            { ...contract.allocations[0], id: 'a1', priceCharged: 899.9 },
+            { ...contract.allocations[0], id: 'a2', productId: 'p2', priceCharged: 299.9 },
+            { ...contract.allocations[0], id: 'a3', productId: 'p3', priceCharged: 449.9 },
+          ],
+          payments: [
+            { id: 'pm1', contractId: 'ct1', amount: 824.85, method: 'PIX', paidAt: '2026-09-20', createdAt: '2026-09-20' },
+            { id: 'pm2', contractId: 'ct1', amount: 824.85, method: 'PIX', paidAt: '2026-09-21', createdAt: '2026-09-21' },
+          ],
+        },
+      ],
+    })
+    await renderAndSelect(<ContractsPage />)
+
+    const panel = document.querySelector('aside') as HTMLElement
+    expect(within(panel).getByText('Quitado')).toBeInTheDocument()
+    expect(within(panel).queryByText(/além do total/)).not.toBeInTheDocument()
+  })
+
+  it('CRITICAL: shows the caução still being held, separately from the money owed', async () => {
+    // Collected minus returned, over live pieces. Nothing read these columns
+    // before, so no screen could answer "how much caução am I holding" — the
+    // only place in the app where real cash could leave through the wrong hand
+    // with nothing to check it against.
+    mockHooks({
+      contracts: [
+        {
+          ...contract,
+          allocations: [
+            { ...contract.allocations[0], id: 'a1', depositCollected: 300, depositReturned: null },
+            { ...contract.allocations[0], id: 'a2', productId: 'p2', depositCollected: 200, depositReturned: 200 },
+            { ...contract.allocations[0], id: 'a3', productId: 'p3', status: 'cancelled' as const, depositCollected: 999, depositReturned: null },
+          ],
+        },
+      ],
+    })
+    await renderAndSelect(<ContractsPage />)
+
+    const panel = document.querySelector('aside') as HTMLElement
+    const held = within(within(panel).getByText('Caução retida').parentElement as HTMLElement)
+      .getByText(/R\$/)
+      .textContent?.replace(/\u00a0/g, ' ')
+    // 300 outstanding, 200 already given back, and the cancelled piece's 999
+    // never counted at all.
+    expect(held).toBe('R$ 300,00')
   })
 
   it('lists logged payments with their date, method and amount', async () => {

@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { formatDate, parseDateOnly } from '../../lib/date.ts'
 import { formatCurrency, getLocaleConfig } from '../../lib/locale.ts'
 import { contractTotal, liveAllocations, type ContractDetail } from './contractSchemas.ts'
+import { fromCentavos, sumCentavos } from '../../lib/money.ts'
 
 const DATE_FORMAT_OPTIONS: Intl.DateTimeFormatOptions = { day: '2-digit', month: '2-digit', year: 'numeric' }
 
@@ -23,6 +24,7 @@ export function ContractPrintView({ contract }: ContractPrintViewProps) {
    */
   const items = liveAllocations(contract.allocations)
   const total = contractTotal(contract)
+  const depositCollected = fromCentavos(sumCentavos(items.map((allocation) => allocation.depositCollected ?? 0)))
 
   return (
     // Deliberate exception to the semantic-token rule: a printed/signed
@@ -88,6 +90,17 @@ export function ContractPrintView({ contract }: ContractPrintViewProps) {
         <p className="text-right font-medium">
           {t('print.total')}: {formatCurrency(total, locale, currency)}
         </p>
+        {/*
+          The client hands over cash for the caução and, until now, left with a
+          signed document that did not mention it anywhere. This is her only
+          receipt for it. Printed under the total and labelled separately, so
+          it can never be read as part of what she owes.
+        */}
+        {depositCollected > 0 && (
+          <p className="text-right">
+            {t('print.depositCollected')}: {formatCurrency(depositCollected, locale, currency)}
+          </p>
+        )}
       </section>
 
       <section className="flex flex-col gap-2">

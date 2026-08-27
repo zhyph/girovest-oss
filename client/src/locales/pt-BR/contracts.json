@@ -65,7 +65,8 @@
     "clausesSection": "Termos e Condições",
     "signatureLabel": "Assinatura do Cliente",
     "signedAt": "Assinado em {{date}}",
-    "loadError": "Não foi possível carregar este contrato."
+    "loadError": "Não foi possível carregar este contrato.",
+    "depositCollected": "Caução recebida"
   },
   "sign": {
     "action": "Assinar remotamente",
@@ -123,7 +124,8 @@
     "remainingAfter": "Fica {{amount}} em aberto",
     "refundAfter": "Fica {{amount}} para devolver",
     "save": "Salvar pagamento",
-    "subtitle": "Contrato {{number}} · {{client}}"
+    "subtitle": "Contrato {{number}} · {{client}}",
+    "depositHeld": "Caução retida"
   },
   "newContractSubtitle": "Cliente, evento e peças em uma tela só.",
   "saveContract": "Salvar contrato",

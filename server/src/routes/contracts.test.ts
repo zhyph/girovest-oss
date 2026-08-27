@@ -385,4 +385,114 @@ describe('GET /api/contracts/outstanding', () => {
     const response = await request(app).get('/api/contracts/outstanding')
     expect(response.status).toBe(401)
   })
+
+  it('CRITICAL: a contract paid to the centavo leaves the worklist and the count', async () => {
+    /*
+      679,90 + 1.249,90 sums, as floats, to 1929.8000000000001819; the payment
+      of exactly 1929,80 is 1929.7999999999999545. `Math.max(0, owed - paid)`
+      returned 2.27e-13, which is `> 0`, so this contract stayed in the
+      receivables list AND the Painel's "em N contratos em aberto" count
+      forever — a worklist that can never be worked off, and a phone call to a
+      client who owes nothing. The total looked fine (R$ 0,00); the count did
+      not.
+    */
+    const product = await prisma.product.create({
+      data: { locationId, name: 'Vestido Residuo', category: 'festa', size: 'M', color: 'azul', rentalPrice: 679.9, depositAmount: 0 },
+    })
+    const second = await prisma.product.create({
+      data: { locationId, name: 'Vestido Residuo 2', category: 'festa', size: 'G', color: 'rosa', rentalPrice: 1249.9, depositAmount: 0 },
+    })
+    const created = await request(app)
+      .post('/api/contracts')
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({
+        clientId,
+        eventDate: '2026-10-03',
+        paymentMethod: 'PIX',
+        items: [
+          { productId: product.id, checkoutDate: '2026-10-01', dueDate: '2026-10-05', priceCharged: 679.9 },
+          { productId: second.id, checkoutDate: '2026-10-01', dueDate: '2026-10-05', priceCharged: 1249.9 },
+        ],
+      })
+    expect(created.status).toBe(201)
+
+    const before = await request(app).get('/api/contracts/outstanding').set('Authorization', `Bearer ${staffToken}`)
+    expect(before.body.count).toBe(1)
+
+    await request(app)
+      .post(`/api/contracts/${created.body.id}/payments`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({ amount: 1929.8, method: 'PIX', paidAt: '2026-10-02' })
+
+    const after = await request(app).get('/api/contracts/outstanding').set('Authorization', `Bearer ${staffToken}`)
+    expect(after.body.count).toBe(0)
+    expect(after.body.total).toBe(0)
+
+    const list = await request(app)
+      .get('/api/contracts?status=outstanding')
+      .set('Authorization', `Bearer ${staffToken}`)
+    expect(list.body.contracts.map((c: { id: string }) => c.id)).not.toContain(created.body.id)
+  })
+
+  it('CRITICAL: never lets a sub-centavo amount into the ledger', async () => {
+    // The dialog's untouched prefill for "R$ 500,20 minus R$ 199,90" was
+    // 300.29999999999995 — correct to any 2-decimal reading, so nothing looked
+    // wrong, and then it joined every later `paid` sum and spread its drift to
+    // contracts that had none. The server is the last line: whatever arrives,
+    // whole centavos are what get stored.
+    const product = await prisma.product.create({
+      data: { locationId, name: 'Vestido Quantiza', category: 'festa', size: 'M', color: 'preto', rentalPrice: 500.2, depositAmount: 0 },
+    })
+    const created = await request(app)
+      .post('/api/contracts')
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({
+        clientId,
+        eventDate: '2026-12-03',
+        paymentMethod: 'PIX',
+        items: [{ productId: product.id, checkoutDate: '2026-12-01', dueDate: '2026-12-05', priceCharged: 500.2 }],
+      })
+
+    const paid = await request(app)
+      .post(`/api/contracts/${created.body.id}/payments`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({ amount: 300.29999999999995, method: 'PIX', paidAt: '2026-12-02' })
+    expect(paid.status).toBe(201)
+
+    const stored = await prisma.payment.findFirst({ where: { contractId: created.body.id } })
+    expect(stored?.amount).toBe(300.3)
+
+    // And a correction cannot be the way one gets in either.
+    await request(app)
+      .patch(`/api/contracts/${created.body.id}/payments/${stored!.id}`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({ amount: 199.89999999999998 })
+    const corrected = await prisma.payment.findUnique({ where: { id: stored!.id } })
+    expect(corrected?.amount).toBe(199.9)
+  })
+
+  it('still reports a genuine one-centavo debt', async () => {
+    // The floor must not swallow real money: rounding to centavos may not
+    // become "close enough is settled".
+    const product = await prisma.product.create({
+      data: { locationId, name: 'Vestido Centavo', category: 'festa', size: 'P', color: 'verde', rentalPrice: 100, depositAmount: 0 },
+    })
+    const created = await request(app)
+      .post('/api/contracts')
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({
+        clientId,
+        eventDate: '2026-11-03',
+        paymentMethod: 'PIX',
+        items: [{ productId: product.id, checkoutDate: '2026-11-01', dueDate: '2026-11-05', priceCharged: 100 }],
+      })
+    await request(app)
+      .post(`/api/contracts/${created.body.id}/payments`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({ amount: 99.99, method: 'PIX', paidAt: '2026-11-02' })
+
+    const summary = await request(app).get('/api/contracts/outstanding').set('Authorization', `Bearer ${staffToken}`)
+    expect(summary.body.count).toBe(1)
+    expect(summary.body.total).toBeCloseTo(0.01, 10)
+  })
 })

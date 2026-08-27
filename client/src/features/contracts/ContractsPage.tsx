@@ -41,7 +41,15 @@ import {
   CONTRACT_STATUS_FILTERS,
   type ContractStatusFilter,
 } from './useContracts.ts'
-import { contractTotal, liveAllocations, type Contract, type ContractPayment } from './contractSchemas.ts'
+import {
+  contractTotal,
+  contractTotalCentavos,
+  depositHeldCentavos,
+  liveAllocations,
+  type Contract,
+  type ContractPayment,
+} from './contractSchemas.ts'
+import { fromCentavos, sumCentavos } from '../../lib/money.ts'
 import { NewContractForm } from './NewContractForm.tsx'
 import { SignRemotelyModal } from './SignRemotelyModal.tsx'
 import { PaymentDialog } from './PaymentDialog.tsx'
@@ -96,7 +104,28 @@ export function AllocationActions({ allocation }: { allocation: Allocation }) {
   const [conditionNotesOut, setConditionNotesOut] = useState('')
   const [depositCollected, setDepositCollected] = useState(0)
   const [conditionNotesIn, setConditionNotesIn] = useState('')
-  const [depositReturned, setDepositReturned] = useState(0)
+  /*
+   * Seeded with what was actually collected at checkout, not zero.
+   *
+   * Caução is real cash: it was typed here weeks ago, written to
+   * `depositCollected`, and then never shown again anywhere in the app — not
+   * on the row, not on the contract the client took home, and not here, where
+   * the question is precisely "how much do I hand back?". The operator was
+   * returning whatever she remembered or found on paper, and nothing ever
+   * compared the two numbers.
+   */
+  const depositHeld = allocation.depositCollected ?? 0
+  // Seeded on OPEN, not on mount. This row survives the refetch that follows
+  // check-out, so useState's initializer had already run — with
+  // depositCollected still null — and the field then showed R$ 0,00 directly
+  // above a hint saying R$ 300,00, while `isDirty` below read 0 !== 300 and
+  // fired "Descartar alterações?" on every close with nothing typed.
+  const [depositReturned, setDepositReturned] = useState(depositHeld)
+
+  function openReturnDialog() {
+    setDepositReturned(depositHeld)
+    setShowReturnDialog(true)
+  }
 
   // These dialogs hold their input in plain state, so closing them has to clear
   // it explicitly — otherwise reopening shows whatever was typed last time.
@@ -109,7 +138,7 @@ export function AllocationActions({ allocation }: { allocation: Allocation }) {
   function closeReturnDialog() {
     setShowReturnDialog(false)
     setConditionNotesIn('')
-    setDepositReturned(0)
+    setDepositReturned(depositHeld)
   }
 
   const checkOutGuard = useUnsavedChangesGuard({
@@ -117,7 +146,9 @@ export function AllocationActions({ allocation }: { allocation: Allocation }) {
     onConfirmDiscard: closeCheckOutDialog,
   })
   const returnGuard = useUnsavedChangesGuard({
-    isDirty: conditionNotesIn.trim() !== '' || depositReturned !== 0,
+    // Dirty relative to the suggested amount, not to zero — otherwise the
+    // prefill itself would count as unsaved input and prompt on every close.
+    isDirty: conditionNotesIn.trim() !== '' || depositReturned !== depositHeld,
     onConfirmDiscard: closeReturnDialog,
   })
 
@@ -262,7 +293,7 @@ export function AllocationActions({ allocation }: { allocation: Allocation }) {
     return (
       <div className="flex flex-col items-end gap-1">
         <RowActions label={t('actions.more')}>
-          <DropdownMenuItem disabled={returnAllocation.isPending} onSelect={() => setShowReturnDialog(true)}>
+          <DropdownMenuItem disabled={returnAllocation.isPending} onSelect={openReturnDialog}>
             {t('actions.return')}
           </DropdownMenuItem>
         </RowActions>
@@ -277,6 +308,11 @@ export function AllocationActions({ allocation }: { allocation: Allocation }) {
             <label className="flex flex-col gap-1 text-sm">
               {t('fields.depositReturned')}
               <CurrencyInput value={depositReturned} onChange={setDepositReturned} aria-label={t('fields.depositReturned')} />
+              <span className="text-meta text-muted-foreground">
+                {depositHeld > 0
+                  ? t('returnDialog.depositHeld', { amount: formatCurrency(depositHeld, locale, getLocaleConfig(locale).currency) })
+                  : t('returnDialog.noDepositHeld')}
+              </span>
             </label>
             <div className="flex justify-end gap-2">
               <Button type="button" variant="secondary" onClick={returnGuard.requestClose}>
@@ -312,10 +348,16 @@ const SHORT_DATE: Intl.DateTimeFormatOptions = { day: '2-digit', month: '2-digit
  * or has paid past the total. The label and tone on the third tile change
  * with it — "Devolver" in a neutral tone rather than "Em aberto" turned
  * negative, since a client who paid extra is not a problem to flag red.
+ *
+ * Takes WHOLE CENTAVOS, not reais. It used to take the reais float and test
+ * it against 0 exactly, so a contract paid to the centavo could carry a
+ * 2.27e-13 residue and read as 'open' — an urgent "Em aberto R$ 0,00" tile,
+ * with the badge agreeing and the three figures beside it disagreeing. See
+ * lib/money.ts for why the residue exists at all.
  */
-function outstandingState(outstanding: number): 'open' | 'settled' | 'overpaid' {
-  if (outstanding > 0) return 'open'
-  if (outstanding === 0) return 'settled'
+function outstandingState(outstandingCentavos: number): 'open' | 'settled' | 'overpaid' {
+  if (outstandingCentavos > 0) return 'open'
+  if (outstandingCentavos === 0) return 'settled'
   return 'overpaid'
 }
 
@@ -331,10 +373,18 @@ function ContractPayments({ contract, clientName }: { contract: Contract; client
   // just what has actually come in against that. They do not always add up
   // to the same number, so the outstanding balance is measured against the
   // pieces, never against a payment plan — there is no plan any more.
-  const total = contractTotal(contract)
-  const paid = contract.payments.reduce((sum, payment) => sum + payment.amount, 0)
-  const outstanding = total - paid
-  const state = outstandingState(outstanding)
+  //
+  // Summed and subtracted as centavos, then converted back once for display,
+  // so the tiles and the badge are derived from the same integers and cannot
+  // contradict each other.
+  const totalCentavos = contractTotalCentavos(contract)
+  const paidCentavos = sumCentavos(contract.payments.map((payment) => payment.amount))
+  const outstandingCentavos = totalCentavos - paidCentavos
+  const state = outstandingState(outstandingCentavos)
+  const total = fromCentavos(totalCentavos)
+  const paid = fromCentavos(paidCentavos)
+  const outstanding = fromCentavos(outstandingCentavos)
+  const depositHeld = fromCentavos(depositHeldCentavos(contract))
 
   const thirdTile =
     state === 'overpaid'
@@ -410,6 +460,19 @@ function ContractPayments({ contract, clientName }: { contract: Contract; client
         <span className="text-meta text-muted-foreground">
           {t('payments.overpaidNote', { amount: formatCurrency(-outstanding, locale, currency) })}
         </span>
+      )}
+      {/*
+        Deliberately OUTSIDE the three money tiles and styled differently:
+        caução is the client's money being held, not the shop's revenue, and
+        putting it in the same row would invite it being read as part of the
+        total. Shown whenever any is held so the drawer and the screen can be
+        reconciled — which nothing in the app allowed before.
+      */}
+      {depositHeld !== 0 && (
+        <div className="flex items-baseline justify-between gap-2 rounded-panel border border-dashed border-border-strong px-3 py-2">
+          <span className="text-label uppercase text-foreground-subtle">{t('payments.depositHeld')}</span>
+          <span className="tabular text-meta font-semibold">{formatCurrency(depositHeld, locale, currency)}</span>
+        </div>
       )}
       {contract.payments.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-panel border border-dashed border-border-strong bg-card p-5">

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { isValidIsoDate } from '../../lib/date.ts'
+import { fromCentavos, sumCentavos } from '../../lib/money.ts'
 
 const isoDateString = z.string().min(1).refine(isValidIsoDate, { message: 'INVALID_DATE' })
 
@@ -91,7 +92,40 @@ export function liveAllocations<T extends { status: ContractAllocationStatus }>(
  * which is how the print view came to carry its own, wrong, copy of the sum.
  */
 export function contractTotal(contract: { allocations: { status: ContractAllocationStatus; priceCharged: number }[] }): number {
-  return liveAllocations(contract.allocations).reduce((sum, allocation) => sum + allocation.priceCharged, 0)
+  return fromCentavos(contractTotalCentavos(contract))
+}
+
+/**
+ * The same total as whole centavos — the only form fit to be COMPARED.
+ *
+ * Adding the reais floats gave 1929.8000000000002 for two pieces that sum to
+ * exactly R$ 1.929,80, which is harmless while the number is only printed and
+ * wrong the moment anything asks "is this paid?". See lib/money.ts.
+ */
+export function contractTotalCentavos(contract: {
+  allocations: { status: ContractAllocationStatus; priceCharged: number }[]
+}): number {
+  return sumCentavos(liveAllocations(contract.allocations).map((allocation) => allocation.priceCharged))
+}
+
+/**
+ * Caução the shop is still holding on this contract: collected minus returned,
+ * over the pieces that were not cancelled.
+ *
+ * It is NOT revenue and must never be folded into a total — it is the client's
+ * money, sitting in the shop's drawer until the dress comes back. It had no
+ * definition at all before: the amount was typed at checkout, stored, and then
+ * read by nothing, so no screen could answer "how much caução am I holding"
+ * and no one could tell whether the right amount had been handed back.
+ */
+export function depositHeldCentavos(contract: {
+  allocations: { status: ContractAllocationStatus; depositCollected: number | null; depositReturned: number | null }[]
+}): number {
+  const live = liveAllocations(contract.allocations)
+  return (
+    sumCentavos(live.map((allocation) => allocation.depositCollected ?? 0)) -
+    sumCentavos(live.map((allocation) => allocation.depositReturned ?? 0))
+  )
 }
 
 export interface ContractDetailIdentityDocument {
