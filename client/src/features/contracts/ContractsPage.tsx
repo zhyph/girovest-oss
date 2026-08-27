@@ -34,6 +34,7 @@ import {
 } from '../allocations/useAllocations.ts'
 import type { Allocation } from '../allocations/allocationSchemas.ts'
 import {
+  useContract,
   useContractsList,
   useCancelContract,
   useDeletePayment,
@@ -871,6 +872,21 @@ export function ContractsPage() {
   const currency = getLocaleConfig(locale).currency
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
+  /*
+   * ABOVE the `isLoading` early return below, and it must stay there: a hook
+   * placed after a conditional return registers on some renders and not
+   * others. Sitting below it, the first (cold-cache) render took the loading
+   * branch with one fewer hook, and the moment the list resolved React threw
+   * "Rendered more hooks than during the previous render" — which
+   * ChunkErrorBoundary turns into a full-app crash screen, not a broken
+   * panel. It read as intermittent because a return within gcTime finds
+   * isLoading already false.
+   *
+   * The selected contract is fetched BY ID, with the row from the current
+   * page only as an immediate stand-in — see `selected` below.
+   */
+  const selectedDetail = useContract(selectedId ?? undefined)
+
   const contracts = data?.contracts
   // Both the chip counts and the narrowing are the server's answers now, over
   // the whole archive rather than over whichever page came back. The week
@@ -890,6 +906,8 @@ export function ContractsPage() {
   const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / pageSize))
 
   function handleSearchChange(value: string) {
+    // Deliberate navigation, unlike a refetch: the panel should follow.
+    setSelectedId(null)
     setSearch(value)
     setPage(1)
   }
@@ -898,6 +916,8 @@ export function ContractsPage() {
   // landing on an empty page reads as "no results" rather than as a paging
   // accident.
   function handleFilterChange(next: ContractStatusFilter) {
+    // Deliberate navigation, unlike a refetch: the panel should follow.
+    setSelectedId(null)
     setFilter(next)
     setPage(1)
   }
@@ -984,7 +1004,21 @@ export function ContractsPage() {
     },
   ]
 
-  const selected = contracts?.find((contract) => contract.id === selectedId) ?? null
+  /*
+   * The selected contract is fetched BY ID, with the row from the current page
+   * only as an immediate stand-in.
+   *
+   * Reading it out of the filtered page alone meant the panel emptied whenever
+   * the contract legitimately left the result set — and the two ways that
+   * happens are the two moments a customer is standing there watching. From
+   * "Não assinados", the client signs on their phone, the modal's own success
+   * invalidates the list, the row drops out, and the QR modal is torn down
+   * before she ever sees "Assinado com sucesso!". From "Em aberto", logging
+   * the final payment blanks the whole right-hand side. She cannot tell
+   * whether it worked.
+   */
+  const selectedFromPage = contracts?.find((contract) => contract.id === selectedId) ?? null
+  const selected = selectedDetail.data ?? selectedFromPage
 
   return (
     <div className="flex h-full min-h-0 flex-col">

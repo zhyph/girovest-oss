@@ -114,7 +114,17 @@ function mockHooks(
     mutateAsync: overrides.cancelImpl ?? vi.fn(),
     isPending: false,
   } as never)
-  vi.spyOn(useContractsModule, 'useContract').mockReturnValue({ data: overrides.contracts?.[0] ?? contract } as never)
+  // Id-aware, matching the real hook: useContract(undefined) is a DISABLED
+  // query and resolves to no data. A blanket mock made the detail panel look
+  // permanently populated, which hid whether the page had actually selected
+  // anything.
+  vi.spyOn(useContractsModule, 'useContract').mockImplementation(
+    ((id?: string) => {
+      if (!id) return { data: undefined } as never
+      const pool = overrides.contracts ?? [contract]
+      return { data: pool.find((entry) => entry.id === id) ?? pool[0] } as never
+    }) as never,
+  )
   vi.spyOn(useContractsModule, 'useIssueSigningToken').mockReturnValue({
     mutateAsync: vi.fn().mockResolvedValue({ token: 't', expiresAt: new Date().toISOString(), port: 3000, candidates: [] }),
     isPending: false,
@@ -697,6 +707,63 @@ describe('payments summary', () => {
     // 300 outstanding, 200 already given back, and the cancelled piece's 999
     // never counted at all.
     expect(held).toBe('R$ 300,00')
+  })
+
+  it('CRITICAL: survives the list resolving from loading, with the real hooks', async () => {
+    /*
+      A hook placed after the `isLoading` early return registers on some
+      renders and not others: the cold-cache render took the loading branch
+      with one fewer hook, and the moment the list resolved React threw
+      "Rendered more hooks than during the previous render" — which
+      ChunkErrorBoundary turns into a full-app crash screen, not a broken
+      panel. It read as intermittent because a return within gcTime finds
+      isLoading already false.
+
+      No test rendered the loading state, and mockHooks pinned
+      `isLoading: false` unconditionally, so 847 green tests could not see it.
+      This one drives the transition and leaves useContract UNMOCKED, which is
+      the combination that reproduces it.
+    */
+    mockHooks({ contracts: [contract] })
+    vi.spyOn(useContractsModule, 'useContract').mockRestore?.()
+    vi.spyOn(useContractsModule, 'useContractsList').mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      isError: false,
+    } as never)
+
+    const { rerender } = renderWithProviders(<ContractsPage />)
+
+    vi.spyOn(useContractsModule, 'useContractsList').mockReturnValue({
+      data: { contracts: [contract], counts: {}, total: 1 },
+      isLoading: false,
+      isError: false,
+    } as never)
+    rerender(<ContractsPage />)
+
+    expect(screen.getByText('Contratos')).toBeInTheDocument()
+  })
+
+  it('CRITICAL: the panel survives the contract leaving the filtered list', async () => {
+    /*
+      The two ways a contract legitimately leaves the result set are the two
+      moments a customer is standing there watching: signing from "Não
+      assinados", and logging the final payment from "Em aberto". The panel
+      read from the filtered page, so it emptied — and SignRemotelyModal lives
+      in that subtree, so the QR modal was torn down by the very invalidation
+      its own success triggered, before she ever saw it worked.
+    */
+    mockHooks({ contracts: [contract] })
+    const { rerender } = await renderAndSelect(<ContractsPage />)
+    expect(document.body.textContent).toContain('Pagamentos')
+
+    // The list refetches and the contract is no longer in it, but it is still
+    // the selected one.
+    mockHooks({ contracts: [] })
+    vi.spyOn(useContractsModule, 'useContract').mockReturnValue({ data: contract } as never)
+    rerender(<ContractsPage />)
+
+    expect(document.body.textContent).toContain('Pagamentos')
   })
 
   it('lists logged payments with their date, method and amount', async () => {

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -35,6 +35,30 @@ function mockStaff() {
 }
 
 describe('ProductsPage', () => {
+  // The view choice is persisted now, so it survives BETWEEN TESTS too unless
+  // it is cleared — the default-to-Grade cases below would otherwise inherit
+  // whatever the persistence test last stored.
+  beforeEach(() => {
+    localStorage.removeItem('girovest.products.view')
+  })
+
+  it('CRITICAL: remembers Grade/Lista across visits', async () => {
+    // She picks the dense list to scan by name, opens a piece, comes back, and
+    // is in the photo grid again. It is a standing preference, not a per-visit
+    // one.
+    vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [product], isLoading: false } as never)
+    mockStaff()
+    const first = renderWithQueryClient(<ProductsPage />)
+    await userEvent.click(screen.getByRole('button', { name: 'Lista' }))
+    expect(screen.getByRole('button', { name: 'Lista' })).toHaveAttribute('aria-pressed', 'true')
+    first.unmount()
+
+    vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [product], isLoading: false } as never)
+    mockStaff()
+    renderWithQueryClient(<ProductsPage />)
+    expect(screen.getByRole('button', { name: 'Lista' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
   it('lists products with their status', () => {
     vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [product], isLoading: false } as never)
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ staff: { id: '1', name: 'Ana', login: 'lojista', role: 'owner', locationId: 'l1', locationName: 'Loja Teste', locale: 'pt-BR' }, isLoadingStaff: false, isErrorStaff: false, refetchStaff: vi.fn(), login: vi.fn(), logout: vi.fn(), isLoggedIn: true })

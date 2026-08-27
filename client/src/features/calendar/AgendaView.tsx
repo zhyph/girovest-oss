@@ -26,10 +26,13 @@ export function AgendaView({
   entries,
   products,
   clientNames,
+  filter = 'all',
 }: {
   entries: CalendarEntry[]
   products: Map<string, Product>
   clientNames: Map<string, string>
+  /** Only used to key the lists below, so a chip change restarts them at page 1. */
+  filter?: string
 }) {
   const { t } = useTranslation('calendarScreen')
 
@@ -58,7 +61,15 @@ export function AgendaView({
       {GROUP_ORDER.filter((group) => grouped.has(group)).map((group) => (
         <div key={group} className="flex flex-col gap-2">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t(`groups.${group}`)}</h2>
+          {/*
+            Keyed by FILTER as well as group. `key={group}` alone was inert:
+            the wrapping div is already keyed by group, and a key only
+            disambiguates siblings — the sole child of a stably-keyed parent
+            never remounts. Switching chips left the list parked on page 2 of
+            the previous set.
+          */}
           <CalendarDayItemsList
+            key={`${filter}-${group}`}
             entries={grouped.get(group)!}
             products={products}
             clientNames={clientNames}

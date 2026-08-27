@@ -158,7 +158,11 @@ export function ClientsPage() {
             <span className="flex min-w-0 items-center gap-2">
               <ProductThumbnail product={product} className="size-7" />
               <span className="truncate text-[13px] text-muted-foreground">
-                {product?.name ?? client.lastRentalProductId}
+                {/* Never the raw id. A product deleted, retired out of the
+                    fetched set, or simply not loaded yet rendered its uuid
+                    into the "Último aluguel" column as though that were the
+                    dress's name. */}
+                {product?.name ?? t('columns.unknownProduct')}
               </span>
             </span>
           )

@@ -246,7 +246,27 @@ export function DashboardPage() {
           <div className="mb-4 grid flex-shrink-0 grid-cols-4 gap-3" data-tour="dashboard.stats">
             <StatTile label={t('goingOutToday')} value={goingOutToday.length} />
             <StatTile label={t('dueBackToday')} value={dueBackToday.length} />
-            <StatTile label={t('overdue')} value={overdue.length} danger />
+            {/*
+              The one red number on the screen, and it went nowhere. "2
+              atrasados" with no way to ask WHICH two meant hunting the
+              Contratos list by hand. It carries the same footer link the
+              receivables tile beside it already has.
+            */}
+            <StatTile
+              label={t('overdue')}
+              value={overdue.length}
+              danger
+              footer={
+                overdue.length > 0 ? (
+                  <Link
+                    to="/contratos?status=overdue"
+                    className="text-meta text-destructive-subtle-foreground hover:underline"
+                  >
+                    {t('overdueSeeAll')}
+                  </Link>
+                ) : undefined
+              }
+            />
             <StatTile
               label={t('receivableTotal')}
               value={outstanding.total}

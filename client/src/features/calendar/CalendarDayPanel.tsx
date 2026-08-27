@@ -60,7 +60,18 @@ export function CalendarDayPanel({
             <span className={`text-label uppercase ${TONE_TEXT[section.tone]}`}>{section.label}</span>
             <span className="tabular text-xs text-foreground-subtle">{section.entries.length}</span>
           </div>
-          <CalendarDayItemsList entries={section.entries} products={products} clientNames={clientNames} />
+          {/*
+            Keyed by the DAY as well as the section: the list holds its own
+            page number, and picking a different day replaced the entries
+            under a page chosen for the previous one — she landed on page 3
+            of a one-page day and saw nothing.
+          */}
+          <CalendarDayItemsList
+            key={`${day.toDateString()}-${section.key}`}
+            entries={section.entries}
+            products={products}
+            clientNames={clientNames}
+          />
         </div>
       ))}
     </div>

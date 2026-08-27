@@ -64,6 +64,8 @@ const FILTER_MATCHES: Record<AvailabilityFilter, (product: Product) => boolean> 
   maintenance: (product) => productState(product) === 'maintenance',
 }
 
+const PRODUCT_VIEW_KEY = 'girovest.products.view'
+
 export function ProductsPage() {
   const { t } = useTranslation(['products', 'common'])
   const { locale } = useLocale()
@@ -74,7 +76,30 @@ export function ProductsPage() {
   const [filter, setFilter] = useState<AvailabilityFilter>('all')
   const [facets, setFacets] = useState<ProductFacetSelection>(EMPTY_FACET_SELECTION)
   const [sort, setSort] = useState<ProductSort>(DEFAULT_PRODUCT_SORT)
-  const [view, setView] = useState<'grid' | 'list'>('grid')
+  /*
+   * Grade/Lista is a standing preference, not a per-visit one: she picks the
+   * dense list to scan by name, opens a piece, comes back, and is in the photo
+   * grid again. Persisted per install rather than mirrored into the URL —
+   * unlike a filter, it is not something she would ever want to share or go
+   * BACK to. Reads are guarded because localStorage throws in some
+   * sandboxed/partitioned contexts, matching how useTheme reads its own.
+   */
+  const [view, setView] = useState<'grid' | 'list'>(() => {
+    try {
+      return localStorage.getItem(PRODUCT_VIEW_KEY) === 'list' ? 'list' : 'grid'
+    } catch {
+      return 'grid'
+    }
+  })
+
+  function chooseView(next: 'grid' | 'list') {
+    setView(next)
+    try {
+      localStorage.setItem(PRODUCT_VIEW_KEY, next)
+    } catch {
+      // A preference that cannot be stored is not worth failing a render over.
+    }
+  }
   const [addingPhotosRemotely, setAddingPhotosRemotely] = useState(false)
   const { data: products, isLoading, isError, refetch } = useProducts()
   // In-memory only, never persisted: cleared on page reload, updated only by a successful create.
@@ -280,7 +305,7 @@ export function ProductsPage() {
                 <button
                   key={key}
                   type="button"
-                  onClick={() => setView(key)}
+                  onClick={() => chooseView(key)}
                   aria-pressed={view === key}
                   className={cn(
                     'h-6.5 rounded-[4px] px-2.5 text-meta font-medium',

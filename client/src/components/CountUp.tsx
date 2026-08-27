@@ -69,11 +69,20 @@ export default function CountUp({
     [maxDecimals, separator]
   );
 
+  // Only on FIRST mount. This reset also ran whenever `to` changed, so every
+  // refetch that moved a Painel counter wrote `from` (0) into the tile for a
+  // frame before animating back up — a flash of "0 atrasados" on the one
+  // screen she reads at a glance, indistinguishable from the real thing.
+  const hasRenderedOnce = useRef(false);
   useEffect(() => {
+    if (hasRenderedOnce.current) return;
+    hasRenderedOnce.current = true;
     if (ref.current) {
       ref.current.textContent = formatValue(direction === 'down' ? to : from);
     }
-  }, [from, to, direction, formatValue]);
+    // Deliberately empty: this is the FIRST-PAINT value and must not re-run.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (isInView && startWhen) {

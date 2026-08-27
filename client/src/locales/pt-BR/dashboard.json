@@ -35,5 +35,6 @@
     "dismiss": "Dispensar"
   },
   "todayMovement": "Movimentação de hoje",
-  "todayMovementEmpty": "Nada sai nem volta hoje."
+  "todayMovementEmpty": "Nada sai nem volta hoje.",
+  "overdueSeeAll": "Ver quais"
 }

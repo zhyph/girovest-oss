@@ -30,6 +30,11 @@ export function CalendarDayItemsList({
 }) {
   const { t } = useTranslation('calendarScreen')
   const { locale } = useLocale()
+  // Deliberately NOT reset on every `entries` change: a set that shrinks
+  // under a parked page is clamped by `currentPage` below, and stepping back
+  // from there is the behaviour its own test pins. What has to reset is a
+  // change of DAY or FILTER — a different question entirely — and the callers
+  // do that by keying this component, so the state simply starts fresh.
   const [page, setPage] = useState(0)
   const { openZoom, zoomDialog } = useProductZoom()
 

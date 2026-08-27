@@ -1,11 +1,11 @@
-import { lazy, Suspense, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { RouteFallback } from '../../components/RouteFallback.tsx'
 import { QueryState } from '../../components/QueryState.tsx'
 import { FilterChip } from '../../components/ui/toolbar.tsx'
 import { cn } from '../../lib/cn.ts'
-import { formatDate } from '../../lib/date.ts'
+import { formatDate, toIsoDateOnly } from '../../lib/date.ts'
 import { useLocale } from '../../lib/LocaleContext.tsx'
 import { useProducts } from '../products/useProducts.ts'
 import { useClients } from '../clients/useClients.ts'
@@ -63,6 +63,29 @@ export function CalendarPage() {
   const [anchor, setAnchor] = useState(new Date())
   const [selectedDay, setSelectedDay] = useState<Date | null>(null)
   const { from, to } = monthRange(anchor)
+
+  /*
+   * The day panel reads from the visible month's entries, so paging away left
+   * it showing a date no longer on the grid with nothing under it — an empty
+   * panel that reads as "nothing happens that day" rather than "you are
+   * looking at a different month". Dropping the selection puts the panel back
+   * to its own "pick a day" prompt, which is honest.
+   *
+   * Compared as CALENDAR DAYS, not instants: a selected day can carry a time
+   * component while `monthRange` returns local midnight, so an instant
+   * comparison dropped a legitimately visible selection on the month's last
+   * day. Keyed on the ISO strings for the same reason `monthRange` allocates
+   * fresh Dates every render and would otherwise re-run this constantly.
+   */
+  const fromKey = toIsoDateOnly(from)
+  const toKey = toIsoDateOnly(to)
+  useEffect(() => {
+    setSelectedDay((current) => {
+      if (!current) return current
+      const key = toIsoDateOnly(current)
+      return key < fromKey || key > toKey ? null : current
+    })
+  }, [fromKey, toKey])
 
   // All three sets are fetched for the visible month, not just the active
   // one. The chips can then show real counts instead of only the set that
@@ -239,7 +262,7 @@ export function CalendarPage() {
       <div className="flex min-h-0 flex-1 border-t border-border-strong">
         <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
           {view === 'agenda' ? (
-            <AgendaView entries={entries} products={productsById} clientNames={clientNames} />
+            <AgendaView entries={entries} products={productsById} clientNames={clientNames} filter={filter} />
           ) : (
             <Suspense fallback={<RouteFallback />}>
               <MonthView

@@ -8,14 +8,19 @@ import {
   TriangleAlertIcon,
 } from "lucide-react"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
+import { useTheme } from "../../lib/useTheme.ts"
 
-// This app has no dark mode (see index.css: color-scheme: light is
-// hardcoded, and a theme toggle is explicitly out of v1 scope per the
-// design spec) — next-themes would be a dependency with nothing to read.
+// The comment that used to sit here said this app has no dark mode. It does
+// now (useTheme, and Configurações has a preference), so a hardcoded light
+// toast was a white card thrown onto a dark screen for every save and every
+// error — read straight off the app's own resolved theme instead.
 const Toaster = ({ ...props }: ToasterProps) => {
+  const { theme } = useTheme()
   return (
     <Sonner
-      theme="light"
+      // 'system' included — sonner resolves it against the OS the same way
+      // the app's own bootstrap does.
+      theme={theme}
       richColors
       closeButton
       className="toaster group"

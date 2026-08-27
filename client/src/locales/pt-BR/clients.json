@@ -57,7 +57,8 @@
     "email": "E-mail",
     "lastRental": "Último aluguel",
     "contracts": "Contratos",
-    "neverRented": "Nunca alugou"
+    "neverRented": "Nunca alugou",
+    "unknownProduct": "Peça não encontrada"
   },
   "pagination": {
     "pageOf": "{{page}} / {{total}}"
