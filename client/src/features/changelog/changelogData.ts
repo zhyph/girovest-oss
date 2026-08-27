@@ -23,6 +23,73 @@ export interface ChangelogRelease {
  */
 export const RELEASES: ChangelogRelease[] = [
   {
+    version: '0.15.0',
+    date: '2026-08-27',
+    headline: 'Revisão geral da tela e das contas',
+    items: [
+      {
+        kind: 'fixed',
+        text: 'Corrigido: o Painel mostrava o dia errado. "Saindo hoje" listava as peças de amanhã e escondia as de hoje, o dia 1º de cada mês não aparecia no Calendário, e "Atrasados" contava peças que só voltam amanhã. Agora as duas telas mostram o mesmo dia — o de hoje.',
+      },
+      {
+        kind: 'fixed',
+        text: 'Corrigido: fotos tiradas pelo celular podiam sumir. Se a ficha da peça já estivesse aberta no computador quando as fotos chegavam, salvar a ficha apagava essas fotos. Agora elas são mantidas.',
+      },
+      {
+        kind: 'fixed',
+        text: 'Corrigido: um contrato pago até o último centavo continuava marcado como "Em aberto" com R$ 0,00, e seguia aparecendo na conta de "Total a receber". Agora ele aparece como Quitado e sai da lista.',
+      },
+      {
+        kind: 'fixed',
+        text: 'Corrigido: o contrato impresso cobrava peças canceladas. A folha que a cliente assina agora traz só as peças que ela leva.',
+      },
+      {
+        kind: 'fixed',
+        text: 'Corrigido: apagar um número da data limpava o campo inteiro. Agora dá para corrigir só o ano, ou só o mês, sem digitar tudo de novo.',
+      },
+      {
+        kind: 'fixed',
+        text: 'Corrigido: buscar "jose" não encontrava José, e "antonio" não encontrava Antônio. A busca de clientes agora ignora acentos e também aceita o telefone colado sem formatação.',
+      },
+      {
+        kind: 'fixed',
+        text: 'Corrigido: enviar mais de 10 fotos pelo celular dava erro sempre, pedindo para tentar de novo. Agora o envio é feito em partes e funciona com qualquer quantidade.',
+      },
+      {
+        kind: 'fixed',
+        text: 'Corrigido: em alguns casos o botão Salvar não fazia nada e não explicava o motivo. Agora o campo que está faltando fica marcado em vermelho.',
+      },
+      {
+        kind: 'new',
+        text: 'Novo: a caução agora aparece no sistema. O contrato impresso traz o valor recebido, a ficha mostra quanto está retido, e na devolução o valor já vem preenchido com o que foi recebido na saída.',
+      },
+      {
+        kind: 'new',
+        text: 'Novo: dá para corrigir o valor de uma peça sem cancelar o contrato inteiro, enquanto ela ainda não saiu.',
+      },
+      {
+        kind: 'new',
+        text: 'Novo: o contrato impresso agora mostra quanto ainda falta pagar, em vez de deixar a conta para a cliente fazer.',
+      },
+      {
+        kind: 'improved',
+        text: 'Melhorado: quando a sessão expira, o aplicativo pede a senha na própria tela em vez de sair e perder o que estava sendo preenchido. Enquanto isso a tela fica protegida.',
+      },
+      {
+        kind: 'improved',
+        text: 'Melhorado: quando o sistema da loja não responde, as telas dizem isso claramente e oferecem "Tentar novamente" — antes pareciam apenas vazias, como se não houvesse nada cadastrado.',
+      },
+      {
+        kind: 'improved',
+        text: 'Melhorado: um pagamento registrado duas vezes por engano agora conta só uma vez, e o sistema guarda quem registrou cada pagamento.',
+      },
+      {
+        kind: 'improved',
+        text: 'Melhorado: o Calendário e o Painel guardam melhor o que você estava vendo, os avisos aparecem na cor certa no modo escuro, e o número de "Atrasados" agora leva direto à lista.',
+      },
+    ],
+  },
+  {
     version: '0.14.9',
     date: '2026-08-14',
     items: [
