@@ -251,6 +251,57 @@ describe('POST /:id/photos', () => {
     expect(second.body.photos[0]).not.toBe(second.body.photos[1])
   })
 
+  it('CRITICAL: a stale editor save does not delete photos that arrived while it was open', async () => {
+    /*
+      The exact workflow the QR photo session exists for: the drawer is open on
+      the desktop, photos are sent from the phone at the rack, then the drawer
+      is saved. `photos` is a full replacement, so without a baseline the
+      server read the drawer's stale array as "everything else was removed" and
+      unlinked those files from disk. There is no undo, and nothing on screen
+      said anything had happened.
+    */
+    const opened = await request(app)
+      .post(`/api/products/${productId}/photos`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({ photos: [TINY_JPEG] })
+    const seenByDrawer = opened.body.photos as string[]
+
+    const fromPhone = await request(app)
+      .post(`/api/products/${productId}/photos`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({ photos: [TINY_JPEG] })
+    const arrivedLater = (fromPhone.body.photos as string[]).filter((p) => !seenByDrawer.includes(p))
+    expect(arrivedLater).toHaveLength(1)
+
+    const saved = await request(app)
+      .patch(`/api/products/${productId}`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({ name: 'Nome corrigido', photos: seenByDrawer, photosBaseline: seenByDrawer })
+
+    expect(saved.status).toBe(200)
+    expect(saved.body.photos).toEqual([...seenByDrawer, ...arrivedLater])
+    // Still on disk, and still served.
+    const served = await request(app).get(arrivedLater[0]).set('Authorization', `Bearer ${staffToken}`)
+    expect(served.status).toBe(200)
+  })
+
+  it('still deletes a photo the editor deliberately removed', async () => {
+    const uploaded = await request(app)
+      .post(`/api/products/${productId}/photos`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({ photos: [TINY_JPEG, TINY_JPEG] })
+    const [kept, removed] = uploaded.body.photos as string[]
+
+    const saved = await request(app)
+      .patch(`/api/products/${productId}`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .send({ photos: [kept], photosBaseline: [kept, removed] })
+
+    expect(saved.body.photos).toEqual([kept])
+    const served = await request(app).get(removed).set('Authorization', `Bearer ${staffToken}`)
+    expect(served.status).toBe(404)
+  })
+
   it('rejects a payload that is not a JPEG data URL', async () => {
     const response = await request(app)
       .post(`/api/products/${productId}/photos`)

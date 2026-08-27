@@ -132,6 +132,18 @@ export function ClientDrawer({
     showErrorToast(t(`errors.${code}`, { defaultValue: t('common:errors.UNKNOWN', { ns: 'common' }) }))
   }
 
+  /**
+   * Nothing here may fail silently. A row that has a value but no label is
+   * rejected by clientSchema's per-row refine, and that error had nowhere to
+   * render: Salvar stayed enabled, the drawer stayed open, and not one word
+   * appeared on screen — indistinguishable from a frozen app, with a customer
+   * waiting. The row errors below say which row and why; this says the save
+   * did not happen at all, for anyone who missed the red text further down.
+   */
+  function onInvalid() {
+    showErrorToast(t('validation.formInvalid'))
+  }
+
   async function onSubmit(values: ClientFormValues) {
     const normalized: ClientFormValues = {
       ...values,
@@ -192,7 +204,7 @@ export function ClientDrawer({
           </SheetClose>
         </SheetHeader>
         <SheetBody>
-      <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3">
+      <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="flex flex-col gap-3">
         <label className="flex flex-col gap-1 text-sm">
           <span>{t('fields.name')}<RequiredMark /></span>
           <Input
@@ -241,14 +253,18 @@ export function ClientDrawer({
           <span className="text-sm font-medium">{t('identityDocuments.title')}</span>
           {identityDocuments.fields.map((field, index) => {
             const isDefaultField = template.identityDocuments[index]?.label === field.label
+            const labelError = errors.identityDocuments?.[index]?.label
             return (
-            <div key={field.id} className="flex items-center gap-2">
+            <div key={field.id} className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
               <div className="w-24 shrink-0">
                 <Input
                   {...register(`identityDocuments.${index}.label`)}
                   aria-label={t('identityDocuments.labelFieldAria')}
                   placeholder={t('identityDocuments.labelPlaceholder')}
                   readOnly={isDefaultField}
+                  aria-invalid={labelError ? true : undefined}
+                  aria-describedby={labelError ? `client-document-${index}-error` : undefined}
                   className={isDefaultField ? 'cursor-default bg-muted text-muted-foreground' : undefined}
                 />
               </div>
@@ -276,6 +292,12 @@ export function ClientDrawer({
                 <X size={16} />
               </Button>
             </div>
+            {labelError && (
+              <span id={`client-document-${index}-error`} className="text-xs text-destructive">
+                {t('validation.documentLabelRequired')}
+              </span>
+            )}
+            </div>
           )})}
           <Button
             type="button"
@@ -289,14 +311,18 @@ export function ClientDrawer({
           <span className="text-sm font-medium">{t('addressLines.title')}</span>
           {addressLines.fields.map((field, index) => {
             const isDefaultField = template.addressLines[index]?.label === field.label
+            const labelError = errors.addressLines?.[index]?.label
             return (
-            <div key={field.id} className="flex items-center gap-2">
+            <div key={field.id} className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
               <div className="w-24 shrink-0">
                 <Input
                   {...register(`addressLines.${index}.label`)}
                   aria-label={t('addressLines.labelFieldAria')}
                   placeholder={t('addressLines.labelPlaceholder')}
                   readOnly={isDefaultField}
+                  aria-invalid={labelError ? true : undefined}
+                  aria-describedby={labelError ? `client-address-${index}-error` : undefined}
                   className={isDefaultField ? 'cursor-default bg-muted text-muted-foreground' : undefined}
                 />
               </div>
@@ -333,6 +359,12 @@ export function ClientDrawer({
               >
                 <X size={16} />
               </Button>
+            </div>
+            {labelError && (
+              <span id={`client-address-${index}-error`} className="text-xs text-destructive">
+                {t('validation.addressLabelRequired')}
+              </span>
+            )}
             </div>
           )})}
           <Button

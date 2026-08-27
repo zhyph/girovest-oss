@@ -37,9 +37,13 @@ const monthViewImport = import('./MonthView.tsx')
 monthViewImport.catch(() => {})
 const MonthView = lazy(() => monthViewImport.then((m) => ({ default: m.MonthView })))
 
+// Both ends are whole calendar days — useCalendarTab sends them as date-only
+// strings, so an end-of-day time component would be dropped anyway, and while
+// it was still being serialized as an instant it pulled the 1st of the NEXT
+// month into this month's range.
 function monthRange(anchor: Date) {
   const from = new Date(anchor.getFullYear(), anchor.getMonth(), 1)
-  const to = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0, 23, 59, 59)
+  const to = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0)
   return { from, to }
 }
 

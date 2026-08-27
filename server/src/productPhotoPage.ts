@@ -1,3 +1,4 @@
+import { SUBMIT_PHOTOS_MAX_COUNT } from './lib/signingValidation.js'
 function invalidMessage(status: 'expired' | 'not_found'): string {
   if (status === 'expired') return 'Este código expirou. Peça um novo código à loja.'
   return 'Código inválido. Peça um novo código à loja.'
@@ -180,6 +181,11 @@ function photoIntakeBody(token: string): string {
         }
       }
 
+      // True from the first batch leaving until the queue drains or fails.
+      // Batching turned the send into something with a MIDDLE, and the
+      // controls that edit the queue were written when it had none.
+      var isSending = false;
+
       function renderPreviews() {
         previews.innerHTML = '';
         capturedPhotos.forEach(function (dataUrl, index) {
@@ -191,7 +197,12 @@ function photoIntakeBody(token: string): string {
           removeBtn.type = 'button';
           removeBtn.className = 'remove';
           removeBtn.textContent = '✕';
+          removeBtn.disabled = isSending;
           removeBtn.addEventListener('click', function () {
+            // splice() mutates the very array the in-flight send still holds
+            // as its 'remaining', so removing a preview mid-send shifted the queue
+            // under it and silently dropped an unsent photo.
+            if (isSending) return;
             capturedPhotos.splice(index, 1);
             renderPreviews();
           });
@@ -199,18 +210,25 @@ function photoIntakeBody(token: string): string {
           wrapper.appendChild(removeBtn);
           previews.appendChild(wrapper);
         });
-        submitBtn.disabled = capturedPhotos.length === 0;
+        submitBtn.disabled = isSending || capturedPhotos.length === 0;
       }
 
       function addFiles(fileList) {
         var files = Array.prototype.slice.call(fileList);
         if (files.length === 0) return;
         statusEl.textContent = 'Processando fotos...';
-        Promise.all(files.map(compress)).then(function (dataUrls) {
-          capturedPhotos = capturedPhotos.concat(dataUrls);
-          renderPreviews();
-          statusEl.textContent = capturedPhotos.length + ' foto(s) pronta(s) para enviar.';
-        });
+        Promise.all(files.map(compress))
+          .then(function (dataUrls) {
+            capturedPhotos = capturedPhotos.concat(dataUrls);
+            renderPreviews();
+            statusEl.textContent = capturedPhotos.length + ' foto(s) pronta(s) para enviar.';
+          })
+          .catch(function () {
+            // Without this, a single file the browser cannot decode left
+            // "Processando fotos..." on screen forever, with no way to tell
+            // that nothing was still happening.
+            statusEl.textContent = 'Não foi possível abrir alguma das fotos. Escolha de novo.';
+          });
       }
 
       function openCaptureScreen(product) {
@@ -344,33 +362,95 @@ function photoIntakeBody(token: string): string {
 
       backLink.addEventListener('click', function (event) {
         event.preventDefault();
+        // Leaving mid-send used to null selectedProductId and empty the queue
+        // while a batch was still in flight; its callback then posted the next
+        // batch with productId: null (a 400, reported into a hidden status
+        // line) and resurrected the emptied queue behind her.
+        if (isSending) {
+          statusEl.textContent = 'Aguarde o envio terminar.';
+          return;
+        }
         if (capturedPhotos.length > 0 && !confirm('Descartar as fotos ainda não enviadas?')) {
           return;
         }
         openPickerScreen();
       });
 
-      submitBtn.addEventListener('click', function () {
-        if (capturedPhotos.length === 0 || !selectedProductId) return;
+      // The submit route's own limits: submitPhotosSchema caps a batch at 10
+      // photos, and express.json caps the whole body at 5 MB. The capture
+      // screen never capped what could be picked, so a selection of 14 went in
+      // one request, came back 400 (or 413), and showed "Erro ao enviar. Tente
+      // novamente." — advice that could never work no matter how many times
+      // she followed it. Splitting the queue into batches that fit is what the
+      // desktop drawer's picker already does with its own limits.
+      var SUBMIT_MAX_PHOTOS = ${SUBMIT_PHOTOS_MAX_COUNT};
+      var SUBMIT_MAX_BODY_LENGTH = 3500000;
+
+      function nextBatch(photos) {
+        var batch = [];
+        var length = 0;
+        for (var i = 0; i < photos.length; i++) {
+          if (batch.length >= SUBMIT_MAX_PHOTOS) break;
+          if (batch.length > 0 && length + photos[i].length > SUBMIT_MAX_BODY_LENGTH) break;
+          batch.push(photos[i]);
+          length += photos[i].length;
+        }
+        return batch;
+      }
+
+      function sendBatches(remaining, sentCount) {
+        isSending = true;
         submitBtn.disabled = true;
-        statusEl.textContent = 'Enviando...';
+        if (remaining.length === 0) {
+          isSending = false;
+          statusEl.textContent = sentCount + ' foto(s) adicionada(s) ao produto.';
+          capturedPhotos = [];
+          renderPreviews();
+          setTimeout(openPickerScreen, 2000);
+          return;
+        }
+        var batch = nextBatch(remaining);
+        var total = sentCount + remaining.length;
+        statusEl.textContent =
+          total > batch.length
+            ? 'Enviando ' + (sentCount + batch.length) + ' de ' + total + '...'
+            : 'Enviando...';
         fetch(basePath + '/submit', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ productId: selectedProductId, photos: capturedPhotos }),
+          body: JSON.stringify({ productId: selectedProductId, photos: batch }),
         })
           .then(function (response) {
-            if (!response.ok) throw new Error('failed');
-            var count = capturedPhotos.length;
-            statusEl.textContent = count + ' fotos adicionadas ao produto.';
-            capturedPhotos = [];
+            if (!response.ok) {
+              var rejection = new Error('rejected');
+              // A 4xx is permanent for this payload; retrying it unchanged is
+              // the one thing that cannot help.
+              rejection.permanent = response.status >= 400 && response.status < 500;
+              throw rejection;
+            }
+            // Only the photos this batch carried leave the queue, so a later
+            // failure never discards ones already safely on the server.
+            // slice() copies, so the next hop never shares an array with
+            // anything the UI can still mutate.
+            var stillQueued = remaining.slice(batch.length);
+            capturedPhotos = stillQueued;
             renderPreviews();
-            setTimeout(openPickerScreen, 2000);
+            sendBatches(stillQueued, sentCount + batch.length);
           })
-          .catch(function () {
-            statusEl.textContent = 'Erro ao enviar. Tente novamente.';
-            submitBtn.disabled = false;
+          .catch(function (error) {
+            var message = error && error.permanent
+              ? 'O servidor recusou estas fotos. Remova algumas com o ✕ e envie de novo.'
+              : 'Falha na conexão. As fotos continuam aqui — toque em Enviar para tentar de novo.';
+            statusEl.textContent =
+              sentCount > 0 ? sentCount + ' foto(s) já foram salvas. ' + message : message;
+            isSending = false;
+            renderPreviews();
           });
+      }
+
+      submitBtn.addEventListener('click', function () {
+        if (capturedPhotos.length === 0 || !selectedProductId) return;
+        sendBatches(capturedPhotos, 0);
       });
 
       bindMoneyInput(createRentalPrice);

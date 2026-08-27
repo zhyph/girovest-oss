@@ -41,7 +41,7 @@ import {
   CONTRACT_STATUS_FILTERS,
   type ContractStatusFilter,
 } from './useContracts.ts'
-import type { Contract, ContractPayment } from './contractSchemas.ts'
+import { contractTotal, liveAllocations, type Contract, type ContractPayment } from './contractSchemas.ts'
 import { NewContractForm } from './NewContractForm.tsx'
 import { SignRemotelyModal } from './SignRemotelyModal.tsx'
 import { PaymentDialog } from './PaymentDialog.tsx'
@@ -53,7 +53,7 @@ import { PaymentDialog } from './PaymentDialog.tsx'
  * Precedence is worst-first: one late piece makes the contract late.
  */
 export function contractState(contract: Contract, today = new Date()): EntityState {
-  const live = contract.allocations.filter((allocation) => allocation.status !== 'cancelled')
+  const live = liveAllocations(contract.allocations)
   if (live.length === 0) return 'cancelled'
   const isLate = (allocation: (typeof live)[number]) =>
     allocation.status === 'checked_out' && parseDateOnly(allocation.dueDate) < today
@@ -78,22 +78,6 @@ export function contractWeekGroup(contract: Contract, today: Date): ContractWeek
 }
 
 const WEEK_GROUP_ORDER: ContractWeekGroup[] = ['thisWeek', 'upcoming', 'past']
-
-/**
- * What the contract is worth today: its pieces' charged prices, minus the ones
- * that were cancelled.
- *
- * The single definition of a contract's total — the row's figure and the
- * detail panel's money tiles both come through here. They disagreed once, and
- * a contract showed two different Totals depending on where you looked; worse,
- * the higher of the two counted cancelled pieces, so the outstanding balance
- * told the shop to chase a client for a dress it never sent out.
- */
-export function contractTotal(contract: Contract): number {
-  return contract.allocations
-    .filter((allocation) => allocation.status !== 'cancelled')
-    .reduce((sum, allocation) => sum + allocation.priceCharged, 0)
-}
 
 function resolveErrorCode(error: unknown): string {
   return (error as { code?: string })?.code ?? 'UNKNOWN'

@@ -66,6 +66,34 @@ export interface Contract {
   payments: ContractPayment[]
 }
 
+/**
+ * The pieces a contract still has: everything except the ones that were
+ * cancelled.
+ *
+ * A cancelled piece stays on the record — it is history, and the allocation
+ * row is never deleted — but it is not part of what the client owes or takes
+ * home, so it must not appear in a total, an item list, or a printed sheet.
+ */
+export function liveAllocations<T extends { status: ContractAllocationStatus }>(allocations: T[]): T[] {
+  return allocations.filter((allocation) => allocation.status !== 'cancelled')
+}
+
+/**
+ * What the contract is worth today.
+ *
+ * The single definition of a contract's total — the list row, the detail
+ * panel's money tiles and the printed contract all come through here. They
+ * disagreed once, and a contract showed two different Totals depending on
+ * where you looked; worse, the higher of the two counted cancelled pieces, so
+ * the outstanding balance told the shop to chase a client for a dress it never
+ * sent out. It lives here rather than in ContractsPage so the print view can
+ * use it without pulling the whole Contratos screen into the print chunk —
+ * which is how the print view came to carry its own, wrong, copy of the sum.
+ */
+export function contractTotal(contract: { allocations: { status: ContractAllocationStatus; priceCharged: number }[] }): number {
+  return liveAllocations(contract.allocations).reduce((sum, allocation) => sum + allocation.priceCharged, 0)
+}
+
 export interface ContractDetailIdentityDocument {
   id: string
   label: string

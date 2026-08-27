@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../../lib/api.ts'
+import { toIsoDateOnly } from '../../lib/date.ts'
+import { fetchOverdue, overdueQueryKey } from '../calendar/useCalendar.ts'
 import { useOutstanding } from '../contracts/useContracts.ts'
 
 export interface AllocationSummary {
@@ -26,29 +28,32 @@ export interface LeavingMaintenanceSummary {
 const EMPTY_OUTSTANDING = { total: 0, count: 0 }
 const EMPTY_LEAVING_MAINTENANCE: LeavingMaintenanceSummary = { count: 0, items: [] }
 
-function startOfToday() {
-  const d = new Date()
-  d.setHours(0, 0, 0, 0)
-  return d
-}
+/** How far ahead "Próximas saídas" looks, in days. */
+const UPCOMING_WINDOW_DAYS = 7
 
-function endOfToday() {
+function daysFromToday(days: number) {
   const d = new Date()
-  d.setHours(23, 59, 59, 999)
-  return d
-}
-
-function endOfUpcomingWindow() {
-  const d = new Date()
-  d.setDate(d.getDate() + 7)
-  d.setHours(23, 59, 59, 999)
+  d.setDate(d.getDate() + days)
   return d
 }
 
 export function useDashboard() {
-  const from = startOfToday().toISOString()
-  const to = endOfToday().toISOString()
-  const upcomingTo = endOfUpcomingWindow().toISOString()
+  /*
+   * Date-only bounds, for the reason spelled out on useCalendarTab: the
+   * calendar-day columns are stored at UTC midnight, and a local-midnight
+   * instant sent as `toISOString()` lands at T03:00:00Z here, an hour range
+   * that starts AFTER today's own rows and ends inside tomorrow's. The Painel
+   * was reading a whole day late — "Saindo hoje" listed tomorrow's pieces and
+   * hid today's, on the one screen the shop plans the morning from.
+   */
+  const from = toIsoDateOnly(new Date())
+  const to = from
+  // "Próximas saídas" starts TOMORROW, not today. Today's departures have
+  // their own tile and their own list right beside it, and the date fix above
+  // would otherwise have made the two panels repeat each other verbatim — the
+  // old bounds hid that by accidentally starting a day late.
+  const upcomingFrom = toIsoDateOnly(daysFromToday(1))
+  const upcomingTo = toIsoDateOnly(daysFromToday(UPCOMING_WINDOW_DAYS))
 
   const goingOut = useQuery({
     queryKey: ['calendar', 'going-out', from, to],
@@ -58,13 +63,20 @@ export function useDashboard() {
     queryKey: ['calendar', 'due-back', from, to],
     queryFn: () => apiFetch<AllocationSummary[]>(`/api/calendar/due-back?from=${from}&to=${to}`),
   })
+  /*
+   * Asked exactly the way the Calendário asks it, through the shared helpers,
+   * so the two screens share one cache entry and cannot disagree. Asking as of
+   * the END of today was the bug: at UTC-3 that instant is tomorrow 02:59 UTC,
+   * past tomorrow's UTC-midnight due dates, so "Atrasados" counted pieces that
+   * are not due back until tomorrow and sent the shop chasing them.
+   */
   const overdue = useQuery({
-    queryKey: ['calendar', 'overdue', to],
-    queryFn: () => apiFetch<AllocationSummary[]>(`/api/calendar/overdue?asOf=${to}`),
+    queryKey: overdueQueryKey(),
+    queryFn: fetchOverdue,
   })
   const upcoming = useQuery({
-    queryKey: ['calendar', 'going-out', from, upcomingTo],
-    queryFn: () => apiFetch<AllocationSummary[]>(`/api/calendar/going-out?from=${from}&to=${upcomingTo}`),
+    queryKey: ['calendar', 'going-out', upcomingFrom, upcomingTo],
+    queryFn: () => apiFetch<AllocationSummary[]>(`/api/calendar/going-out?from=${upcomingFrom}&to=${upcomingTo}`),
   })
 
   const outstanding = useOutstanding()

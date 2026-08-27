@@ -78,6 +78,21 @@ export interface UpdateProductInput {
   rentalPrice?: number
   depositAmount?: number
   photos?: string[]
+  /**
+   * The photo list the editor was shown when it loaded, if it knows it.
+   *
+   * `photos` is a full replacement, which only means "delete what is missing"
+   * for photos the editor actually saw. Anything that arrived at the piece
+   * afterwards — a phone photo session writing while the drawer sat open, the
+   * concurrent workflow this app is built around — is absent from the editor's
+   * array because it never knew about it, not because anyone removed it.
+   * Without this the drawer's stale snapshot was taken as authoritative and
+   * those files were unlinked from disk, with no undo.
+   *
+   * Omitted by callers that cannot have raced (and by older clients), where it
+   * falls back to the stored list and the update behaves exactly as before.
+   */
+  photosBaseline?: string[]
   status?: ProductStatus
 }
 
@@ -142,7 +157,13 @@ async function upcomingReservationsByProductId(
   if (productIds.length === 0) return result
 
   const today = new Date(Date.UTC(asOf.getUTCFullYear(), asOf.getUTCMonth(), asOf.getUTCDate()))
-  // ast-grep-ignore: no-unscoped-location-model — Scoped to the caller-verified productIds, same pattern as availabilityByProductId's own allocation lookup.
+  // Unscoped by design, and deliberately NOT carrying a suppression comment:
+  // no-unscoped-location-model only guards prisma.client/prisma.product, so
+  // a directive on an Allocation read can never match and the scan reports
+  // it as an unused suppression on every run. It is safe for the same reason
+  // availabilityByProductId's own allocation lookup is — the productIds were
+  // verified by the caller, so nothing outside that location is reachable
+  // through them.
   const allocations = await prisma.allocation.findMany({
     where: { productId: { in: productIds }, status: 'reserved', checkoutDate: { gt: today }, contractId: { not: null } },
     include: { client: true, contract: { select: { number: true } } },
@@ -361,20 +382,41 @@ export async function getProduct(locationId: string, id: string): Promise<Produc
   return toDTO(row, await availabilityFor(id), await hasHistory(id))
 }
 
+/**
+ * Reconciles a full-replacement photo list against what is actually stored.
+ *
+ * A photo the editor never saw (not in its baseline) and did not send back is
+ * not a removal — it is a write that landed after the editor loaded. Those are
+ * appended, after the order the editor chose, which it is still the authority
+ * on. A photo that WAS in the baseline and is missing from the new list is a
+ * deliberate removal and stays removed.
+ */
+function reconcilePhotos(stored: string[], next: string[], baseline: string[]): string[] {
+  const seen = new Set(baseline)
+  const arrivedSinceEditorLoaded = stored.filter((photo) => !seen.has(photo) && !next.includes(photo))
+  return arrivedSinceEditorLoaded.length === 0 ? next : [...next, ...arrivedSinceEditorLoaded]
+}
+
 export async function updateProduct(locationId: string, id: string, data: UpdateProductInput): Promise<ProductDTO> {
   const existing = await getProduct(locationId, id)
+  const { photosBaseline, ...fields } = data
+  const photos = fields.photos
+    ? reconcilePhotos(existing.photos, fields.photos, photosBaseline ?? existing.photos)
+    : undefined
   const row = await scopedDb(locationId).product.update({
     where: { id },
     data: {
-      ...data,
-      photos: data.photos ? JSON.stringify(data.photos) : undefined,
+      ...fields,
+      photos: photos ? JSON.stringify(photos) : undefined,
     } as any,
   })
   // Only when photos was actually part of this update — an update touching
   // unrelated fields must never treat "photos wasn't provided" as "photos is
-  // now empty" and delete every file on disk.
-  if (data.photos) {
-    await removeOrphanedPhotoFiles(existing.photos, data.photos)
+  // now empty" and delete every file on disk. `photos` (reconciled), not
+  // `fields.photos`, is what survives: anything reconciliation added back is
+  // still on the piece and must not be unlinked.
+  if (photos) {
+    await removeOrphanedPhotoFiles(existing.photos, photos)
   }
   return toDTO(row, await availabilityFor(id), await hasHistory(id))
 }

@@ -76,6 +76,36 @@ describe('GET /api/calendar/going-out', () => {
     expect(response.status).toBe(200)
     expect(response.body.map((a: { id: string }) => a.id)).toEqual([allocation.id])
   })
+
+  it('CRITICAL: includes both endpoint days and excludes the day after the range', async () => {
+    // The contract the client relies on: date-only bounds are whole calendar
+    // days, inclusive at both ends. checkoutDate is stored at UTC midnight, so
+    // a caller that sends a local-midnight instant instead (T03:00:00Z at
+    // UTC-3) loses the first day and gains the one after the last — which is
+    // exactly how the 1st of every month went missing from the grid.
+    const first = await seedReservedAllocation({
+      checkoutDate: new Date('2026-09-01'),
+      dueDate: new Date('2026-09-05'),
+    })
+    const last = await seedReservedAllocation({
+      checkoutDate: new Date('2026-09-30'),
+      dueDate: new Date('2026-10-02'),
+    })
+    const nextMonth = await seedReservedAllocation({
+      checkoutDate: new Date('2026-10-01'),
+      dueDate: new Date('2026-10-04'),
+    })
+
+    const response = await request(app)
+      .get('/api/calendar/going-out')
+      .query({ from: '2026-09-01', to: '2026-09-30' })
+      .set('Authorization', `Bearer ${staffToken}`)
+
+    const ids = response.body.map((a: { id: string }) => a.id)
+    expect(ids).toContain(first.id)
+    expect(ids).toContain(last.id)
+    expect(ids).not.toContain(nextMonth.id)
+  })
 })
 
 describe('GET /api/calendar/due-back', () => {

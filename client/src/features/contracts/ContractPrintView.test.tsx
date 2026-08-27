@@ -71,6 +71,42 @@ describe('ContractPrintView', () => {
     expect(screen.queryByAltText('Assinatura do Cliente')).not.toBeInTheDocument()
   })
 
+  it('CRITICAL: leaves a cancelled piece off the sheet and out of the total', () => {
+    // A signed sheet that bills a dress the shop never sent out. Cancelling is
+    // irreversible, so once this is printed and signed there is no fixing it
+    // in the app — only reprinting and explaining the difference at the
+    // counter. The single reserved allocation the other tests use here is
+    // exactly why this stayed green while the bug was live.
+    const mixedContract: ContractDetail = {
+      ...baseContract,
+      allocations: [
+        baseContract.allocations[0],
+        {
+          ...baseContract.allocations[0],
+          id: 'al2',
+          productId: 'p2',
+          status: 'cancelled',
+          priceCharged: 500,
+          product: { id: 'p2', name: 'Vestido Cancelado' },
+        },
+      ],
+    }
+    render(<ContractPrintView contract={mixedContract} />)
+
+    expect(screen.getByText('Vestido Azul')).toBeInTheDocument()
+    expect(screen.queryByText('Vestido Cancelado')).not.toBeInTheDocument()
+
+    const brl = (value: number) =>
+      new RegExp(
+        new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
+          .format(value)
+          .replace('$', '\\$')
+          .replace(/\s/g, '\\s'),
+      )
+    expect(screen.getAllByText(brl(380)).length).toBeGreaterThan(0)
+    expect(screen.queryAllByText(brl(880))).toHaveLength(0)
+  })
+
   it('renders the signature image when the contract is signed', () => {
     const signedContract: ContractDetail = {
       ...baseContract,

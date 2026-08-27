@@ -1,8 +1,21 @@
+import { useState } from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '../../i18n.ts'
 import { DateInput } from './date-input.tsx'
+
+/**
+ * Every other test here passes a fixed `value` prop, which is exactly how the
+ * "one Backspace blanks the field" bug survived: the component is never a
+ * controlled input in those tests, so its own emitted value never comes back
+ * to it. This harness is how the app actually mounts it — react-hook-form's
+ * Controller feeding `field.value` straight back in.
+ */
+function ControlledDateInput({ initial }: { initial: string }) {
+  const [value, setValue] = useState(initial)
+  return <DateInput value={value} onChange={setValue} aria-label="Data" />
+}
 
 describe('DateInput', () => {
   it('formats a stored ISO date as DD/MM/AAAA regardless of OS locale', () => {
@@ -26,6 +39,47 @@ describe('DateInput', () => {
     await userEvent.type(screen.getByLabelText('Data'), '23082026')
 
     expect(onChange).toHaveBeenLastCalledWith('2026-08-23')
+  })
+
+  it('keeps the remaining digits when one is deleted from a complete date', async () => {
+    render(<ControlledDateInput initial="2026-08-23" />)
+    const field = screen.getByLabelText('Data')
+
+    await userEvent.click(field)
+    await userEvent.keyboard('{End}{Backspace}')
+
+    // Not ''. Going 8 digits -> 7 makes digitsToIso report "incomplete", and
+    // the host writes that '' back; the field must not read that as "clear me".
+    expect(field).toHaveValue('23/08/202')
+  })
+
+  it('lets a date be corrected in place without retyping it', async () => {
+    render(<ControlledDateInput initial="2026-08-23" />)
+    const field = screen.getByLabelText('Data')
+
+    await userEvent.click(field)
+    await userEvent.keyboard('{End}{Backspace}7')
+
+    expect(field).toHaveValue('23/08/2027')
+  })
+
+  it('still accepts a new value pushed in by the host', async () => {
+    function Host() {
+      const [value, setValue] = useState('2026-08-23')
+      return (
+        <>
+          <DateInput value={value} onChange={setValue} aria-label="Data" />
+          <button type="button" onClick={() => setValue('2027-01-05')}>
+            definir
+          </button>
+        </>
+      )
+    }
+    render(<Host />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'definir' }))
+
+    expect(screen.getByLabelText('Data')).toHaveValue('05/01/2027')
   })
 
   it('keeps the labelled field a plain masked text input (no OS-locale display)', () => {

@@ -43,12 +43,20 @@ export const submitSignatureSchema = z.object({
 // drifting apart.
 export const PHOTO_BASE64_MAX_LENGTH = 2_000_000
 
+/**
+ * How many photos one phone submission may carry. The capture screen splits
+ * its queue into batches of this size before posting, so the two cannot drift
+ * apart — they did, and a selection larger than this was rejected forever
+ * under a message telling the user to retry.
+ */
+export const SUBMIT_PHOTOS_MAX_COUNT = 10
+
 export const submitPhotosSchema = z.object({
   productId: z.string().min(1),
   // The whole batch is additionally bounded to 5 MB by the transport on both
   // paths (express.json's limit on LAN, the Worker's content-length check on
   // relay).
-  photos: z.array(z.string().min(1).max(PHOTO_BASE64_MAX_LENGTH)).min(1).max(10),
+  photos: z.array(z.string().min(1).max(PHOTO_BASE64_MAX_LENGTH)).min(1).max(SUBMIT_PHOTOS_MAX_COUNT),
   idempotencyKey: idempotencyKeySchema,
 })
 

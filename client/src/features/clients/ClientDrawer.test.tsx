@@ -37,6 +37,41 @@ describe('ClientDrawer', () => {
     expect(screen.getByLabelText('Nome')).toHaveValue('Nova Cliente')
   })
 
+  it('CRITICAL: says why the save was blocked instead of no-opping', async () => {
+    // A document row with a value and no label fails clientSchema's per-row
+    // refine. That error had nowhere to render, so Salvar stayed enabled, the
+    // drawer stayed open and nothing at all appeared: identical to a frozen
+    // app, with a customer waiting at the counter.
+    const createImpl = vi.fn()
+    mockClientHooks(vi.fn(), createImpl)
+    renderWithToast(<ClientDrawer client={null} onClose={vi.fn()} />)
+
+    await userEvent.type(screen.getByLabelText('Nome'), 'Nova Cliente')
+    await userEvent.type(screen.getByLabelText('Telefone'), '11999990000')
+    await userEvent.click(screen.getByRole('button', { name: 'Adicionar documento' }))
+    await userEvent.type(screen.getAllByLabelText('Valor do documento').at(-1)!, '123456789')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+
+    expect(createImpl).not.toHaveBeenCalled()
+    expect(await screen.findByText(/Dê um nome a este documento/)).toBeInTheDocument()
+    expect(screen.getAllByLabelText('Rótulo do documento').at(-1)!).toHaveAttribute('aria-invalid', 'true')
+  })
+
+  it('saves once the blocked row is given a label', async () => {
+    const createImpl = vi.fn().mockResolvedValue({ ...client, id: 'c-new' })
+    mockClientHooks(vi.fn(), createImpl)
+    renderWithToast(<ClientDrawer client={null} onClose={vi.fn()} />)
+
+    await userEvent.type(screen.getByLabelText('Nome'), 'Nova Cliente')
+    await userEvent.type(screen.getByLabelText('Telefone'), '11999990000')
+    await userEvent.click(screen.getByRole('button', { name: 'Adicionar documento' }))
+    await userEvent.type(screen.getAllByLabelText('Valor do documento').at(-1)!, '123456789')
+    await userEvent.type(screen.getAllByLabelText('Rótulo do documento').at(-1)!, 'CNH')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+
+    expect(createImpl).toHaveBeenCalled()
+  })
+
   it('ignores initialName when editing an existing client', () => {
     mockClientHooks()
     renderWithToast(<ClientDrawer client={client} initialName="Deveria Ser Ignorado" onClose={vi.fn()} />)

@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { formatDate, parseDateOnly } from '../../lib/date.ts'
 import { formatCurrency, getLocaleConfig } from '../../lib/locale.ts'
-import type { ContractDetail } from './contractSchemas.ts'
+import { contractTotal, liveAllocations, type ContractDetail } from './contractSchemas.ts'
 
 const DATE_FORMAT_OPTIONS: Intl.DateTimeFormatOptions = { day: '2-digit', month: '2-digit', year: 'numeric' }
 
@@ -13,7 +13,16 @@ export function ContractPrintView({ contract }: ContractPrintViewProps) {
   const { t } = useTranslation('contracts')
   const locale = contract.location.locale
   const currency = getLocaleConfig(locale).currency
-  const total = contract.allocations.reduce((sum, allocation) => sum + allocation.priceCharged, 0)
+  /*
+   * Cancelled pieces are dropped from the sheet AND from its total, through
+   * the same helpers every on-screen figure uses. Printing the raw list was a
+   * signed-paper bug: a three-dress contract with one piece cancelled showed
+   * two dresses on every screen and then printed three, billed for three, and
+   * the client signed that. Cancelling is irreversible, so the only remedy was
+   * reprinting after the fact and explaining the difference at the counter.
+   */
+  const items = liveAllocations(contract.allocations)
+  const total = contractTotal(contract)
 
   return (
     // Deliberate exception to the semantic-token rule: a printed/signed
@@ -64,7 +73,7 @@ export function ContractPrintView({ contract }: ContractPrintViewProps) {
             </tr>
           </thead>
           <tbody>
-            {contract.allocations.map((allocation) => (
+            {items.map((allocation) => (
               <tr key={allocation.id} className="border-b border-border-soft print:break-inside-avoid">
                 <td className="py-1">{allocation.product.name}</td>
                 <td className="py-1">

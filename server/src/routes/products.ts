@@ -54,6 +54,10 @@ const updateSchema = z.object({
   rentalPrice: z.number().positive().optional(),
   depositAmount: z.number().nonnegative().optional(),
   photos: z.array(z.string().regex(STORED_PHOTO_PATH_PATTERN)).optional(),
+  // What the editor was shown when it loaded — see UpdateProductInput. Sent
+  // alongside `photos` so a concurrent phone upload is not mistaken for a
+  // removal and its files unlinked.
+  photosBaseline: z.array(z.string().regex(STORED_PHOTO_PATH_PATTERN)).optional(),
   status: z.enum(['active', 'maintenance', 'retired']).optional(),
 })
 

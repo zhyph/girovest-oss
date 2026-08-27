@@ -96,9 +96,29 @@ export function ProductDrawer({
     },
   })
 
-  // status and photos live outside react-hook-form, so isDirty alone
-  // under-reports: without this the user could still lose an added photo.
+  /**
+   * The photos this drawer opened with — its baseline, sent with every save.
+   *
+   * ProductsPage holds `editing` as a state snapshot, so this array never
+   * changes while the drawer is open even when the piece gains photos from a
+   * phone session in the meantime. That is what makes it a usable baseline,
+   * and it is also exactly why `photos` alone could not be sent as the whole
+   * truth: the server would have read the missing new arrivals as removals and
+   * unlinked them from disk.
+   */
   const initialPhotos = product?.photos ?? []
+  /**
+   * Everything this drawer has PUT ON THE SERVER during this session, on top
+   * of what it opened with.
+   *
+   * resolvePhotos uploads before the PATCH and folds each successful chunk
+   * into local state, so after a partially-failed upload (or a failed save)
+   * the piece holds photos the mount-time snapshot never knew about. Sending
+   * that snapshot alone as the baseline made the server read a subsequent
+   * REMOVAL of one of those photos as a concurrent arrival and append it
+   * straight back — the drawer refusing to delete what it had just uploaded.
+   */
+  const uploadedHere = useRef<Set<string>>(new Set())
   const hasUnsavedChanges =
     isDirty ||
     status !== (product?.status ?? 'active') ||
@@ -205,6 +225,7 @@ export function ProductDrawer({
       const next = [...latest]
       chunkIndexes.forEach((index, position) => {
         next[index] = storedForChunk[position]
+        uploadedHere.current.add(storedForChunk[position])
       })
       latest = next
       setPhotos(latest)
@@ -230,7 +251,18 @@ export function ProductDrawer({
     try {
       if (product) {
         const resolvedPhotos = await resolvePhotos(product.id)
-        await updateProduct.mutateAsync({ id: product.id, values: { ...normalized, status, photos: resolvedPhotos } })
+        await updateProduct.mutateAsync({
+          id: product.id,
+          values: {
+            ...normalized,
+            status,
+            photos: resolvedPhotos,
+            // What this drawer has SEEN: what it opened with, plus everything
+            // it has since stored itself. Anything outside that really did
+            // arrive from somewhere else.
+            photosBaseline: [...initialPhotos, ...uploadedHere.current],
+          },
+        })
         onClose()
       } else {
         // A piece has to exist before a photo can belong to it, so the row is

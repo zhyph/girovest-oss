@@ -12,7 +12,10 @@
   "validation": {
     "nameRequired": "Nome é obrigatório",
     "phoneRequired": "Telefone é obrigatório",
-    "emailInvalid": "E-mail inválido"
+    "emailInvalid": "E-mail inválido",
+    "documentLabelRequired": "Dê um nome a este documento (ex.: CPF) para poder salvar",
+    "addressLabelRequired": "Dê um nome a este campo (ex.: Cidade) para poder salvar",
+    "formInvalid": "Não foi possível salvar: confira os campos marcados em vermelho"
   },
   "errors": {
     "CANNOT_DELETE_WITH_HISTORY": "Não é possível excluir um cliente com histórico de alocações."

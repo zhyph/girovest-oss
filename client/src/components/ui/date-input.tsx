@@ -20,9 +20,18 @@ export const DateInput = forwardRef<HTMLInputElement, DateInputProps>(
     const [digits, setDigits] = useState(() => isoToDigits(value))
     const [isPickerOpen, setIsPickerOpen] = useState(false)
 
+    // Re-sync ONLY when the incoming value disagrees with what is already on
+    // screen. Naively assigning `isoToDigits(value)` destroyed input mid-edit:
+    // deleting one digit of a complete date leaves 7, `digitsToIso` reports
+    // that as incomplete (''), the host writes '' back, and this effect then
+    // replaced the 7 surviving digits with nothing — one Backspace blanked the
+    // whole field. Comparing through `digitsToIso` treats every set of digits
+    // the host would render identically as "no change", so partially typed
+    // dates survive the round trip while a genuinely new value (the picker,
+    // a form reset) still lands.
     useEffect(() => {
-      setDigits(isoToDigits(value))
-    }, [value, isoToDigits])
+      setDigits((current) => (digitsToIso(current) === value ? current : isoToDigits(value)))
+    }, [value, isoToDigits, digitsToIso])
 
     const isIncomplete = digits.length < 8
     const isInvalidDate = !isIncomplete && !isValidIsoDate(digitsToIso(digits))

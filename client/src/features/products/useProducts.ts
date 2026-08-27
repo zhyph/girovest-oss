@@ -29,7 +29,17 @@ export function useCreateProduct() {
 export function useUpdateProduct() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, values }: { id: string; values: Partial<ProductFormValues> & { status?: ProductStatus } }) =>
+    mutationFn: ({
+      id,
+      values,
+    }: {
+      id: string
+      // `photosBaseline` is the photo list the editor loaded with. The server
+      // treats `photos` as a full replacement, so without a baseline it cannot
+      // tell "she removed this" from "this arrived after the drawer opened"
+      // and deletes the file either way.
+      values: Partial<ProductFormValues> & { status?: ProductStatus; photosBaseline?: string[] }
+    }) =>
       apiFetch<Product>(`/api/products/${id}`, { method: 'PATCH', body: JSON.stringify(values) }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: PRODUCTS_KEY }),
   })
