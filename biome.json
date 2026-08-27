@@ -1,0 +1,62 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.10/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "includes": [
+      "client/src/**/*.ts",
+      "client/src/**/*.tsx",
+      "client/electron/**/*.ts",
+      "server/src/**/*.ts",
+      "!server/src/generated/**",
+      "!client/src/components/ui/**"
+    ]
+  },
+  "formatter": {
+    "enabled": false
+  },
+  "linter": {
+    "enabled": true,
+    "domains": {
+      "react": "recommended"
+    },
+    "rules": {
+      "recommended": false,
+      "correctness": {
+        "useHookAtTopLevel": "error",
+        "noUnusedVariables": "error",
+        "noUnusedImports": "error",
+        "noConstantCondition": "error",
+        "noSelfAssign": "error",
+        "noSwitchDeclarations": "error",
+        "useExhaustiveDependencies": "warn",
+        "useUniqueElementIds": "off"
+      },
+      "suspicious": {
+        "noDoubleEquals": "error",
+        "noDuplicateObjectKeys": "error",
+        "noDuplicateCase": "error",
+        "noFallthroughSwitchClause": "error",
+        "noSelfCompare": "error",
+        "noArrayIndexKey": "warn",
+        "noLeakedRender": "off"
+      },
+      "performance": {
+        "noJsxPropsBind": "off"
+      },
+      "style": {
+        "useComponentExportOnlyModules": "off"
+      }
+    }
+  },
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "off"
+      }
+    }
+  }
+}

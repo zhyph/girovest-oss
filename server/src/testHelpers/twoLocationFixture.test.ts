@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import { prisma } from '../db/client.js'
-import { seedTwoLocations, expectNotFoundAcrossLocations, type TwoLocationFixture } from './twoLocationFixture.js'
+import { seedTwoLocations, expectNotFoundAcrossLocations } from './twoLocationFixture.js'
 import { AppError } from '../errors/AppError.js'
 import { ErrorCodes } from '../errors/errorCodes.js'
 
