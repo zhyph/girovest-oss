@@ -14,6 +14,34 @@ import {
 // SQLite's on-disk magic header for use in tests
 const SQLITE_HEADER = 'SQLite format 3\0'
 
+/**
+ * A structurally complete SQLite file: right magic, a legal page size, and a
+ * header page count that agrees with the file's actual length.
+ *
+ * The fixtures used to be the magic bytes with a marker glued on, which is
+ * exactly the shape of the truncated archive the restore is supposed to
+ * REFUSE — so they could not tell a good database from a destroyed one.
+ * `marker` is carried in the page body so a test can still prove which file
+ * ended up where.
+ */
+function sqliteFile(marker: string): Buffer {
+  const pageSize = 512
+  const pageCount = 2
+  const buffer = Buffer.alloc(pageSize * pageCount)
+  buffer.write(SQLITE_HEADER, 0, 'latin1')
+  buffer.writeUInt16BE(pageSize, 16)
+  buffer.writeUInt32BE(7, 24) // change counter
+  buffer.writeUInt32BE(pageCount, 28) // size in pages
+  buffer.writeUInt32BE(7, 92) // version-valid-for, must equal the change counter
+  buffer.write(marker, 100, 'latin1')
+  return buffer
+}
+
+function markerOf(filePath: string): string {
+  const contents = fs.readFileSync(filePath)
+  return contents.subarray(100, contents.indexOf(0, 100)).toString('latin1')
+}
+
 describe('runManualBackup', () => {
   let userDataPath: string
   let destinationDir: string
@@ -215,7 +243,7 @@ describe('runManualRestore', () => {
       dbSidecarNames: ['dev.db-wal', 'dev.db-journal', 'dev.db-shm'],
       productPhotosDir,
       extractArchive: async (_zipPath: string, destDir: string) => {
-        fs.writeFileSync(path.join(destDir, 'dev.db'), `${SQLITE_HEADER}restored-db-bytes`)
+        fs.writeFileSync(path.join(destDir, 'dev.db'), sqliteFile('restored-db-bytes'))
         fs.mkdirSync(path.join(destDir, 'product-photos'), { recursive: true })
         fs.writeFileSync(path.join(destDir, 'product-photos', 'new-photo.jpg'), 'new')
       },
@@ -228,7 +256,7 @@ describe('runManualRestore', () => {
     const result = await runManualRestore(baseDeps())
 
     expect(result).toEqual({ photosRestored: true })
-    expect(fs.readFileSync(path.join(userDataPath, 'dev.db'), 'utf-8')).toBe(`${SQLITE_HEADER}restored-db-bytes`)
+    expect(markerOf(path.join(userDataPath, 'dev.db'))).toBe('restored-db-bytes')
     expect(fs.existsSync(path.join(userDataPath, 'dev.db-wal'))).toBe(false)
     expect(fs.existsSync(path.join(productPhotosDir, 'old-photo.jpg'))).toBe(false)
     expect(fs.readFileSync(path.join(productPhotosDir, 'new-photo.jpg'), 'utf-8')).toBe('new')
@@ -255,7 +283,7 @@ describe('runManualRestore', () => {
     await runManualRestore(
       baseDeps({
         extractArchive: async (_zipPath, destDir) => {
-          fs.writeFileSync(path.join(destDir, 'dev.db'), `${SQLITE_HEADER}restored-db-bytes`)
+          fs.writeFileSync(path.join(destDir, 'dev.db'), sqliteFile('restored-db-bytes'))
           // No product-photos folder in this archive at all.
         },
       }),
@@ -312,9 +340,7 @@ describe('runManualRestore', () => {
 
       // The database committed — that's the whole point of treating its
       // rename as the point of no return.
-      expect(fs.readFileSync(path.join(userDataPath, 'dev.db'), 'utf-8')).toBe(
-        `${SQLITE_HEADER}restored-db-bytes`,
-      )
+      expect(markerOf(path.join(userDataPath, 'dev.db'))).toBe('restored-db-bytes')
       // The photos rename never completed, so the live directory was never
       // moved away — still the original, untouched, not deleted.
       expect(fs.existsSync(path.join(productPhotosDir, 'old-photo.jpg'))).toBe(true)
@@ -348,9 +374,7 @@ describe('runManualRestore', () => {
     try {
       await expect(runManualRestore(baseDeps())).resolves.toEqual({ photosRestored: false })
 
-      expect(fs.readFileSync(path.join(userDataPath, 'dev.db'), 'utf-8')).toBe(
-        `${SQLITE_HEADER}restored-db-bytes`,
-      )
+      expect(markerOf(path.join(userDataPath, 'dev.db'))).toBe('restored-db-bytes')
       // The live directory was moved aside before the failing rename, so it
       // no longer exists at its normal path — but its content is not lost.
       expect(fs.existsSync(path.join(productPhotosDir, 'old-photo.jpg'))).toBe(false)
@@ -377,6 +401,66 @@ describe('runManualRestore', () => {
 
     expect(fs.readFileSync(path.join(userDataPath, 'dev.db'), 'utf-8')).toBe('old-db')
     expect(fs.existsSync(path.join(userDataPath, 'dev.db-wal'))).toBe(true)
+  })
+
+  it('CRITICAL: refuses a truncated database that still starts with the SQLite magic', async () => {
+    /*
+      The failure that actually happens to a shop: the USB drive fills, the
+      cable is pulled, or the machine dies mid-copy, and the archive holds a
+      dev.db that begins perfectly and simply stops. Checking only the 16 magic
+      bytes waved it through, and the next line atomically renamed it over her
+      live database — a swap with no undo, on the one feature whose entire job
+      is not losing her data.
+    */
+    await expect(
+      runManualRestore(
+        baseDeps({
+          extractArchive: async (_zipPath, destDir) => {
+            const complete = sqliteFile('restored-db-bytes')
+            fs.writeFileSync(path.join(destDir, 'dev.db'), complete.subarray(0, complete.length - 200))
+          },
+        }),
+      ),
+    ).rejects.toThrow(/incomplete/i)
+
+    expect(fs.readFileSync(path.join(userDataPath, 'dev.db'), 'utf-8')).toBe('old-db')
+    // Pre-commit, so the sidecars it would have cleared are still there too.
+    expect(fs.existsSync(path.join(userDataPath, 'dev.db-wal'))).toBe(true)
+    expect(fs.existsSync(path.join(userDataPath, 'restore-staging'))).toBe(false)
+  })
+
+  it('refuses a file whose header declares an impossible page size', async () => {
+    await expect(
+      runManualRestore(
+        baseDeps({
+          extractArchive: async (_zipPath, destDir) => {
+            const forged = sqliteFile('restored-db-bytes')
+            forged.writeUInt16BE(999, 16) // not a power of two
+            fs.writeFileSync(path.join(destDir, 'dev.db'), forged)
+          },
+        }),
+      ),
+    ).rejects.toThrow(/valid dev\.db/)
+
+    expect(fs.readFileSync(path.join(userDataPath, 'dev.db'), 'utf-8')).toBe('old-db')
+  })
+
+  it('still accepts a database whose header page count cannot be trusted', async () => {
+    // SQLite itself falls back to the file length when the change counter and
+    // version-valid-for disagree, and so must this: refusing here would mean
+    // she cannot restore her own data at all, which is worse than letting a
+    // rare corruption be caught one step later.
+    await runManualRestore(
+      baseDeps({
+        extractArchive: async (_zipPath, destDir) => {
+          const legacy = sqliteFile('restored-db-bytes')
+          legacy.writeUInt32BE(99, 92) // disagrees with the change counter
+          fs.writeFileSync(path.join(destDir, 'dev.db'), legacy.subarray(0, legacy.length - 200))
+        },
+      }),
+    )
+
+    expect(markerOf(path.join(userDataPath, 'dev.db'))).toBe('restored-db-bytes')
   })
 
   it('refuses to start when there is not enough free space to restore', async () => {

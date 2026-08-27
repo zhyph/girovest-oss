@@ -155,6 +155,75 @@ export interface RunManualRestoreDeps {
 // database when swapped in.
 const SQLITE_HEADER = 'SQLite format 3\0'
 
+/** Full SQLite header block; the fields read below all live inside it. */
+const SQLITE_HEADER_BLOCK_BYTES = 100
+
+/**
+ * Confirms the staged file is a COMPLETE SQLite database, not merely one that
+ * starts like one.
+ *
+ * The magic bytes alone were never enough: they are the first sixteen of a
+ * file that can be hundreds of megabytes, so an archive truncated by a full
+ * USB drive, a yanked cable, or a crash mid-write passed the check and then
+ * atomically replaced the shop's live database with a corpse. That swap is
+ * this function's point of no return and there is no undo.
+ *
+ * A complete database satisfies `pageSize * pageCount === fileSize`, and
+ * SQLite records both numbers in its own header — so the file states its
+ * intended length and can be checked against what actually arrived, with no
+ * database engine involved. That matters here: this runs in the Electron main
+ * process, which has no better-sqlite3 (it is the server child process that
+ * owns the native module), so a real `PRAGMA integrity_check` would mean
+ * adding a native dependency to the installer. This catches truncation, which
+ * is the failure that actually happens to a shop copying to a USB stick.
+ *
+ * Deliberately PERMISSIVE where it cannot be sure: a false rejection here
+ * means she cannot restore her own data at all, which is worse than the
+ * corruption being caught one step later.
+ */
+function assertCompleteSqliteFile(dbPath: string): void {
+  const header = Buffer.alloc(SQLITE_HEADER_BLOCK_BYTES)
+  const fd = fs.openSync(dbPath, 'r')
+  let bytesRead: number
+  try {
+    bytesRead = fs.readSync(fd, header, 0, header.length, 0)
+  } finally {
+    fs.closeSync(fd)
+  }
+  if (
+    bytesRead < SQLITE_HEADER_BLOCK_BYTES ||
+    header.subarray(0, SQLITE_HEADER.length).toString('latin1') !== SQLITE_HEADER
+  ) {
+    throw new Error('Backup archive does not contain a valid dev.db')
+  }
+
+  // Offset 16: page size in bytes. The value 1 is SQLite's encoding for 65536,
+  // which does not fit the field; every other legal value is a power of two
+  // from 512 to 32768.
+  const rawPageSize = header.readUInt16BE(16)
+  const pageSize = rawPageSize === 1 ? 65536 : rawPageSize
+  if (pageSize < 512 || (pageSize & (pageSize - 1)) !== 0) {
+    throw new Error('Backup archive does not contain a valid dev.db')
+  }
+
+  // Offset 28 is only authoritative when the change counter (offset 24) equals
+  // the version-valid-for number (offset 92); otherwise SQLite itself falls
+  // back to the file's actual length, and so must this. A snapshot from
+  // backupService.ts's online backup always has them equal.
+  const changeCounter = header.readUInt32BE(24)
+  const pageCount = header.readUInt32BE(28)
+  const versionValidFor = header.readUInt32BE(92)
+  if (pageCount === 0 || versionValidFor !== changeCounter) return
+
+  const expectedBytes = pageSize * pageCount
+  const actualBytes = fs.statSync(dbPath).size
+  if (actualBytes !== expectedBytes) {
+    throw new Error(
+      `Backup archive's dev.db is incomplete (header declares ${expectedBytes} bytes, file is ${actualBytes})`,
+    )
+  }
+}
+
 export interface RunManualRestoreResult {
   // False only when the database committed but the photos swap or
   // cleanup afterward failed (see the comment on the dev.db rename below)
@@ -190,16 +259,7 @@ export async function runManualRestore(deps: RunManualRestoreDeps): Promise<RunM
     if (!fs.existsSync(stagedDbPath)) {
       throw new Error('Backup archive does not contain a dev.db')
     }
-    const header = Buffer.alloc(SQLITE_HEADER.length)
-    const fd = fs.openSync(stagedDbPath, 'r')
-    try {
-      fs.readSync(fd, header, 0, header.length, 0)
-    } finally {
-      fs.closeSync(fd)
-    }
-    if (header.toString('latin1') !== SQLITE_HEADER) {
-      throw new Error('Backup archive does not contain a valid dev.db')
-    }
+    assertCompleteSqliteFile(stagedDbPath)
   } catch (error) {
     fs.rmSync(stagingDir, { recursive: true, force: true })
     throw error
