@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import '../../i18n.ts'
 import { DashboardPage } from './DashboardPage.tsx'
@@ -26,6 +27,7 @@ describe('DashboardPage', () => {
       upcoming: [] as never,
       outstanding: { total: 0, count: 0 },
       leavingMaintenance: { count: 0, items: [] },
+      refetch: vi.fn(),
       isLoading: false,
       isError: false,
     })
@@ -56,6 +58,7 @@ describe('DashboardPage', () => {
       upcoming: [] as never,
       outstanding: { total: 0, count: 0 },
       leavingMaintenance: { count: 0, items: [] },
+      refetch: vi.fn(),
       isLoading: false,
       isError: false,
     })
@@ -82,6 +85,7 @@ describe('DashboardPage', () => {
       upcoming: [] as never,
       outstanding: { total: 0, count: 0 },
       leavingMaintenance: { count: 0, items: [] },
+      refetch: vi.fn(),
       isLoading: true,
       isError: false,
     })
@@ -103,6 +107,7 @@ describe('DashboardPage', () => {
       upcoming: [] as never,
       outstanding: { total: 0, count: 0 },
       leavingMaintenance: { count: 0, items: [] },
+      refetch: vi.fn(),
       isLoading: false,
       isError: true,
     })
@@ -113,6 +118,30 @@ describe('DashboardPage', () => {
     expect(screen.queryByText('Saindo hoje')).not.toBeInTheDocument()
     expect(screen.queryByText('Voltando hoje')).not.toBeInTheDocument()
     expect(screen.queryByText('Atrasados')).not.toBeInTheDocument()
+  })
+
+  it("CRITICAL: the Painel's error offers a control, not just the words 'Tente novamente'", async () => {
+    // The copy promised a retry the screen did not have. This is the first
+    // thing she looks at in the morning, so a dead error block means reaching
+    // for the app's own restart to recover a transient failure.
+    const refetch = vi.fn()
+    mockProductsAndClients()
+    vi.spyOn(useDashboardModule, 'useDashboard').mockReturnValue({
+      goingOutToday: [] as never,
+      dueBackToday: [] as never,
+      overdue: [] as never,
+      upcoming: [] as never,
+      outstanding: { total: 0, count: 0 },
+      leavingMaintenance: { count: 0, items: [] },
+      refetch,
+      isLoading: false,
+      isError: true,
+    })
+
+    renderDashboard()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Tentar novamente' }))
+    expect(refetch).toHaveBeenCalledTimes(1)
   })
 
   it('shows the upcoming allocations list with product and client names', () => {
@@ -129,6 +158,7 @@ describe('DashboardPage', () => {
       upcoming: [{ id: 'a1', productId: 'p1', clientId: 'c1', checkoutDate: '2026-07-25', dueDate: '2026-07-30', status: 'reserved' }] as never,
       outstanding: { total: 0, count: 0 },
       leavingMaintenance: { count: 0, items: [] },
+      refetch: vi.fn(),
       isLoading: false,
       isError: false,
     })
@@ -152,6 +182,7 @@ describe('DashboardPage', () => {
       upcoming: [] as never,
       outstanding: { total: 0, count: 0 },
       leavingMaintenance: { count: 0, items: [] },
+      refetch: vi.fn(),
       isLoading: false,
       isError: false,
     })
@@ -170,6 +201,7 @@ describe('DashboardPage', () => {
       upcoming: [] as never,
       outstanding: { total: 4280.5, count: 3 },
       leavingMaintenance: { count: 0, items: [] },
+      refetch: vi.fn(),
       isLoading: false,
       isError: false,
     })
@@ -195,6 +227,7 @@ describe('DashboardPage', () => {
       upcoming: [] as never,
       outstanding: { total: 0, count: 0 },
       leavingMaintenance: { count: 0, items: [] },
+      refetch: vi.fn(),
       isLoading: false,
       isError: false,
     })
@@ -213,6 +246,7 @@ describe('DashboardPage', () => {
       upcoming: [] as never,
       outstanding: { total: 0, count: 0 },
       leavingMaintenance: { count: 1, items: [{ id: 'p9', name: 'Vestido Longo', availableOn: '2026-08-06' }] },
+      refetch: vi.fn(),
       isLoading: false,
       isError: false,
     })
@@ -233,6 +267,7 @@ describe('DashboardPage', () => {
       upcoming: [] as never,
       outstanding: { total: 0, count: 0 },
       leavingMaintenance: { count: 0, items: [] },
+      refetch: vi.fn(),
       isLoading: false,
       isError: false,
     })
@@ -260,6 +295,7 @@ describe('DashboardPage', () => {
       upcoming: [] as never,
       outstanding: { total: 0, count: 0 },
       leavingMaintenance: { count: 0, items: [] },
+      refetch: vi.fn(),
       isLoading: false,
       isError: false,
     })

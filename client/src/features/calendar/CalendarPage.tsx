@@ -2,6 +2,7 @@ import { lazy, Suspense, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { RouteFallback } from '../../components/RouteFallback.tsx'
+import { QueryState } from '../../components/QueryState.tsx'
 import { FilterChip } from '../../components/ui/toolbar.tsx'
 import { cn } from '../../lib/cn.ts'
 import { formatDate } from '../../lib/date.ts'
@@ -72,6 +73,21 @@ export function CalendarPage() {
   const goingOut = useCalendarTab('going-out', from, to)
   const dueBack = useCalendarTab('due-back', from, to)
   const overdue = useCalendarTab('overdue', from, to)
+
+  // All three sets feed one picture of the month, so a failure in any of them
+  // makes the whole grid wrong rather than partial — an empty Saturday that is
+  // really an unanswered request is worse than no calendar at all, because
+  // nothing on screen says so. Retry recovers all three together.
+  const isError = goingOut.isError || dueBack.isError || overdue.isError
+  const isLoading = goingOut.isLoading || dueBack.isLoading || overdue.isLoading
+  // Any set having arrived is enough to keep the grid up under a failed
+  // refresh; the banner says what is on screen may be behind.
+  const hasCalendarData = goingOut.data !== undefined || dueBack.data !== undefined || overdue.data !== undefined
+  const refetchAll = () => {
+    void goingOut.refetch()
+    void dueBack.refetch()
+    void overdue.refetch()
+  }
 
   const byKind: AllocationsByKind = useMemo(
     () => ({
@@ -212,6 +228,14 @@ export function CalendarPage() {
         </div>
       </div>
 
+      {/*
+        Wraps the whole data region from OUTSIDE it. Inside, the failure
+        banner became a flex sibling of the list in a ROW container — a
+        full-height column beside the table that truncated every name. Out
+        here the parent is the screen's own column, so the banner sits above
+        the region and the region keeps its own layout.
+      */}
+      <QueryState isLoading={isLoading} isError={isError} hasData={hasCalendarData} onRetry={refetchAll}>
       <div className="flex min-h-0 flex-1 border-t border-border-strong">
         <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
           {view === 'agenda' ? (
@@ -245,6 +269,7 @@ export function CalendarPage() {
           />
         </aside>
       </div>
+      </QueryState>
     </div>
   )
 }

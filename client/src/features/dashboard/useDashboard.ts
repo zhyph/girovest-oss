@@ -99,6 +99,20 @@ export function useDashboard() {
       upcoming.isLoading ||
       outstanding.isLoading ||
       leavingMaintenance.isLoading,
+    /**
+     * Refetches every query behind the Painel, so one control can recover the
+     * whole screen. Individual retries would be worse than useless here: the
+     * screen renders as a single unit and one stale tile among five recovered
+     * ones is a figure she cannot tell is stale.
+     */
+    refetch: () => {
+      void goingOut.refetch()
+      void dueBack.refetch()
+      void overdue.refetch()
+      void upcoming.refetch()
+      void outstanding.refetch()
+      void leavingMaintenance.refetch()
+    },
     isError:
       goingOut.isError ||
       dueBack.isError ||

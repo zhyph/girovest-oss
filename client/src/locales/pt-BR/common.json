@@ -63,5 +63,8 @@
     "previous": "Anterior",
     "next": "Próximo",
     "range": "{{from}}–{{to}} de {{total}}"
-  }
+  },
+  "loading": "Carregando...",
+  "loadError": "Não foi possível carregar estas informações. Verifique se o sistema da loja está aberto e tente de novo.",
+  "refreshError": "Não foi possível atualizar. Os dados abaixo podem estar desatualizados."
 }

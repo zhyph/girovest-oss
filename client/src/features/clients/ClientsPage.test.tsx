@@ -86,6 +86,36 @@ describe('ClientsPage', () => {
     vi.spyOn(useProductsModule, 'useProducts').mockReturnValue({ data: [] } as never)
   })
 
+  it('CRITICAL: a failed load reads as an error with a retry, not as an empty shop', async () => {
+    // `data ?? []` used to send a failed query straight into the empty state:
+    // "Nenhum cliente cadastrado", with a button offering to create one. On a
+    // shop with 300 clients on file that is a lie she has no way to detect.
+    const refetch = vi.fn()
+    vi.spyOn(useClientsModule, 'useClients').mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      refetch,
+    } as never)
+
+    renderWithQueryClient(<ClientsPage />)
+
+    expect(screen.getByRole('alert')).toBeInTheDocument()
+    expect(screen.queryByText('Nenhum cliente cadastrado')).not.toBeInTheDocument()
+
+    // Structural, because jsdom cannot see the layout this pins: the guard has
+    // to sit OUTSIDE the list/detail row. Inside it, the failure notice became
+    // a flex sibling of the table — a full-height column beside it that
+    // truncated every client name. Every test still passed.
+    expect(screen.getByRole('alert').parentElement).not.toHaveClass('flex', 'min-h-0', 'flex-1')
+
+    // The chrome has to survive the failure — it is how she leaves the screen.
+    expect(screen.getByRole('button', { name: 'Novo cliente' })).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Tentar novamente' }))
+    expect(refetch).toHaveBeenCalledTimes(1)
+  })
+
   it('lists clients and opens the drawer in create mode when "Novo" is clicked', async () => {
     vi.spyOn(useClientsModule, 'useClients').mockReturnValue({
       data: [makeClient({ id: '1', name: 'Maria Silva' })],

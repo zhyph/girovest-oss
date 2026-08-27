@@ -62,6 +62,7 @@ describe('tour anchors match rendered DOM', () => {
       upcoming: [] as never,
       outstanding: { total: 0, count: 0 },
       leavingMaintenance: { count: 0, items: [] },
+      refetch: vi.fn(),
       isLoading: false,
       isError: false,
     })

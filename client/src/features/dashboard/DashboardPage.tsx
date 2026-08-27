@@ -147,6 +147,7 @@ export function DashboardPage() {
     leavingMaintenance,
     isLoading,
     isError,
+    refetch,
   } = useDashboard()
   const currency = getLocaleConfig(locale).currency
   const { data: products } = useProducts()
@@ -219,9 +220,19 @@ export function DashboardPage() {
           {t('loading')}
         </div>
       )}
+      {/*
+        The copy already said "Tente novamente" — with nothing behind it to
+        press. A failed Painel is the first thing she sees in the morning, so
+        the retry has to be a real control.
+      */}
       {isError && (
         <div className="flex-shrink-0 rounded-panel border border-destructive/30 bg-destructive-subtle px-4 py-3.5 text-meta text-destructive-subtle-foreground">
-          {t('error')}
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <span>{t('error')}</span>
+            <Button variant="secondary" size="sm" onClick={() => void refetch()}>
+              {t('common:actions.retry')}
+            </Button>
+          </div>
         </div>
       )}
 

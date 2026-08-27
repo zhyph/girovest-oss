@@ -10,6 +10,7 @@ import { showErrorToast } from '../../lib/toast.ts'
 import { useSectionTour } from '../onboarding/useSectionTour.ts'
 import { useProducts } from '../products/useProducts.ts'
 import { useClients, useDeleteClient } from './useClients.ts'
+import { QueryState } from '../../components/QueryState.tsx'
 import { ClientDrawer } from './ClientDrawer.tsx'
 import { ClientDetailPanel } from './ClientDetailPanel.tsx'
 import { ProductThumbnail } from './ProductThumbnail.tsx'
@@ -46,7 +47,7 @@ function groupAlphabetically(clients: Client[]): DataListGroup<Client>[] {
 export function ClientsPage() {
   const { t } = useTranslation('clients')
   const navigate = useNavigate()
-  const { data: clients, isLoading } = useClients()
+  const { data: clients, isLoading, isError, refetch } = useClients()
   const { data: products } = useProducts()
   const deleteClient = useDeleteClient()
   const [editing, setEditing] = useState<Client | null | undefined>(undefined)
@@ -182,8 +183,6 @@ export function ClientsPage() {
     [t, productsById, pageClients],
   )
 
-  if (isLoading) return <div>{t('title')}</div>
-
   return (
     <div className="flex h-full min-h-0 flex-col">
       <ScreenTitle>{t('title')}</ScreenTitle>
@@ -210,6 +209,14 @@ export function ClientsPage() {
         the common case and editing it is not, so the old flow charged a
         modal for every look-up. The drawer stays, for editing.
       */}
+      {/*
+        Wraps the whole data region from OUTSIDE it. Inside, the failure
+        banner became a flex sibling of the list in a ROW container — a
+        full-height column beside the table that truncated every name. Out
+        here the parent is the screen's own column, so the banner sits above
+        the region and the region keeps its own layout.
+      */}
+      <QueryState isLoading={isLoading} isError={isError} hasData={clients !== undefined} onRetry={() => void refetch()}>
       <div className="flex min-h-0 flex-1 border-t border-border-strong" data-tour="clients.table">
         <DataList
           columns={columns}
@@ -269,6 +276,7 @@ export function ClientsPage() {
           />
         </aside>
       </div>
+      </QueryState>
 
       {editing !== undefined && (
         <ClientDrawer key={editing?.id ?? 'new'} client={editing} onClose={() => setEditing(undefined)} />

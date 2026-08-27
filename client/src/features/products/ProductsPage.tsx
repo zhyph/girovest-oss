@@ -14,6 +14,7 @@ import { formatCurrency, getLocaleConfig } from '../../lib/locale.ts'
 import { useLocale } from '../../lib/LocaleContext.tsx'
 import { useSectionTour } from '../onboarding/useSectionTour.ts'
 import { useProducts, PRODUCTS_KEY } from './useProducts.ts'
+import { QueryState } from '../../components/QueryState.tsx'
 import { NextReservationHint, NextReservationTag } from './NextReservation.tsx'
 import { ProductDrawer } from './ProductDrawer.tsx'
 import { AddPhotosSessionModal } from './AddPhotosSessionModal.tsx'
@@ -75,7 +76,7 @@ export function ProductsPage() {
   const [sort, setSort] = useState<ProductSort>(DEFAULT_PRODUCT_SORT)
   const [view, setView] = useState<'grid' | 'list'>('grid')
   const [addingPhotosRemotely, setAddingPhotosRemotely] = useState(false)
-  const { data: products, isLoading } = useProducts()
+  const { data: products, isLoading, isError, refetch } = useProducts()
   // In-memory only, never persisted: cleared on page reload, updated only by a successful create.
   const [lastCreatedDefaults, setLastCreatedDefaults] = useState<Partial<ProductFormValues> | null>(null)
   const { openZoom, zoomDialog } = useProductZoom()
@@ -223,8 +224,6 @@ export function ProductsPage() {
     [t, locale, currency, openZoom],
   )
 
-  if (isLoading) return <div>{t('title')}</div>
-
   const emptyState = (
     <DataListEmpty
       title={products && products.length === 0 ? t('empty') : t('noResults')}
@@ -301,6 +300,14 @@ export function ProductsPage() {
         }
       />
 
+      {/*
+        Wraps the whole data region from OUTSIDE it. Inside, the failure
+        banner became a flex sibling of the list in a ROW container — a
+        full-height column beside the table that truncated every name. Out
+        here the parent is the screen's own column, so the banner sits above
+        the region and the region keeps its own layout.
+      */}
+      <QueryState isLoading={isLoading} isError={isError} hasData={products !== undefined} onRetry={() => void refetch()}>
       <div className="flex min-h-0 flex-1 flex-col border-t border-border-strong" data-tour="products.table">
         {visible.length === 0 ? (
           <div className="min-h-0 flex-1 overflow-y-auto">{emptyState}</div>
@@ -375,6 +382,7 @@ export function ProductsPage() {
           />
         )}
       </div>
+      </QueryState>
 
       {editing !== undefined && (
         <ProductDrawer

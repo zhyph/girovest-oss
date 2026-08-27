@@ -44,6 +44,33 @@ describe('ContractPrintPage', () => {
     vi.stubGlobal('print', vi.fn())
   })
 
+  it('CRITICAL: a failed load leaves a way out, on the one route with no sidebar', async () => {
+    /*
+      This route renders outside AppLayout, so it has no nav of its own. The
+      old `isLoading || !contract` branch printed the screen title forever on
+      any failure: no error, no retry, no back — the worst dead end in the app,
+      reached by clicking Imprimir on a contract while the server is restarting.
+    */
+    const refetch = vi.fn()
+    vi.spyOn(useContractsModule, 'useContract').mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      refetch,
+    } as never)
+
+    renderPage()
+
+    expect(screen.getByRole('alert')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Voltar' })).toBeInTheDocument()
+
+    // Printing a document that failed to load would hand her a blank sheet.
+    expect(screen.queryByRole('button', { name: 'Imprimir' })).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Tentar novamente' }))
+    expect(refetch).toHaveBeenCalledTimes(1)
+  })
+
   afterEach(() => {
     vi.unstubAllGlobals()
   })
