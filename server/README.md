@@ -71,14 +71,22 @@ it's just a noisier shutdown message than it needs to be.
 ## Switching database provider
 
 Set `DB_PROVIDER=sqlite` (default) or `DB_PROVIDER=postgresql` in your env
-file, matching `DATABASE_URL` to the provider. The Prisma client is
-generated per-provider by `npm run db:schema` (called automatically by
-`db:generate`/`db:migrate`).
+file, matching `DATABASE_URL` to the provider. Two separate artifacts come
+out of that, and conflating them is how the client silently goes stale:
+`npm run db:schema` writes the per-provider SCHEMA FILE
+(`prisma/<provider>/schema.prisma`), while `prisma generate` writes the
+generated CLIENT (`src/generated/prisma`). `npm run db:generate` runs both.
 
-If `npm run test:postgres` is interrupted (e.g. Ctrl-C) before it finishes
-tearing down, the shared generated client may be left in `postgresql`
-mode — run `npm run db:generate` (with no `DB_PROVIDER` set, or explicitly
-`DB_PROVIDER=sqlite`) to restore it before running `npm test` again.
+`src/generated/prisma` is a single shared output, not one per provider, so
+an interrupted `npm run test:postgres` (Ctrl-C before teardown) can leave a
+postgresql client on disk. `npm test` now repairs that on its own — its
+`pretest` runs `db:generate` — so no manual step is needed before running
+the suite again.
+
+A client that disagrees with `prisma/models.prisma` reports itself as
+`The column ... does not exist in the current database`, while
+`prisma db push` says the schema is already in sync. That contradiction
+means the client is stale, not the database: run `npm run db:generate`.
 
 ## Location scoping
 
