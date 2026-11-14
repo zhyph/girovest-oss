@@ -130,7 +130,7 @@ describe('POST /api/products/photo-session', () => {
 
   it('returns a relayUrl instead of LAN candidates when connectivityMode is relay', async () => {
     await prisma.location.update({ where: { id: locationId }, data: { connectivityMode: 'relay' } })
-    process.env.GIROVEST_UPDATE_URL = 'https://girovest-update-proxy.workers.dev'
+    process.env.GIROVEST_UPDATE_URL = 'https://relay.example'
     process.env.GIROVEST_UPDATE_KEY = 'test-key'
     process.env.GIROVEST_INSTALL_ID = 'test-install'
 
@@ -138,7 +138,7 @@ describe('POST /api/products/photo-session', () => {
 
     expect(response.status).toBe(201)
     expect(response.body.mode).toBe('relay')
-    expect(response.body.relayUrl).toBe(`https://girovest-update-proxy.workers.dev/relay/${response.body.token}/photos`)
+    expect(response.body.relayUrl).toBe(`https://relay.example/relay/${response.body.token}/photos`)
     expect(response.body.relayUnavailable).toBeUndefined()
     expect(response.body.candidates).toBeUndefined()
     expect(response.body.port).toBeUndefined()
@@ -148,7 +148,7 @@ describe('POST /api/products/photo-session', () => {
   // ever produce a 504 on the phone ten seconds after scanning.
   it('reports relayUnavailable (and closes the socket) when the relay never connects', async () => {
     await prisma.location.update({ where: { id: locationId }, data: { connectivityMode: 'relay' } })
-    process.env.GIROVEST_UPDATE_URL = 'https://girovest-update-proxy.workers.dev'
+    process.env.GIROVEST_UPDATE_URL = 'https://relay.example'
     process.env.GIROVEST_UPDATE_KEY = 'test-key'
     process.env.GIROVEST_INSTALL_ID = 'test-install'
     const { openRelayConnection } = await import('../network/relayClient.js')

@@ -318,7 +318,7 @@ describe('POST /api/contracts/:id/sign-token', () => {
   it('returns a relayUrl instead of LAN candidates when connectivityMode is relay', async () => {
     const contract = await createBareContract()
     await prisma.location.update({ where: { id: locationId }, data: { connectivityMode: 'relay' } })
-    process.env.GIROVEST_UPDATE_URL = 'https://girovest-update-proxy.workers.dev'
+    process.env.GIROVEST_UPDATE_URL = 'https://relay.example'
     process.env.GIROVEST_UPDATE_KEY = 'test-key'
     process.env.GIROVEST_INSTALL_ID = 'test-install'
 
@@ -328,7 +328,7 @@ describe('POST /api/contracts/:id/sign-token', () => {
 
     expect(res.status).toBe(201)
     expect(res.body.mode).toBe('relay')
-    expect(res.body.relayUrl).toBe(`https://girovest-update-proxy.workers.dev/relay/${res.body.token}/sign`)
+    expect(res.body.relayUrl).toBe(`https://relay.example/relay/${res.body.token}/sign`)
     expect(res.body.relayUnavailable).toBeUndefined()
     expect(res.body.candidates).toBeUndefined()
     expect(res.body.port).toBeUndefined()
@@ -341,7 +341,7 @@ describe('POST /api/contracts/:id/sign-token', () => {
   it('reports relayUnavailable (and closes the socket) when the relay never connects', async () => {
     const contract = await createBareContract()
     await prisma.location.update({ where: { id: locationId }, data: { connectivityMode: 'relay' } })
-    process.env.GIROVEST_UPDATE_URL = 'https://girovest-update-proxy.workers.dev'
+    process.env.GIROVEST_UPDATE_URL = 'https://relay.example'
     process.env.GIROVEST_UPDATE_KEY = 'test-key'
     process.env.GIROVEST_INSTALL_ID = 'test-install'
     const { openRelayConnection } = await import('../network/relayClient.js')

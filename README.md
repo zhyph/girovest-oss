@@ -14,6 +14,12 @@ Ships two ways from the same codebase:
 The two modes are independent: no data syncing between an offline install and
 the hosted site, by design.
 
+> **Open-source edition.** The hosted licensing and update service that the original
+> shop deployment uses is not part of this repository. The desktop client's
+> activation, update and remote-signing relay code is included and expects an
+> external service configured through environment variables (for example
+> `GIROVEST_UPDATE_URL`); without one, those features are inactive.
+
 ## Structure
 
 npm workspaces monorepo:
